@@ -131,6 +131,10 @@ public static class EventBusLocalizationExtensions
             : localizer["Shared:Scopes:Local"].Value;
     }
 
+    /// <summary>Gets the delivery mode of a distributed subscription.</summary>
+    public static string GetDistributedDeliveryText(this IStringLocalizer localizer, SubscriptionViewModel subscription) =>
+        localizer[subscription.ReceiverInstanceId.HasValue ? "Precision:DeliveryEach" : "Precision:DeliveryShared"].Value;
+
     /// <summary>
     /// Gets localized display text for a subscription discovery mode.
     /// </summary>

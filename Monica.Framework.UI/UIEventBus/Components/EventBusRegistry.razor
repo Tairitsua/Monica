@@ -179,7 +179,10 @@
                             <span class="eb-handler-ns mono eb-break @(duplicates.Contains(row.HandlerTypeShortName) ? "is-disambig" : null)">@(row.IsActionHandler ? row.ActionDeclaringType : EventBusVisuals.NameSpace(row.HandlerType, row.HandlerTypeShortName))</span>
                             <span class="eb-id-sub mono" title="@row.SubscriptionId">@row.SubscriptionId[..Math.Min(12, row.SubscriptionId.Length)]</span>
                         </div></td>
-                        <td data-label="@L["Precision:SubColBus"]"><EventBusTransportBadge Distributed="@(row.Scope == EventSubscriptionScope.Distributed)" Kind="@kind" ServiceKey="@row.ServiceKey" /></td>
+                        <td data-label="@L["Precision:SubColBus"]"><div class="eb-cell-stack">
+                            <EventBusTransportBadge Distributed="@(row.Scope == EventSubscriptionScope.Distributed)" Kind="@kind" ServiceKey="@row.ServiceKey" />
+                            @if (row.Scope == EventSubscriptionScope.Distributed) { <span class="eb-row-sub">@L.GetDistributedDeliveryText(row)</span> }
+                        </div></td>
                         <td data-label="@L["Precision:SubColReg"]"><span class="status is-pill mo-vl-role--@EventBusVisuals.Role(row.State)"><span class="status-dot"></span>@L.GetSubscriptionStateText(row.State)</span></td>
                         <td data-label="@L["Precision:SubColRuntime"]"><div class="eb-cell-stack">
                             <EventBusRuntimeBadge Scope="@row.Scope" Status="@row.TopicStatus" />

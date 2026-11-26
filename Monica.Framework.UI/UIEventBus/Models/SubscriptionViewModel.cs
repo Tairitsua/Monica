@@ -36,6 +36,15 @@ public class SubscriptionViewModel
     /// </summary>
     public string? ServiceKey { get; set; }
 
+    /// <summary>Gets or sets the logical consumer owner of this subscription.</summary>
+    public string? WorkloadOwner { get; set; }
+
+    /// <summary>Gets or sets the host run identifier assigned to a per-instance subscription.</summary>
+    public Guid? ReceiverInstanceId { get; set; }
+
+    /// <summary>Gets or sets whether the transport has established this subscription's receive position.</summary>
+    public bool IsTransportReady { get; set; }
+
     #endregion
 
     #region Handler Information

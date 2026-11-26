@@ -123,6 +123,19 @@
                                 <EventBusEvidenceField Label="@L["Precision:SubColEvent"]" Value="@row.EventType" Copy="true" />
                                 <EventBusEvidenceField Label="@L["Precision:ColTopic"]" Value="@row.TopicName" Copy="true" />
                                 <EventBusEvidenceField Label="@L["Precision:ColProvider"]"><EventBusTransportBadge Distributed="@distributed" Kind="@kind" ServiceKey="@row.ServiceKey" /></EventBusEvidenceField>
+                                @if (distributed)
+                                {
+                                    <EventBusEvidenceField Label="@L["Precision:DeliveryMode"]" Value="@L.GetDistributedDeliveryText(row)" Code="false" />
+                                    @if (row.WorkloadOwner is { } owner)
+                                    {
+                                        <EventBusEvidenceField Label="@L["Precision:WorkloadOwner"]" Value="@owner" Copy="true" />
+                                    }
+                                    @if (row.ReceiverInstanceId is { } receiver)
+                                    {
+                                        <EventBusEvidenceField Label="@L["Precision:ReceiverInstance"]" Value="@receiver.ToString("N")" Copy="true" />
+                                        <EventBusEvidenceField Label="@L["Precision:ReceiverReadiness"]" Value='@L[row.IsTransportReady ? "Precision:ReceiverReady" : "Precision:ReceiverNotReady"].Value' Code="false" />
+                                    }
+                                }
                                 <EventBusEvidenceField Label="@L["Precision:SubFilterDiscovery"]" Value="@L.GetDiscoveryModeText(row.IsAutoDiscovered)" Code="false" />
                                 <EventBusEvidenceField Label="@L["Precision:InspActivation"]" Value="@ActivationText(row.Activation)" Code="false" />
                             </dl>

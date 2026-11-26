@@ -335,10 +335,13 @@ public sealed class EventBusWorkbenchStateTests
         {
             SubscriptionId = "identity",
             ServiceKey = "Orders",
+            WorkloadOwner = "order.handler",
+            ReceiverInstanceId = Guid.NewGuid(),
+            IsTransportReady = true,
             EventType = "Events.OrderApproved",
             HandlerType = "Handlers.ApprovalHandler",
             ActionMethodSignature = "handler-signature",
-            State = EventSubscriptionState.Inactive,
+            State = EventSubscriptionState.Active,
             Scope = EventSubscriptionScope.Distributed,
             TopicStatus = TopicStatus("Orders", "orders.approved", errors),
             Metadata = new Dictionary<string, string> { ["origin"] = "registry" }
@@ -347,17 +350,21 @@ public sealed class EventBusWorkbenchStateTests
         var first = EventBusWorkbenchState.CloneSubscription(source);
         var inspector = EventBusWorkbenchState.CloneSubscription(first);
         errors.Clear();
+        source.IsTransportReady = false;
         source.Metadata["origin"] = "producer changed";
         inspector.Metadata["origin"] = "inspector changed";
         inspector.State = EventSubscriptionState.Disposed;
 
         first.Metadata["origin"].Should().Be("registry");
-        first.State.Should().Be(EventSubscriptionState.Inactive);
+        first.State.Should().Be(EventSubscriptionState.Active);
         first.TopicStatus!.RecentErrors.Should().ContainSingle().Which.Message.Should().Be("original error");
         inspector.TopicStatus!.RecentErrors.Should().ContainSingle();
         first.TopicStatus.Should().NotBeSameAs(source.TopicStatus);
         inspector.TopicStatus.Should().NotBeSameAs(first.TopicStatus);
         inspector.ServiceKey.Should().Be("Orders");
+        inspector.WorkloadOwner.Should().Be(source.WorkloadOwner);
+        inspector.ReceiverInstanceId.Should().Be(source.ReceiverInstanceId);
+        inspector.IsTransportReady.Should().BeTrue();
         inspector.SubscriptionId.Should().Be(source.SubscriptionId);
         inspector.ActionMethodSignature.Should().Be(source.ActionMethodSignature);
     }
