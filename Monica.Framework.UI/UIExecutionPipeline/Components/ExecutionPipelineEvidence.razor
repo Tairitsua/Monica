@@ -1,0 +1,379 @@
+@using Monica.Core.Execution
+@using Monica.Core.Execution.Models
+@using Monica.Framework.UI.UIExecutionPipeline.Models
+@using Monica.Framework.UI.UIExecutionPipeline.Support
+@using Monica.UI.Shared.Components.Dialogs
+@using Monica.UI.Shared.Components.Visual
+@using Monica.UI.Shared.Services
+@implements IAsyncDisposable
+@inject MoTimeFormatter UiTime
+@inject IStringLocalizer<ExecutionPipelineResource> L
+@inject IJSRuntime JS
+@inject ISnackbar Snackbar
+
+<MoSideSheet Open="true" OpenChanged="Dismiss" Width="560px" Compact="true" CloseLabel="@L["Pipeline:Close"]">
+    <TitleContent>
+        <div class="ep-sheet-head">
+            <span class="mo-vl-tile @HeadingRole.ToCssClass()"><MoIcon Icon="@HeadingIcon" Size="16px" /></span>
+            <div class="ep-sheet-id">
+                <h2 class="ep-sheet-title" id="@_headingId" tabindex="-1">@PipelineDisplay.BreakName(Heading)</h2>
+                @if (_row is { } row)
+                {
+                    <div class="ep-sheet-sub mo-vl-mono">@PipelineDisplay.BreakName(row.Plan.Descriptor.FullName)</div>
+                    <div class="ep-sheet-flags">
+                        <span class="mo-vl-capsule @StatusRole(row).ToCssClass()">@(row.Stalled ? L["Pipeline:StalledFlag"] : PipelineDisplay.Status(L, row.Plan.Status))</span>
+                        <span class="mo-vl-capsule mo-vl-capsule--outline mo-vl-mono">@row.Point</span>
+                        <span class="mo-vl-capsule mo-vl-capsule--outline">@(row.Plan.Descriptor.IsBusinessOperation ? L["Pipeline:BusinessYes"] : L["Pipeline:BusinessNo"])</span>
+                        <span class="mo-vl-capsule mo-vl-capsule--outline">@L["Pipeline:TxFlag", PipelineDisplay.Transaction(L, row.Plan.Descriptor.TransactionMode)]</span>
+                    </div>
+                }
+                else if (_registration is { } reg)
+                {
+                    <div class="ep-sheet-sub mo-vl-mono">@PipelineDisplay.BreakName(reg.Registration.BehaviorType.FullName)</div>
+                    <div class="ep-sheet-flags">
+                        <span class="mo-vl-capsule @reg.Band.Role.ToCssClass()">@PipelineDisplay.Band(L, reg.Band.Key)</span>
+                        <span class="mo-vl-capsule mo-vl-capsule--outline mo-vl-mono">@L["Pipeline:Order", reg.Registration.Order]</span>
+                        <span class="mo-vl-capsule mo-vl-capsule--outline">@PipelineDisplay.Lifetime(L, reg.Registration.Lifetime)</span>
+                    </div>
+                }
+            </div>
+        </div>
+    </TitleContent>
+    <ChildContent>
+        <div class="ep-sheet-body">
+            @if (_row is { } planRow)
+            {
+                @PlanContent(planRow)
+            }
+            else if (_registration is { } behavior)
+            {
+                @BehaviorContent(behavior)
+            }
+            else
+            {
+                @Callout(MoVisualRole.Warning, MoIcons.Search, Heading,
+                    IsPlan ? L["Pipeline:UnknownPlan", EvidenceKey] : L["Pipeline:UnknownBehavior", EvidenceKey])
+            }
+        </div>
+    </ChildContent>
+    <FooterContent>
+        @if (_row is { } planRow)
+        {
+            <div class="ep-sheet-foot">
+                <button type="button" class="ep-action ep-action-outline" @onclick="@(() => CopyAsync(DiagnosticsText(planRow)))">
+                    <MoIcon Icon="@MoIcons.Copy" Size="15px" />@L["Pipeline:CopyDiagnostics"]
+                </button>
+            </div>
+        }
+        else if (_registration is { } reg)
+        {
+            <div class="ep-sheet-foot">
+                <button type="button" class="ep-action ep-action-outline" disabled="@(View.Ready.Length == reg.Applied)"
+                        @onclick="@(() => FilterBehavior.InvokeAsync((reg.Key, false)))">
+                    <MoIcon Icon="@MoIcons.FilterOff" Size="15px" />@L["Pipeline:HeadWithout", View.Ready.Length - reg.Applied]
+                </button>
+                <button type="button" class="ep-action ep-action-primary" disabled="@(reg.Applied == 0)"
+                        @onclick="@(() => FilterBehavior.InvokeAsync((reg.Key, true)))">
+                    <MoIcon Icon="@MoIcons.Filter" Size="15px" />@L["Pipeline:HeadWith", reg.Applied]
+                </button>
+            </div>
+        }
+    </FooterContent>
+</MoSideSheet>
+
+@code {
+    [Parameter, EditorRequired] public ExecutionPipelineView View { get; set; } = default!;
+    [Parameter, EditorRequired] public string EvidenceKey { get; set; } = "";
+    [Parameter] public bool IsPlan { get; set; }
+    [Parameter] public EventCallback Closed { get; set; }
+    [Parameter] public EventCallback<string> InspectPlan { get; set; }
+    [Parameter] public EventCallback<string> InspectBehavior { get; set; }
+    [Parameter] public EventCallback<(string Key, bool Applied)> FilterBehavior { get; set; }
+
+    private PipelineRow? _row;
+    private PipelineRegistration? _registration;
+    private readonly string _headingId = $"pipeline-evidence-{Guid.NewGuid():N}";
+    private Task? _focus;
+    private bool _retired;
+    private string Heading => _row?.Name ?? _registration?.Name ?? (IsPlan ? L["Pipeline:UnknownPlanTitle"] : L["Pipeline:UnknownBehaviorTitle"]);
+    private string HeadingIcon => _row is not null ? MoIcons.Route : _registration is not null ? MoIcons.Puzzle : MoIcons.Search;
+    private MoVisualRole HeadingRole => _row is { } row ? (row.Ready ? MoVisualRole.Neutral : StatusRole(row))
+        : _registration?.Band.Role ?? MoVisualRole.Warning;
+
+    protected override void OnParametersSet()
+    {
+        _row = IsPlan ? View.Plans.FirstOrDefault(row => row.Id == EvidenceKey) : null;
+        _registration = IsPlan ? null : View.FindRegistration(EvidenceKey);
+    }
+
+    protected override Task OnAfterRenderAsync(bool firstRender) => firstRender ? _focus = FocusHeadingAsync() : Task.CompletedTask;
+
+    private async Task FocusHeadingAsync()
+    {
+        try
+        {
+            await using var script = await JS.InvokeAsync<IJSObjectReference>("import", "./_content/Monica.Framework.UI/js/execution-pipeline.js");
+            if (!_retired) await script.InvokeVoidAsync("focusEvidence", _headingId);
+        }
+        catch (JSDisconnectedException) { }
+    }
+
+    private Task Dismiss(bool open) => open ? Task.CompletedTask : Closed.InvokeAsync();
+
+    private RenderFragment PlanContent(PipelineRow row) => @<text>
+        @{
+            var plan = row.Plan;
+            var descriptor = plan.Descriptor;
+            var excluded = row.Ready ? View.Registrations.Where(reg => !row.Applies(reg)).ToArray() : [];
+            var related = View.Plans.Where(other => other.Name == row.Name && other.Id != row.Id).ToArray();
+        }
+        @if (plan.Error is { } error)
+        {
+            <div class="mo-vl-callout mo-vl-role--error ep-fault" role="alert">
+                <span class="mo-vl-callout-mark"><MoIcon Icon="@MoIcons.Error" Size="15px" /></span>
+                <div class="mo-vl-callout-content">
+                    <h3 class="mo-vl-callout-title">@L["Pipeline:FaultTitle"]</h3>
+                    <p class="ep-fault-type"><span>@L["Pipeline:ExceptionType"]</span><code>@error.ExceptionType</code></p>
+                    <p class="ep-fault-msg">@error.Message</p>
+                    <p class="mo-vl-callout-body">@L["Pipeline:FaultBody"]</p>
+                </div>
+            </div>
+        }
+        @if (plan.Status == ExecutionPipelinePlanStatus.Building)
+        {
+            @Callout(row.Stalled ? MoVisualRole.Warning : MoVisualRole.Info, MoIcons.Hourglass,
+                row.Stalled ? L["Pipeline:StalledTitle"] : L["Pipeline:BuildingTitle"],
+                row.Stalled ? L["Pipeline:StalledBody", PipelineDisplay.Duration(L, row.Age)] : L["Pipeline:BuildingBody"])
+        }
+        @if (row.Ready)
+        {
+            <section class="ep-sec">
+                <div class="ep-sec-head"><h3>@L["Pipeline:ChainTitle"]</h3><span class="ep-count">@L["Pipeline:ChainCount", plan.Behaviors.Length, View.Registrations.Length]</span></div>
+                <p class="ep-sec-note">@L["Pipeline:ChainNote"]</p>
+                @if (plan.Behaviors.Any(link => link.HasDistinctResolvedType))
+                {
+                    <p class="ep-closed-over">@PipelineDisplay.Sentence(L["Pipeline:ClosedOver"], Code(descriptor.InputType.Name), Code(descriptor.ResultType.Name))</p>
+                }
+                <ol class="ep-spine">
+                    <li class="ep-spine-end"><i class="ep-spine-dot" aria-hidden="true"></i><span>@L["Pipeline:Caller"]</span></li>
+                    @foreach (var link in plan.Behaviors)
+                    {
+                        var reg = View.FindRegistration(link.RegisteredType.Diagnostics.AssemblyQualifiedName);
+                        var join = reg is not null && row.Joins(reg);
+                        <li class="ep-spine-link @((reg?.Band.Role ?? MoVisualRole.Neutral).ToCssClass())">
+                            <i class="ep-node @(join ? "is-join" : null)" aria-hidden="true"></i>
+                            <div class="ep-spine-body">
+                                <div class="ep-spine-row">
+                                    <button type="button" class="ep-reclink" title="@link.ResolvedType.FullName"
+                                            @onclick="@(() => InspectBehavior.InvokeAsync(reg?.Key ?? link.RegisteredType.Diagnostics.AssemblyQualifiedName))">
+                                        @PipelineDisplay.BreakName(reg?.Name ?? link.RegisteredType.Name)
+                                    </button>
+                                    @if (reg is not null) { <span class="ep-band-tag">@PipelineDisplay.Band(L, reg.Band.Key)</span> }
+                                </div>
+                                <span class="ep-spine-meta mo-vl-mono">
+                                    @L["Pipeline:Position", link.Position]<i class="ep-dot"></i>@L["Pipeline:Order", link.Order]
+                                    <i class="ep-dot"></i>@PipelineDisplay.Lifetime(L, link.Lifetime)
+                                    @if (reg?.Registration.IsOpenGeneric == false) { <i class="ep-dot"></i>@L["Pipeline:ClosedShort"] }
+                                </span>
+                                @if (join) { <p class="ep-spine-note">@L["Pipeline:JoinOnly"]</p> }
+                            </div>
+                        </li>
+                    }
+                    @if (plan.Behaviors.Length == 0) { <li class="ep-spine-direct">@L["Pipeline:NoChain"]</li> }
+                    <li class="ep-spine-end is-handler"><i class="ep-spine-dot" aria-hidden="true"></i>
+                        <div class="ep-spine-body"><b>@L["Pipeline:Handler"]</b> <code>@row.Handler</code></div>
+                    </li>
+                </ol>
+            </section>
+        }
+        @if (excluded.Length > 0)
+        {
+            <section class="ep-sec">
+                <div class="ep-sec-head"><h3>@L["Pipeline:ExcludedTitle"]</h3><span class="ep-count">@excluded.Length</span></div>
+                <ul class="ep-excluded">
+                    @foreach (var reg in excluded)
+                    {
+                        <li>
+                            <i class="ep-node is-off @reg.Band.Role.ToCssClass()" aria-hidden="true"></i>
+                            <div>
+                                <button type="button" class="ep-reclink" @onclick="@(() => InspectBehavior.InvokeAsync(reg.Key))">@PipelineDisplay.BreakName(reg.Name)</button>
+                                <span class="mo-vl-mono ep-excl-order">@L["Pipeline:Order", reg.Registration.Order]</span>
+                                <p>@(reg.Registration.HasDescriptorFilter ? L["Pipeline:ExcludedFilter"]
+                                    : reg.Registration.IsOpenGeneric ? L["Pipeline:ExcludedOpen"] : L["Pipeline:ExcludedClosed"])</p>
+                            </div>
+                        </li>
+                    }
+                </ul>
+            </section>
+        }
+        <section class="ep-sec">
+            <div class="ep-sec-head"><h3>@L["Pipeline:BoundaryTitle"]</h3></div>
+            <dl class="ep-facts">
+                @Fact(L["Pipeline:KPoint"], Code(row.Point))
+                @Fact(L["Pipeline:KBusiness"], Text(descriptor.IsBusinessOperation ? L["Pipeline:Yes"] : L["Pipeline:No"]))
+                @Fact(L["Pipeline:KTx"], TransactionFact(descriptor.TransactionMode))
+                @Fact(L["Pipeline:KComponent"], Mono(descriptor.ComponentType.FullName), descriptor.ComponentType.FullName)
+                @Fact(L["Pipeline:KContract"], descriptor.ContractType is { } contract ? Mono(contract.FullName) : Text(L["Pipeline:None"]))
+                @Fact(L["Pipeline:KMethod"], descriptor.EntryMethod is { } method ? Mono(method.DisplaySignature) : Text(L["Pipeline:None"]))
+                @Fact(L["Pipeline:KInput"], Mono(descriptor.InputType.FullName))
+                @Fact(L["Pipeline:KResult"], Mono(descriptor.ResultType.FullName))
+            </dl>
+        </section>
+        <section class="ep-sec">
+            <div class="ep-sec-head"><h3>@L["Pipeline:ConstructionTitle"]</h3></div>
+            <dl class="ep-facts">
+                @Fact(L["Pipeline:KFirst"], Timestamp(plan.StartedAt, L["Pipeline:FirstNote"]))
+                @Fact(L["Pipeline:KCompleted"], plan.CompletedAt is { } completed ? Timestamp(completed) : Text(L["Pipeline:None"]))
+                @Fact(L["Pipeline:KTook"], Mono(PipelineDisplay.Duration(L, plan.CompletedAt is { } end ? end - plan.StartedAt : row.Age)))
+            </dl>
+        </section>
+        @if (related.Length > 0)
+        {
+            <section class="ep-sec">
+                <div class="ep-sec-head"><h3>@L["Pipeline:RelatedTitle"]</h3></div>
+                <p class="ep-sec-note">@L["Pipeline:RelatedD"]</p>
+                <ul class="ep-related">
+                    @foreach (var other in related)
+                    {
+                        <li><button type="button" class="ep-reclink mo-vl-mono" @onclick="@(() => InspectPlan.InvokeAsync(other.Id))">
+                            @other.Plan.Descriptor.InputType.Name → @other.Plan.Descriptor.ResultType.Name</button>
+                            <span class="mo-vl-mono ep-note">@other.Id</span>
+                        </li>
+                    }
+                </ul>
+            </section>
+        }
+        <details class="ep-diag">
+            <summary><MoIcon Icon="@MoIcons.Braces" Size="15px" />@L["Pipeline:DiagnosticsTitle"]<span class="ep-diag-chev"><MoIcon Icon="@MoIcons.ChevronDown" Size="15px" /></span></summary>
+            <p class="ep-sec-note">@L["Pipeline:DiagnosticsD"]</p>
+            <dl class="ep-diag-list">
+                @foreach (var line in Diagnostics(row))
+                {
+                    <div><dt>@line.Label @CopyIcon(line.Label, line.Value)</dt><dd><code>@line.Value</code></dd></div>
+                }
+            </dl>
+        </details>
+    </text>;
+
+    private RenderFragment BehaviorContent(PipelineRegistration reg) => @<text>
+        <div class="ep-bh-value">
+            <p class="ep-display-label">@L["Pipeline:Wraps"]</p>
+            <div class="ep-display ep-bh-display">@reg.Applied<small>@L["Pipeline:OfObserved", View.Plans.Length]</small></div>
+            <div class="mo-vl-meter @reg.Band.Role.ToCssClass()" role="img" aria-label="@L["Pipeline:ReadoutColumn", reg.Name, reg.Applied, View.Plans.Length]">
+                <span class="ep-reach-fill" style="@Width(reg.Applied, View.Plans.Length)"></span>
+            </div>
+        </div>
+        @if (reg.Applied == 0 && View.Ready.Length != 0)
+        {
+            @Callout(MoVisualRole.Neutral, MoIcons.Info, null, reg.Registration.IsOpenGeneric ? L["Pipeline:ZeroOpen"] : L["Pipeline:ZeroClosed"])
+        }
+        <section class="ep-sec">
+            <div class="ep-sec-head"><h3>@L["Pipeline:ByPoint"]</h3></div>
+            <p class="ep-sec-note">@L["Pipeline:ByPointD"]</p>
+            <ul class="ep-reach">
+                @foreach (var point in View.Points)
+                {
+                    var count = point.Rows.Count(row => row.Applies(reg));
+                    <li class="@(count == 0 ? "is-zero" : null)">
+                        <span class="mo-vl-mono ep-reach-point">@point.Point</span>
+                        <span class="ep-reach-bar" aria-hidden="true"><span class="@reg.Band.Role.ToCssClass()" style="@Width(count, point.Rows.Length)"></span></span>
+                        <span class="mo-vl-mono ep-reach-n">@count / @point.Rows.Length</span>
+                    </li>
+                }
+            </ul>
+        </section>
+        <section class="ep-sec">
+            <div class="ep-sec-head"><h3>@L["Pipeline:RegistrationTitle"]</h3></div>
+            <dl class="ep-facts">
+                @Fact(L["Pipeline:KType"], Mono(reg.Registration.BehaviorType.FullName), reg.Registration.BehaviorType.FullName)
+                @Fact(L["Pipeline:KAssembly"], Code(reg.Registration.BehaviorType.AssemblyName))
+                @Fact(L["Pipeline:KOrder"], Detail(reg.Registration.Order.ToString(), L["Pipeline:OrderBand", PipelineDisplay.Band(L, reg.Band.Key), reg.Band.Anchor]))
+                @Fact(L["Pipeline:KLifetime"], Text(PipelineDisplay.Lifetime(L, reg.Registration.Lifetime)))
+                @Fact(L["Pipeline:KShape"], Text(reg.Registration.IsOpenGeneric ? L["Pipeline:OpenGeneric"] : L["Pipeline:ClosedType"]))
+                @Fact(L["Pipeline:KFilter"], Text(reg.Registration.HasDescriptorFilter ? L["Pipeline:FilterYes"] : L["Pipeline:FilterNo"]))
+                @Fact(L["Pipeline:KSource"], reg.Registration.SourceModuleKey is { } module ? Mono(module.Value) : Detail(L["Pipeline:SourceHost"], L["Pipeline:SourceNote"]))
+            </dl>
+        </section>
+    </text>;
+
+    private static MoVisualRole StatusRole(PipelineRow row) => row.Plan.Status switch
+    {
+        ExecutionPipelinePlanStatus.Ready => MoVisualRole.Success,
+        ExecutionPipelinePlanStatus.Building => MoVisualRole.Warning,
+        _ => MoVisualRole.Error
+    };
+    private static string Width(int part, int total) => FormattableString.Invariant($"width:{(total == 0 ? 0 : 100d * part / total):0.##}%");
+    private static RenderFragment Text(string value) => builder => builder.AddContent(0, value);
+    private static RenderFragment Mono(string value) => @<span class="mo-vl-mono ep-wrap">@PipelineDisplay.BreakName(value)</span>;
+    private static RenderFragment Code(string value) => @<code>@value</code>;
+    private static RenderFragment Detail(string value, string note) => @<span><b>@value</b><span class="ep-note ep-block">@note</span></span>;
+    private RenderFragment TransactionFact(ExecutionTransactionMode mode) => Detail(PipelineDisplay.Transaction(L, mode),
+        mode == ExecutionTransactionMode.Automatic ? L["Pipeline:TxExplain:Automatic"] : L["Pipeline:TxExplain:None"]);
+    private RenderFragment Timestamp(DateTimeOffset time, string? note = null) => @<span>
+        <time class="mo-vl-mono" datetime="@time.ToString("O")">@UiTime.Format(time, "yyyy-MM-dd HH:mm:ss")</time>
+        @if (note is not null) { <span class="ep-note ep-block">@note</span> }
+    </span>;
+    private RenderFragment Fact(string label, RenderFragment value, string? copy = null) => @<div>
+        <dt>@label</dt><dd>@value @if (copy is not null) { @CopyIcon(label, copy) }</dd>
+    </div>;
+    private RenderFragment CopyIcon(string label, string value) => @<button type="button" class="ep-copy"
+        aria-label="@L["Pipeline:CopyValue", label]" title="@L["Pipeline:CopyValue", label]" @onclick="@(() => CopyAsync(value))">
+        <MoIcon Icon="@MoIcons.Copy" Size="14px" />
+    </button>;
+    private static RenderFragment Callout(MoVisualRole role, string icon, string? title, string body) => @<div class="mo-vl-callout @role.ToCssClass()">
+        <span class="mo-vl-callout-mark"><MoIcon Icon="@icon" Size="16px" /></span>
+        <div class="mo-vl-callout-content">
+            @if (title is not null) { <h3 class="mo-vl-callout-title">@title</h3> }
+            <p class="mo-vl-callout-body">@body</p>
+        </div>
+    </div>;
+
+    private IEnumerable<(string Label, string Value)> Diagnostics(PipelineRow row)
+    {
+        var plan = row.Plan;
+        var descriptor = plan.Descriptor;
+        yield return (L["Pipeline:KPlanId"], row.Id);
+        yield return (L["Pipeline:KOpId"], descriptor.Id.Value);
+        yield return (L["Pipeline:KPlanKey"], plan.Diagnostics.CanonicalKey);
+        yield return (L["Pipeline:KOpKey"], descriptor.Diagnostics.CanonicalKey);
+        yield return Exact(L["Pipeline:KComponent"], descriptor.ComponentType);
+        if (descriptor.ContractType is { } contract) yield return Exact(L["Pipeline:KContract"], contract);
+        if (descriptor.EntryMethod is { } method) yield return (L["Pipeline:KMethod"], method.Diagnostics.CanonicalSignature);
+        yield return Exact(L["Pipeline:KInput"], descriptor.InputType);
+        yield return Exact(L["Pipeline:KResult"], descriptor.ResultType);
+        foreach (var link in plan.Behaviors)
+        {
+            yield return Exact(L["Pipeline:RegisteredAs"], link.RegisteredType);
+            if (link.HasDistinctResolvedType) yield return Exact(L["Pipeline:ResolvedAs"], link.ResolvedType);
+        }
+        if (plan.Error is { } error)
+        {
+            yield return (L["Pipeline:ExceptionType"], error.ExceptionType);
+            yield return (L["Pipeline:ExceptionMessage"], error.Message);
+        }
+    }
+
+    private (string, string) Exact(string label, ExecutionTypeSnapshot type) => (L["Pipeline:Exact", label], type.Diagnostics.AssemblyQualifiedName);
+    private string DiagnosticsText(PipelineRow row) => string.Join(Environment.NewLine, Diagnostics(row).Select(line => $"{line.Label}: {line.Value}"));
+
+    private async Task CopyAsync(string value)
+    {
+        try
+        {
+            var copied = await JS.InvokeAsync<bool>("MoClipboard.copyText", value);
+            if (!_retired) Snackbar.Add(copied ? L["Pipeline:Copied"] : L["Pipeline:CopyFailed"], copied ? Severity.Success : Severity.Warning);
+        }
+        catch (JSDisconnectedException) { }
+        catch (JSException)
+        {
+            if (!_retired) Snackbar.Add(L["Pipeline:CopyFailed"], Severity.Warning);
+        }
+    }
+
+    /// <summary>Stops pending focus work when the route retires the drawer.</summary>
+    public async ValueTask DisposeAsync()
+    {
+        _retired = true;
+        if (_focus is not null) await _focus;
+    }
+}

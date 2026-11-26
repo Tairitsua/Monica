@@ -1,0 +1,310 @@
+@using Monica.Core.Execution.Models
+@using Monica.Framework.UI.UIExecutionPipeline.Models
+@using Monica.Framework.UI.UIExecutionPipeline.Support
+@using Monica.UI.Shared.Components.Visual
+@using Monica.UI.Shared.Services
+@implements IAsyncDisposable
+@inject IStringLocalizer<ExecutionPipelineResource> L
+@inject MoTimeFormatter UiTime
+@inject IJSRuntime JS
+
+<div class="ep-mx @(View.Registrations.Length == 0 ? "is-direct" : null)" style="@($"--ep-cols:{Math.Max(1, View.Registrations.Length)}")"
+     @ref="_matrix" @onpointerleave="ClearReading">
+    <div class="ep-mx-top">
+        <div class="ep-mx-title"><h2>@L["Pipeline:MatrixTitle"]</h2><p>@L["Pipeline:MatrixD"]</p></div>
+        <div class="ep-mx-tools">
+            <div class="mo-vl-segment" role="group" aria-label="@L["Pipeline:SortLabel"]">
+                <button type="button" aria-pressed="@PipelineDisplay.Aria(Query.Sort != "recent")"
+                        @onclick="@(() => ChangeQuery.InvokeAsync(Query with { Sort = null }))">@L["Pipeline:SortName"]</button>
+                <button type="button" aria-pressed="@PipelineDisplay.Aria(Query.Sort == "recent")"
+                        @onclick="@(() => ChangeQuery.InvokeAsync(Query with { Sort = "recent" }))">@L["Pipeline:SortRecent"]</button>
+            </div>
+            <button type="button" class="ep-action ep-action-ghost" disabled="@(Groups.Length == 0)" @onclick="ToggleAll">
+                <MoIcon Icon="@(AllOpen ? MoIcons.Minimize : MoIcons.UnfoldVertical)" Size="15px" />
+                @(AllOpen ? L["Pipeline:CollapseAll"] : L["Pipeline:ExpandAll"])
+            </button>
+        </div>
+    </div>
+    <div class="mo-vl-legend ep-legend">
+        @Legend(MoVisualRole.Info, L["Pipeline:Families:Observe"])
+        @Legend(MoVisualRole.Primary, L["Pipeline:Families:Guard"])
+        @Legend(MoVisualRole.Secondary, L["Pipeline:Families:Transact"])
+        @Legend(MoVisualRole.Neutral, L["Pipeline:Families:Extend"])
+        @if (View.Registrations.Any(reg => reg.UnitOfWork))
+        {
+            <span><i class="ep-node is-legend is-join mo-vl-role--secondary" aria-hidden="true"></i>@L["Pipeline:LegendJoin"]</span>
+        }
+        @if (View.Faulted.Length != 0)
+        {
+            <span><i class="ep-legend-line is-broken" aria-hidden="true"></i>@L["Pipeline:LegendFaulted"]</span>
+        }
+        @if (View.Building.Length + View.Stalled.Length != 0)
+        {
+            <span><i class="ep-legend-line is-building" aria-hidden="true"></i>@L["Pipeline:LegendBuilding"]</span>
+        }
+    </div>
+    @if (View.Registrations.Length > 0)
+    {
+        <div class="ep-regstrip" role="group" aria-label="@L["Pipeline:MatrixLabel"]">
+            @foreach (var reg in View.Registrations) { @Menu(reg, true) }
+        </div>
+    }
+    <div class="ep-mx-grid" role="group" aria-label="@L["Pipeline:MatrixLabel"]">
+        @if (View.Registrations.Length > 0)
+        {
+            <div class="ep-head">
+                <span class="ep-head-corner">@L["Pipeline:Caller"] <MoIcon Icon="@MoIcons.ArrowRight" Size="14px" /></span>
+                @foreach (var band in View.Registrations.GroupBy(reg => reg.Band))
+                {
+                    <span class="ep-band @band.Key.Role.ToCssClass()" style="@($"{Column(band.First())} / span {band.Count()}")"
+                          title="@PipelineDisplay.Band(L, band.Key.Key)">@PipelineDisplay.Band(L, band.Key.Key)</span>
+                }
+                @foreach (var reg in View.Registrations) { @Menu(reg, false) }
+                <span class="ep-head-term" style="@TermColumn">@L["Pipeline:Handler"]</span>
+            </div>
+        }
+        <ul class="ep-list">
+            @foreach (var group in Groups)
+            {
+                var open = Expanded.Contains(group.Point);
+                var groupKey = "g:" + group.Point;
+                var ready = group.Rows.Where(row => row.Ready).ToArray();
+                <li class="ep-group @(open ? "is-open" : null)" @key="group.Point">
+                    <button type="button" class="ep-grow" data-ep-nav="@groupKey" tabindex="@TabIndex(groupKey)"
+                            aria-expanded="@PipelineDisplay.Aria(open)" aria-label="@L["Pipeline:GroupToggle", group.Point, group.Rows.Length]"
+                            @onclick="@(() => Toggle(group.Point))" @onfocus="@(() => FocusGroup(group, groupKey))"
+                            @onpointerenter="@(() => GroupReading(group))">
+                        <span class="ep-label ep-glabel" @onpointerenter="@(() => GroupReading(group))">
+                            <span class="ep-chev"><MoIcon Icon="@MoIcons.ChevronRight" Size="13px" /></span>
+                            <b class="mo-vl-mono" title="@group.Point">@group.Point</b>
+                            <span class="ep-count">@(group.Rows.Length == group.Total ? group.Total.ToString() : $"{group.Rows.Length} / {group.Total}")</span>
+                            @if (group.Blocking > 0) { <span class="ep-flag mo-vl-role--error">@group.Blocking</span> }
+                        </span>
+                        @foreach (var reg in View.Registrations)
+                        {
+                            var n = ready.Count(row => row.Applies(reg));
+                            <span class="ep-cell ep-gcell @Hot(reg)" style="@Column(reg)"
+                                  @onpointerenter="@(() => ReadColumn(reg, n, group.Rows.Length, group.Point))">
+                                @if (n == 0) { <i class="ep-gnone" aria-hidden="true"></i> }
+                                else { <b class="ep-gcount @reg.Band.Role.ToCssClass() @(n == ready.Length ? "is-all" : "is-some")">@n</b> }
+                            </span>
+                        }
+                        <span class="ep-term ep-gterm" style="@TermColumn"></span>
+                    </button>
+                    @if (open)
+                    {
+                        <ul class="ep-rows">
+                            @foreach (var row in group.Rows)
+                            {
+                                var faulted = row.Plan.Status == ExecutionPipelinePlanStatus.Faulted;
+                                var stateClass = row.Ready ? null : faulted ? "is-faulted mo-vl-role--error" : "is-building mo-vl-role--warning";
+                                var stateText = row.Ready ? null : faulted ? PipelineDisplay.ExceptionName(row.Plan) : PipelineDisplay.Duration(L, row.Age);
+                                <li @key="row.Id">
+                                    <button type="button" class="ep-row @stateClass @(Query.Plan == row.Id ? "is-selected" : null)"
+                                            data-ep-nav="@row.Id" data-ep-parent="@groupKey" tabindex="@TabIndex(row.Id)"
+                                            aria-current="@(Query.Plan == row.Id ? "true" : null)" aria-label="@PlanReading(row)"
+                                            @onfocus="@(() => FocusPlan(row))" @onpointerenter="@(() => ReadPlan(row))"
+                                            @onclick="@(() => InspectPlan.InvokeAsync(row.Id))">
+                                        <span class="ep-label" @onpointerenter="@(() => ReadPlan(row))">
+                                            <b class="ep-name">@PipelineDisplay.BreakName(row.Name)</b>
+                                            <small>
+                                                <span class="mo-vl-mono">@row.Plan.Descriptor.ComponentType.AssemblyName</span>
+                                                @if (_repeatedNames.Contains(row.Name))
+                                                {
+                                                    <span class="mo-vl-mono ep-types">@row.Plan.Descriptor.InputType.Name → @row.Plan.Descriptor.ResultType.Name</span>
+                                                }
+                                                @if (row.IsNew)
+                                                {
+                                                    <span class="mo-vl-capsule mo-vl-role--info ep-new" title="@L["Pipeline:NewTip", UiTime.FormatTime(View.PreviousAt)]">@L["Pipeline:NewMark"]</span>
+                                                }
+                                            </small>
+                                        </span>
+                                        @if (row.Ready)
+                                        {
+                                            @foreach (var reg in View.Registrations)
+                                            {
+                                                <span class="ep-cell @Hot(reg)" style="@Column(reg)" @onpointerenter="@(() => ReadCell(row, reg))">
+                                                    @if (row.Applies(reg))
+                                                    {
+                                                        <i class="ep-node @reg.Band.Role.ToCssClass() @(row.Joins(reg) ? "is-join" : null)" aria-hidden="true"></i>
+                                                    }
+                                                </span>
+                                            }
+                                        }
+                                        else
+                                        {
+                                            <span class="ep-cell ep-broken @stateClass" style="@($"grid-column:2 / span {Math.Max(1, View.Registrations.Length)}")">
+                                                <i class="ep-node @(faulted ? "is-x" : "is-wait")" aria-hidden="true"></i><span>@stateText</span>
+                                            </span>
+                                        }
+                                        <span class="ep-term @(!row.Ready ? "is-dim" : null)" style="@TermColumn"
+                                              @onpointerenter="@(() => ReadPlan(row))"><i class="ep-term-node" aria-hidden="true"></i><span class="mo-vl-mono">@row.Handler</span></span>
+                                        <span class="ep-chips" aria-hidden="true">
+                                            @if (!row.Ready) { <span class="mo-vl-capsule @stateClass">@stateText</span> }
+                                            else if (row.Plan.Behaviors.Length == 0) { <span class="ep-chip is-direct">@L["Pipeline:Direct"]</span> }
+                                            else
+                                            {
+                                                @foreach (var reg in View.Registrations.Where(row.Applies))
+                                                {
+                                                    <span class="ep-chip @reg.Band.Role.ToCssClass() @(row.Joins(reg) ? "is-join" : null)">
+                                                        <i class="ep-node" aria-hidden="true"></i>@PipelineDisplay.BreakName(reg.Label)
+                                                    </span>
+                                                }
+                                            }
+                                        </span>
+                                    </button>
+                                </li>
+                            }
+                        </ul>
+                    }
+                </li>
+            }
+        </ul>
+        @if (Groups.Length == 0) { @Empty }
+    </div>
+    <p class="ep-readout" aria-live="polite">@(_reading ?? L["Pipeline:ReadoutIdle"].Value)</p>
+</div>
+
+@code {
+    [Parameter, EditorRequired] public ExecutionPipelineView View { get; set; } = default!;
+    [Parameter, EditorRequired] public ExecutionPipelineQuery Query { get; set; } = default!;
+    [Parameter, EditorRequired] public PipelineGroup[] Groups { get; set; } = [];
+    [Parameter, EditorRequired] public HashSet<string> Expanded { get; set; } = [];
+    [Parameter] public RenderFragment? Empty { get; set; }
+    [Parameter] public EventCallback<ExecutionPipelineQuery> ChangeQuery { get; set; }
+    [Parameter] public EventCallback<string> InspectPlan { get; set; }
+    [Parameter] public EventCallback<string> InspectBehavior { get; set; }
+
+    private ElementReference _matrix;
+    private Task? _attach;
+    private IJSObjectReference? _controller;
+    private string? _focusKey, _tabKey, _reading;
+    private int? _hotColumn;
+    private (int Index, bool Compact)? _openMenu;
+    private bool _retired;
+    private PipelineRow[] _menuRows = [];
+    private HashSet<string> _repeatedNames = [];
+    private bool AllOpen => Groups.Length > 0 && Groups.All(group => Expanded.Contains(group.Point));
+    private string TermColumn => $"grid-column:{View.Registrations.Length + 2}";
+
+    protected override void OnParametersSet()
+    {
+        var keys = Groups.SelectMany(group => Expanded.Contains(group.Point)
+            ? new[] { "g:" + group.Point }.Concat(group.Rows.Select(row => row.Id)) : ["g:" + group.Point]).ToArray();
+        _tabKey = keys.Contains(_focusKey) ? _focusKey : keys.Contains(Query.Plan) ? Query.Plan : keys.FirstOrDefault();
+        _menuRows = View.Filter(Query with { Behavior = null, Applied = null }).Where(row => row.Ready).ToArray();
+        _repeatedNames = View.Plans.GroupBy(row => row.Name).Where(group => group.Count() > 1).Select(group => group.Key).ToHashSet();
+    }
+
+    protected override Task OnAfterRenderAsync(bool firstRender) => firstRender ? _attach = AttachAsync() : Task.CompletedTask;
+
+    private async Task AttachAsync()
+    {
+        try
+        {
+            await using var script = await JS.InvokeAsync<IJSObjectReference>("import", "./_content/Monica.Framework.UI/js/execution-pipeline.js");
+            if (!_retired) _controller = await script.InvokeAsync<IJSObjectReference>("attachMatrix", _matrix);
+        }
+        catch (JSDisconnectedException) { }
+    }
+
+    private int TabIndex(string key) => _tabKey == key ? 0 : -1;
+    private string? Hot(PipelineRegistration reg) => _hotColumn == reg.Index ? "is-col" : null;
+    private static string Column(PipelineRegistration reg) => $"grid-column:{reg.Index + 2}";
+
+    private Task Toggle(string point)
+    {
+        var next = new HashSet<string>(Expanded, StringComparer.Ordinal);
+        if (!next.Add(point)) next.Remove(point);
+        var open = Groups.All(group => next.Contains(group.Point)) ? "all" : next.Count == 0 ? "none" : string.Join(',', next);
+        return ChangeQuery.InvokeAsync(Query with { Open = open });
+    }
+
+    private Task ToggleAll() => ChangeQuery.InvokeAsync(Query with { Open = AllOpen ? "none" : "all" });
+
+    private void ClearReading() => SetReading(null, null);
+    private void SetReading(string? text, int? column) { _reading = text; _hotColumn = column; }
+    private void FocusGroup(PipelineGroup group, string key) { _focusKey = _tabKey = key; GroupReading(group); }
+    private void FocusPlan(PipelineRow row) { _focusKey = _tabKey = row.Id; ReadPlan(row); }
+    private void GroupReading(PipelineGroup group) => SetReading(group.Blocking == 0
+        ? L["Pipeline:ReadoutGroup", group.Point, group.Rows.Length]
+        : L["Pipeline:ReadoutGroupBlocking", group.Point, group.Rows.Length, group.Blocking], null);
+    private void ReadPlan(PipelineRow row) => SetReading(PlanReading(row), null);
+    private string PlanReading(PipelineRow row) => row.Plan.Status switch
+    {
+        ExecutionPipelinePlanStatus.Faulted => L["Pipeline:ReadoutFaulted", row.Name, PipelineDisplay.ExceptionName(row.Plan)],
+        ExecutionPipelinePlanStatus.Building => L["Pipeline:ReadoutBuilding", row.Name, PipelineDisplay.Duration(L, row.Age)],
+        _ => L["Pipeline:ReadoutPlan", row.Name, row.Plan.Behaviors.Length, View.Registrations.Length, PipelineDisplay.Transaction(L, row.Plan.Descriptor.TransactionMode)]
+    };
+    private void ReadColumn(PipelineRegistration reg, int count, int total, string? point = null) =>
+        SetReading(L["Pipeline:ReadoutColumn", reg.Name, count, total].Value + (point is null ? "" : $" ({point})"), reg.Index);
+    private void ReadCell(PipelineRow row, PipelineRegistration reg) => SetReading(!row.Applies(reg)
+        ? L["Pipeline:ReadoutCellWithout", reg.Name, row.Name] : row.Joins(reg)
+            ? L["Pipeline:ReadoutCellJoin", reg.Name, row.Name] : L["Pipeline:ReadoutCellWith", reg.Name, row.Name], reg.Index);
+    private void MenuChanged(int index, bool compact, bool open)
+    {
+        if (open) _openMenu = (index, compact);
+        else if (_openMenu == (index, compact)) _openMenu = null;
+    }
+    private static Task HandleMenuKey(MenuContext menu, KeyboardEventArgs args) =>
+        args.Key == "Escape" ? menu.CloseAllAsync() : Task.CompletedTask;
+    private Task FilterBehavior(PipelineRegistration reg, bool applied) => ChangeQuery.InvokeAsync(Query with
+        { Behavior = reg.Key, Applied = applied ? null : "0", Open = null });
+
+    private RenderFragment Legend(MoVisualRole role, string label) => @<text>
+        @if (View.Registrations.Any(reg => reg.Band.Role == role))
+        {
+            <span><i class="ep-node is-legend @role.ToCssClass()" aria-hidden="true"></i>@label</span>
+        }
+    </text>;
+
+    private RenderFragment Menu(PipelineRegistration reg, bool compact) => @<text>
+        @{
+            var matched = _menuRows.Count(row => row.Applies(reg));
+        }
+        <div class="@(compact ? "ep-compact-menu" : "ep-col-menu")" style="@(compact ? null : Column(reg))">
+            <MudMenu AnchorOrigin="Origin.BottomLeft" TransformOrigin="Origin.TopLeft" Dense="true" Modal="false"
+                     Open="@(_openMenu == (reg.Index, compact))" OpenChanged="@(open => MenuChanged(reg.Index, compact, open))"
+                     PopoverClass="ep-menu-popover" aria-label="@L["Pipeline:HeadMenu", reg.Name]">
+                <ActivatorContent Context="menu">
+                    @if (compact)
+                    {
+                        <button type="button" class="ep-chip is-head @reg.Band.Role.ToCssClass()" aria-haspopup="menu"
+                                aria-expanded="@PipelineDisplay.Aria(_openMenu == (reg.Index, compact))"
+                                @onkeydown="@(args => HandleMenuKey(menu, args))" @onclick="@(args => menu.ToggleAsync(args))">
+                            <i class="ep-node" aria-hidden="true"></i>@PipelineDisplay.BreakName(reg.Label)<b class="mo-vl-mono">@reg.Applied</b>
+                        </button>
+                    }
+                    else
+                    {
+                        <button type="button" class="ep-col @reg.Band.Role.ToCssClass() @Hot(reg)" aria-haspopup="menu"
+                                aria-expanded="@PipelineDisplay.Aria(_openMenu == (reg.Index, compact))"
+                                aria-label="@L["Pipeline:ReadoutColumn", reg.Name, reg.Applied, View.Plans.Length]"
+                                @onfocus="@(() => ReadColumn(reg, reg.Applied, View.Plans.Length))"
+                                @onpointerenter="@(() => ReadColumn(reg, reg.Applied, View.Plans.Length))"
+                                @onkeydown="@(args => HandleMenuKey(menu, args))" @onclick="@(args => menu.ToggleAsync(args))">
+                            <span class="ep-col-name">@PipelineDisplay.BreakName(reg.Label)</span>
+                            <span class="ep-col-meta mo-vl-mono"><span>@reg.Registration.Order</span><b>@reg.Applied</b></span>
+                        </button>
+                    }
+                </ActivatorContent>
+                <ChildContent>
+                    <div class="ep-menu-title"><b>@reg.Name</b><small class="mo-vl-mono">@L["Pipeline:Order", reg.Registration.Order]</small></div>
+                    <MudMenuItem Icon="@MoIcons.Filter" Disabled="@(matched == 0)" OnClick="@(() => FilterBehavior(reg, true))">@L["Pipeline:HeadWith", matched]</MudMenuItem>
+                    <MudMenuItem Icon="@MoIcons.FilterOff" Disabled="@(matched == _menuRows.Length)" OnClick="@(() => FilterBehavior(reg, false))">@L["Pipeline:HeadWithout", _menuRows.Length - matched]</MudMenuItem>
+                    <MudMenuItem Icon="@MoIcons.Info" OnClick="@(() => InspectBehavior.InvokeAsync(reg.Key))">@L["Pipeline:HeadDetails"]</MudMenuItem>
+                </ChildContent>
+            </MudMenu>
+        </div>
+    </text>;
+
+    /// <summary>Removes the browser-side keyboard listener after any admitted attachment.</summary>
+    public async ValueTask DisposeAsync()
+    {
+        _retired = true;
+        if (_attach is not null) await _attach;
+        if (_controller is null) return;
+        try { await _controller.InvokeVoidAsync("dispose"); await _controller.DisposeAsync(); }
+        catch (JSDisconnectedException) { }
+    }
+}

@@ -24,10 +24,7 @@ public sealed class ExecutionPipelineCatalogPageTests
 
         cut.WaitForAssertion(() =>
         {
-            cut.Find("[data-testid='execution-pipeline-observed-empty']").Should().NotBeNull();
-            cut.Find("[data-testid='execution-pipeline-registration-count']").TextContent.Should().Be("1");
-            cut.Find("[data-testid='execution-pipeline-plan-count']").TextContent.Should().Be("0");
-            cut.Markup.Should().Contain("Page:States:NoObservedPlans");
+            cut.Markup.Should().Contain("Pipeline:NoPlansTitle").And.Contain("Pipeline:NoPlans");
         });
     }
 
@@ -39,7 +36,7 @@ public sealed class ExecutionPipelineCatalogPageTests
         var cut = context.Render<UIExecutionPipelinePage>();
 
         cut.WaitForAssertion(() =>
-            cut.Find("[data-testid='execution-pipeline-summary']").Should().NotBeNull());
+            cut.Markup.Should().Contain("Pipeline:DisplayLabel"));
 
         await cut.InvokeAsync(() => cut.Instance.DisposeAsync().AsTask());
         await cut.InvokeAsync(() => cut.Instance.DisposeAsync().AsTask());

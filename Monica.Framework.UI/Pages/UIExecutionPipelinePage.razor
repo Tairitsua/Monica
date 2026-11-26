@@ -1,161 +1,191 @@
-@inject Monica.UI.Shared.Services.MoTimeFormatter UiTime
 @attribute [Route(PAGE_URL)]
 @implements IAsyncDisposable
 @using Monica.Framework.UI.UIExecutionPipeline.Components
+@using Monica.Framework.UI.UIExecutionPipeline.Models
 @using Monica.Framework.UI.UIExecutionPipeline.State
+@using Monica.UI.Shared.Services
 @inject ExecutionPipelinePageState PageState
+@inject NavigationManager Navigation
+@inject MoTimeFormatter UiTime
+@inject IJSRuntime JS
 @inject ISnackbar Snackbar
 @inject IStringLocalizer<ExecutionPipelineResource> L
 
-<PageTitle>@L["Page:PageTitle"]</PageTitle>
+<PageTitle>@L["Pipeline:Title"]</PageTitle>
 
-<div class="execution-pipeline-page" aria-busy="@PageState.IsLoading.ToString().ToLowerInvariant()">
-    <div class="execution-pipeline-page__content">
-        <header class="execution-pipeline-page__header">
-            <div class="execution-pipeline-page__heading">
-                <span class="execution-pipeline-page__eyebrow">@L["Page:Header:Eyebrow"]</span>
-                <h1>@L["Page:Header:Title"]</h1>
-                <p>@L["Page:Header:Description"]</p>
-            </div>
-            <div class="execution-pipeline-page__actions">
-                @if (PageState.Snapshot is { } snapshot)
+<div class="ep-page" aria-busy="@Aria(_loading || PageState.View is null && PageState.FailedAt is null)">
+    <header class="mo-vl-masthead mo-vl-masthead--sealed ep-mh">
+        <div class="mo-vl-masthead__identity">
+            <span class="mo-vl-masthead__seal" aria-hidden="true"><MoIcon Icon="@MoIcons.Workflow" Size="24px" /></span>
+            <div class="mo-vl-masthead__copy">
+                <h1 class="mo-vl-title">@L["Pipeline:Title"]</h1>
+                @if (PageState.View is { } captured)
                 {
-                    <div class="execution-pipeline-page__capture">
-                        <span>@L["Page:Header:CaptureLabel"]</span>
-                        <time datetime="@snapshot.CapturedAt.ToString("O")">
-                            @UiTime.Format(snapshot.CapturedAt)
-                        </time>
-                        <small>@L["Page:Header:LocalTime"]</small>
+                    <div class="mo-vl-meta">
+                        <span class="mo-vl-capsule mo-vl-capsule--outline mo-vl-mono">@L["Pipeline:Host", Environment.MachineName]</span>
+                        <span class="mo-vl-capsule mo-vl-capsule--outline">@L["Pipeline:Registered", captured.Registrations.Length]</span>
+                        @if (captured.FirstAt is { } first)
+                        {
+                            <time class="mo-vl-capsule mo-vl-capsule--outline" datetime="@first.ToString("O")" title="@L["Pipeline:SinceTip"]">@L["Pipeline:Since", UiTime.FormatTime(first)]</time>
+                        }
                     </div>
                 }
-                <MudButton Variant="Variant.Outlined"
-                           Color="Color.Primary"
-                           StartIcon="@MoIcons.Refresh"
-                           Disabled="@PageState.IsLoading"
-                           OnClick="RefreshAsync">
-                    @L["Page:Header:Refresh"]
-                </MudButton>
             </div>
-        </header>
-
-        @if (!string.IsNullOrWhiteSpace(PageState.LoadError))
+        </div>
+        @if (PageState.View is not null || PageState.FailedAt is not null)
         {
-            <MudAlert Icon="@MoIcons.Error" Severity="Severity.Error" Variant="Variant.Outlined"
-                      Class="execution-pipeline-page__error"
-                      data-testid="execution-pipeline-load-error">
-                @L["Page:Messages:RefreshFailed", PageState.LoadError]
-            </MudAlert>
-        }
-
-        @if (PageState.IsLoading && PageState.Snapshot is null)
-        {
-            <div class="execution-pipeline-page__state" role="status" data-testid="execution-pipeline-loading">
-                <MudProgressCircular Indeterminate="true" Color="Color.Primary" Size="Size.Medium" />
-                <p>@L["Page:States:Loading"]</p>
-            </div>
-        }
-        else if (PageState.Snapshot is { } catalog)
-        {
-            <ExecutionPipelineSummary Snapshot="@catalog" />
-
-            <section class="execution-pipeline-page__catalog" aria-label="@L["Page:Catalog:AriaLabel"]">
-                @if (PageState.IsLoading)
+            <div class="ep-mh-actions">
+                @if (PageState.View is { } stamp)
                 {
-                    <MudProgressLinear Indeterminate="true" Color="Color.Primary"
-                                       Class="execution-pipeline-page__refresh-progress" />
+                    <div class="ep-stamp">
+                        <span>@(PageState.FailedAt is null ? L["Pipeline:Captured"] : L["Pipeline:CapturedStale"])</span>
+                        <time datetime="@stamp.Snapshot.CapturedAt.ToString("O")" title="@UiTime.Format(stamp.Snapshot.CapturedAt)">@UiTime.FormatTime(stamp.Snapshot.CapturedAt)</time>
+                    </div>
                 }
-                <MudTabs PrevIcon="@MoIcons.ChevronLeft" NextIcon="@MoIcons.ChevronRight" Rounded="false"
-                         Outlined="false"
-                         Elevation="0"
-                         ApplyEffectsToContainer="false"
-                         Class="execution-pipeline-page__tabs mo-self-painted"
-                         TabPanelsClass="execution-pipeline-page__tab-panel">
-                    <MudTabPanel Text="@L["Page:Tabs:PlansWithCount", catalog.Plans.Length]" Icon="@MoIcons.Route">
-                        @if (catalog.Plans.IsDefaultOrEmpty)
-                        {
-                            <div class="execution-pipeline-page__state" data-testid="execution-pipeline-observed-empty">
-                                <span class="execution-pipeline-page__state-icon">
-                                    <MoIcon Icon="@MoIcons.Route" Size="1.5rem" />
-                                </span>
-                                <h2>@L["Page:States:NoObservedPlansTitle"]</h2>
-                                <p>@L["Page:States:NoObservedPlans"]</p>
-                            </div>
-                        }
-                        else
-                        {
-                            <ExecutionPipelinePlanFilterBar State="@PageState" />
-                            <ExecutionPipelinePlanExplorer Plans="@PageState.FilteredPlans"
-                                                           SelectedPlan="@PageState.SelectedPlan"
-                                                           PlanSelected="PageState.SelectPlan" />
-                        }
-                    </MudTabPanel>
-                    <MudTabPanel Text="@L["Page:Tabs:RegistrationsWithCount", catalog.Registrations.Length]" Icon="@MoIcons.Puzzle">
-                        <ExecutionPipelineRegistrationTable Registrations="@catalog.Registrations" />
-                    </MudTabPanel>
-                </MudTabs>
-            </section>
+                <button type="button" class="ep-action ep-action-primary" disabled="@_loading" @onclick="Refresh">
+                    <span class="@(_loading ? "ep-spin" : null)"><MoIcon Icon="@MoIcons.Refresh" Size="15px" /></span>
+                    @(PageState.View is null ? L["Pipeline:Retry"] : L["Pipeline:Refresh"])
+                </button>
+            </div>
         }
-        else if (!PageState.IsLoading)
+    </header>
+
+    @if (PageState.View is { } view)
+    {
+        @if (PageState.FailedAt is { } failedAt)
         {
-            <MudAlert Icon="@MoIcons.Error" Severity="Severity.Error" Variant="Variant.Outlined" Class="execution-pipeline-page__error">
-                @L["Page:States:LoadFailed"]
-            </MudAlert>
+            <div class="mo-vl-callout mo-vl-role--warning" role="alert">
+                <span class="mo-vl-callout-mark"><MoIcon Icon="@MoIcons.Warning" Size="16px" /></span>
+                <div class="mo-vl-callout-content">
+                    <h2 class="mo-vl-callout-title">@L["Pipeline:StaleTitle"]</h2>
+                    <p class="mo-vl-callout-body">@L["Pipeline:Stale", UiTime.FormatTime(failedAt), UiTime.FormatTime(view.Snapshot.CapturedAt)]</p>
+                </div>
+            </div>
         }
-    </div>
+        <div class="ep-signature">
+            <ExecutionPipelineWorkbench View="view" Query="Query" ChangeQuery="ChangeQuery"
+                                        InspectPlan="InspectPlan" InspectBehavior="InspectBehavior" />
+        </div>
+        @if ((Plan ?? Registration) is { } evidence)
+        {
+            <ExecutionPipelineEvidence @key="(Plan, Registration)" View="view" EvidenceKey="@evidence"
+                                       IsPlan="@(Plan is not null)" Closed="CloseEvidence" InspectPlan="InspectPlan"
+                                       InspectBehavior="InspectBehavior" FilterBehavior="FilterFromEvidence" />
+        }
+    }
+    else if (PageState.FailedAt is not null)
+    {
+        <section class="mo-vl-surface ep-failed" role="alert">
+            <span class="mo-vl-tile mo-vl-role--error"><MoIcon Icon="@MoIcons.Error" Size="18px" /></span>
+            <h2>@L["Pipeline:LoadFailedTitle"]</h2>
+            <p>@L["Pipeline:LoadFailed"]</p>
+        </section>
+    }
+    else
+    {
+        <section class="mo-vl-surface ep-skeleton" role="status">
+            <span class="ep-skel is-short"></span><span class="ep-skel is-display"></span><span class="ep-skel"></span>
+            @for (var row = 0; row < 7; row++) { <span class="ep-skel is-row"></span> }
+            <p>@L["Pipeline:Loading"]</p>
+        </section>
+    }
 </div>
 
 @code {
+    /// <summary>The stable route to the host-local execution-pipeline catalog.</summary>
     public const string PAGE_URL = "/execution-pipeline";
+    private const string EvidenceHistory = "execution-pipeline-evidence";
 
-    private Task _pendingRender = Task.CompletedTask;
-    private bool _disposed;
+    [SupplyParameterFromQuery(Name = "q")] private string? Q { get; set; }
+    [SupplyParameterFromQuery(Name = "point")] private string? Point { get; set; }
+    [SupplyParameterFromQuery(Name = "status")] private string? Status { get; set; }
+    [SupplyParameterFromQuery(Name = "tx")] private string? Tx { get; set; }
+    [SupplyParameterFromQuery(Name = "business")] private string? Business { get; set; }
+    [SupplyParameterFromQuery(Name = "behavior")] private string? Behavior { get; set; }
+    [SupplyParameterFromQuery(Name = "applied")] private string? Applied { get; set; }
+    [SupplyParameterFromQuery(Name = "sort")] private string? Sort { get; set; }
+    [SupplyParameterFromQuery(Name = "open")] private string? Open { get; set; }
+    [SupplyParameterFromQuery(Name = "plan")] private string? Plan { get; set; }
+    [SupplyParameterFromQuery(Name = "registration")] private string? Registration { get; set; }
 
-    protected override async Task OnAfterRenderAsync(bool firstRender)
+    private ExecutionPipelineQuery Query => new(Q, EmptyToNull(Point), EmptyToNull(Status), EmptyToNull(Tx),
+        EmptyToNull(Business), EmptyToNull(Behavior), Applied, Sort, EmptyToNull(Open),
+        EmptyToNull(Plan), EmptyToNull(Registration));
+
+    private Task? _load;
+    private bool _retired, _loading;
+
+    protected override Task OnAfterRenderAsync(bool firstRender) => firstRender ? LoadAsync(notify: false) : Task.CompletedTask;
+
+    private Task Refresh() => LoadAsync(notify: PageState.View is not null);
+
+    private Task LoadAsync(bool notify)
     {
-        if (!firstRender)
-        {
-            return;
-        }
-
-        PageState.StateChanged += OnStateChanged;
-        await PageState.InitializeAsync();
+        if (_retired || _load is { IsCompleted: false }) return Task.CompletedTask;
+        _loading = true;
+        return _load = LoadCoreAsync(notify);
     }
 
-    private async Task RefreshAsync()
+    private async Task LoadCoreAsync(bool notify)
     {
-        var succeeded = await PageState.RefreshAsync();
-        if (_disposed)
+        // Give the skeleton or busy action a render before taking the synchronous catalog capture.
+        await Task.Yield();
+        if (_retired) return;
+        var success = await PageState.RefreshAsync();
+        if (_retired) return;
+        _loading = false;
+        if (notify)
         {
-            return;
+            var newCount = PageState.View?.Plans.Count(row => row.IsNew) ?? 0;
+            Snackbar.Add(!success ? L["Pipeline:RefreshFailed"] : newCount == 0
+                ? L["Pipeline:Refreshed"] : L["Pipeline:RefreshedNew", newCount],
+                success ? Severity.Success : Severity.Warning);
         }
-
-        Snackbar.Add(
-            succeeded
-                ? L["Page:Messages:RefreshSucceeded"]
-                : L["Page:Messages:RefreshFailed", PageState.LoadError ?? L["Page:States:LoadFailed"]],
-            succeeded ? Severity.Success : Severity.Error);
+        StateHasChanged();
     }
 
-    private void OnStateChanged()
+    private void ChangeQuery(ExecutionPipelineQuery next) => WriteQuery(next, replace: true);
+    private void InspectPlan(string id) => WriteQuery(Query with { Plan = id, Registration = null }, replace: false);
+    private void InspectBehavior(string key) => WriteQuery(Query with { Plan = null, Registration = key }, replace: false);
+    private void FilterFromEvidence((string Key, bool Applied) filter) =>
+        ChangeQuery(Query with { Plan = null, Registration = null, Behavior = filter.Key, Applied = filter.Applied ? null : "0", Open = null });
+
+    private async Task CloseEvidence()
     {
-        _pendingRender = InvokeAsync(() =>
+        if (Navigation.HistoryEntryState == EvidenceHistory)
         {
-            if (!_disposed)
-            {
-                StateHasChanged();
-            }
+            try { await JS.InvokeVoidAsync("history.back"); }
+            catch (JSDisconnectedException) { }
+        }
+        else ChangeQuery(Query with { Plan = null, Registration = null });
+    }
+
+    private void WriteQuery(ExecutionPipelineQuery next, bool replace)
+    {
+        var destination = Navigation.GetUriWithQueryParameters(new Dictionary<string, object?>
+        {
+            ["q"] = EmptyToNull(next.Q), ["point"] = EmptyToNull(next.Point), ["status"] = EmptyToNull(next.Status),
+            ["tx"] = EmptyToNull(next.Tx), ["business"] = EmptyToNull(next.Business), ["behavior"] = EmptyToNull(next.Behavior),
+            ["applied"] = next.Behavior is not null && next.Applied == "0" ? "0" : null,
+            ["sort"] = next.Sort == "recent" ? "recent" : null, ["open"] = EmptyToNull(next.Open),
+            ["plan"] = EmptyToNull(next.Plan), ["registration"] = EmptyToNull(next.Registration)
+        });
+        if (destination == Navigation.Uri) return;
+        Navigation.NavigateTo(destination, new NavigationOptions
+        {
+            ReplaceHistoryEntry = replace,
+            HistoryEntryState = next.Plan is not null || next.Registration is not null
+                ? (replace ? Navigation.HistoryEntryState : EvidenceHistory) : null
         });
     }
 
+    private static string? EmptyToNull(string? value) => string.IsNullOrEmpty(value) ? null : value;
+    private static string Aria(bool value) => value ? "true" : "false";
+
+    /// <summary>Waits for the admitted capture and prevents late render or notification.</summary>
     public async ValueTask DisposeAsync()
     {
-        if (_disposed)
-        {
-            return;
-        }
-
-        _disposed = true;
-        PageState.StateChanged -= OnStateChanged;
-        await _pendingRender;
+        _retired = true;
+        if (_load is not null) await _load;
     }
 }

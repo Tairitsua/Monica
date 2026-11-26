@@ -1,0 +1,226 @@
+@using Monica.Core.Execution.Models
+@using Monica.Framework.UI.UIExecutionPipeline.Models
+@using Monica.Framework.UI.UIExecutionPipeline.Support
+@using Monica.UI.Shared.Components.Visual
+@using Monica.UI.Shared.Services
+@inject MoTimeFormatter UiTime
+@inject IStringLocalizer<ExecutionPipelineResource> L
+
+<section class="mo-vl-surface ep-sig" aria-labelledby="ep-attention">
+    <div class="ep-decision">
+        <div class="ep-decision-value">
+            <p class="ep-display-label" id="ep-attention" title="@L["Pipeline:DisplayTip"]">@L["Pipeline:DisplayLabel"]</p>
+            <div class="ep-display @(View.Blocking > 0 ? "ep-display-alert" : null)">@View.Blocking<small>@L["Pipeline:OfObserved", View.Plans.Length]</small></div>
+            <div class="ep-reasons" role="group" aria-label="@L["Pipeline:DisplayLabel"]">
+                @Reason(L["Pipeline:Reasons:Faulted"], View.Faulted.Length, nameof(ExecutionPipelinePlanStatus.Faulted), MoVisualRole.Error)
+                @Reason(L["Pipeline:Reasons:Stalled"], View.Stalled.Length, nameof(ExecutionPipelinePlanStatus.Building), MoVisualRole.Warning)
+                @if (View.Building.Length > 0)
+                {
+                    @Reason(L["Pipeline:Reasons:Building"], View.Building.Length, nameof(ExecutionPipelinePlanStatus.Building), MoVisualRole.Neutral)
+                }
+                @Reason(L["Pipeline:Reasons:Ready"], View.Ready.Length, nameof(ExecutionPipelinePlanStatus.Ready), MoVisualRole.Success)
+            </div>
+        </div>
+        <p class="ep-lede">
+            @if (View.Plans.Length == 0)
+            {
+                @(View.Registrations.Length == 0 ? L["Pipeline:NoRegistrations"] : L["Pipeline:NoPlans", View.Registrations.Length])
+            }
+            else
+            {
+                @if (View.Faulted.FirstOrDefault() is { } fault)
+                {
+                    @if (View.Faulted.Length == 1)
+                    {
+                        @PipelineDisplay.Sentence(L["Pipeline:FaultedOne"], PlanLink(fault, MoVisualRole.Error), Mark(PipelineDisplay.ExceptionName(fault.Plan), MoVisualRole.Error))
+                    }
+                    else
+                    {
+                        @PipelineDisplay.Sentence(L["Pipeline:FaultedMany"], Mark(View.Faulted.Length, MoVisualRole.Error), PlanLink(fault, MoVisualRole.Error), Mark(PipelineDisplay.ExceptionName(fault.Plan), MoVisualRole.Error))
+                    }
+                    @(" ")
+                }
+                @if (View.Stalled.FirstOrDefault() is { } stalled)
+                {
+                    @PipelineDisplay.Sentence(L["Pipeline:Stalled"], PlanLink(stalled, MoVisualRole.Warning), Mark(PipelineDisplay.Duration(L, stalled.Age), MoVisualRole.Warning))
+                    @(" ")
+                }
+                @if (View.Ready.Length == View.Plans.Length)
+                {
+                    @PipelineDisplay.Sentence(L["Pipeline:Calm"], Mark(View.Ready.Length, MoVisualRole.Success),
+                        Text(View.Ready.Min(row => row.Plan.Behaviors.Length)), Text(View.Ready.Max(row => row.Plan.Behaviors.Length)))
+                    @(" ")
+                }
+                @if (View.Building.FirstOrDefault() is { } building)
+                {
+                    @PipelineDisplay.Sentence(L["Pipeline:Building"], PlanLink(building, MoVisualRole.Warning))
+                    @(" ")
+                }
+                @if (View.Registrations.Length == 0)
+                {
+                    @L["Pipeline:NoRegistrations"]
+                    @(" ")
+                }
+                @if (View.Guard is { } guard && View.Ready.Length > 0)
+                {
+                    @PipelineDisplay.Sentence(L["Pipeline:Guard"], BehaviorLink(guard), Mark(guard.Applied, guard.Band.Role),
+                        Text(View.Plans.Length), GuardScope(guard))
+                    @(" ")
+                }
+                @if (View.Ready.Length > 0 && View.Registrations.FirstOrDefault(reg => reg.Applied == 0 && reg != View.Guard) is { } unused)
+                {
+                    @PipelineDisplay.Sentence(unused.Registration.IsOpenGeneric ? L["Pipeline:UnusedOpen"] : L["Pipeline:UnusedClosed"],
+                        BehaviorLink(unused))
+                    @(" ")
+                }
+                @if (View.FirstAt is { } since)
+                {
+                    @L["Pipeline:Caveat", UiTime.FormatTime(since)]
+                }
+            }
+        </p>
+    </div>
+
+    @if (View.Plans.Length > 0)
+    {
+        <div class="ep-filters" role="search" aria-label="@L["Pipeline:FilterLabel"]">
+            <div class="ep-filter-row">
+                <label class="ep-search">
+                    <MoIcon Icon="@MoIcons.Search" Size="14px" />
+                    <input type="search" aria-label="@L["Pipeline:Search"]" placeholder="@L["Pipeline:SearchPlaceholder"]"
+                           value="@Query.Q" @oninput="SearchChanged" />
+                </label>
+                <div class="ep-seg-field"><span class="ep-field-label">@L["Pipeline:TxLabel"]</span>
+                    <div class="mo-vl-segment" role="group" aria-label="@L["Pipeline:TxLabel"]">
+                        @Choice(L["Pipeline:TxAll"], Query.Tx is null, Query with { Tx = null })
+                        @Choice(L["Pipeline:Tx:Automatic"], Query.Tx == "Automatic", Query with { Tx = "Automatic" })
+                        @Choice(L["Pipeline:Tx:None"], Query.Tx == "None", Query with { Tx = "None" })
+                    </div>
+                </div>
+                <div class="ep-seg-field"><span class="ep-field-label">@L["Pipeline:BusinessLabel"]</span>
+                    <div class="mo-vl-segment" role="group" aria-label="@L["Pipeline:BusinessLabel"]">
+                        @Choice(L["Pipeline:BusinessAll"], Query.Business is null, Query with { Business = null })
+                        @Choice(L["Pipeline:Business:Yes"], Query.Business == "yes", Query with { Business = "yes" })
+                        @Choice(L["Pipeline:Business:No"], Query.Business == "no", Query with { Business = "no" })
+                    </div>
+                </div>
+            </div>
+            <div class="ep-points" role="group" aria-label="@L["Pipeline:PointLabel"]">
+                <button type="button" class="ep-point" aria-pressed="@PipelineDisplay.Aria(Query.Point is null)"
+                        @onclick="@(() => SetFilter(Query with { Point = null }))">@L["Pipeline:AllPoints"]<small>@_pointCounts.Values.Sum()</small></button>
+                @foreach (var point in View.Points)
+                {
+                    <button type="button" class="ep-point @(point.Blocking > 0 ? "mo-vl-role--error" : null)"
+                            aria-pressed="@PipelineDisplay.Aria(Query.Point == point.Point)"
+                            @onclick="@(() => SetFilter(Query with { Point = Query.Point == point.Point ? null : point.Point }))">
+                        <span class="mo-vl-mono">@point.Point</span><small>@_pointCounts.GetValueOrDefault(point.Point)</small>
+                    </button>
+                }
+            </div>
+            @if (Query.Filtered)
+            {
+                <div class="ep-active">
+                    @if (Query.Behavior is { } key)
+                    {
+                        var reg = View.FindRegistration(key);
+                        <button type="button" class="mo-vl-capsule @((reg?.Band.Role ?? MoVisualRole.Warning).ToCssClass())"
+                                @onclick="@(() => SetFilter(Query with { Behavior = null, Applied = null }))">
+                            @(reg is null ? key : Query.Applied == "0" ? L["Pipeline:Without", reg.Name] : L["Pipeline:With", reg.Name])
+                            <MoIcon Icon="@MoIcons.Close" Size="12px" />
+                        </button>
+                    }
+                    @if (Query.Status is { } status)
+                    {
+                        <button type="button" class="mo-vl-capsule mo-vl-role--neutral"
+                                @onclick="@(() => SetFilter(Query with { Status = null }))">
+                            @L["Pipeline:StatusChip", Enum.TryParse<ExecutionPipelinePlanStatus>(status, out var value) && Enum.IsDefined(value) ? PipelineDisplay.Status(L, value) : status]
+                            <MoIcon Icon="@MoIcons.Close" Size="12px" />
+                        </button>
+                    }
+                    <span class="ep-showing">@L["Pipeline:Showing", _rows.Length, View.Plans.Length]</span>
+                    <button type="button" class="ep-action ep-action-ghost" @onclick="ClearFilters"><MoIcon Icon="@MoIcons.FilterOff" Size="15px" />@L["Pipeline:Clear"]</button>
+                </div>
+            }
+        </div>
+    }
+    <ExecutionPipelineChainMatrix View="View" Query="Query" Groups="_groups" Expanded="_expanded"
+                                  ChangeQuery="ChangeQuery" InspectPlan="InspectPlan" InspectBehavior="InspectBehavior"
+                                  Empty="EmptyMatrix" />
+    <p class="ep-caveat"><MoIcon Icon="@MoIcons.Info" Size="14px" />@L["Pipeline:CaveatNote"]</p>
+</section>
+
+@code {
+    [Parameter, EditorRequired] public ExecutionPipelineView View { get; set; } = default!;
+    [Parameter, EditorRequired] public ExecutionPipelineQuery Query { get; set; } = default!;
+    [Parameter] public EventCallback<ExecutionPipelineQuery> ChangeQuery { get; set; }
+    [Parameter] public EventCallback<string> InspectPlan { get; set; }
+    [Parameter] public EventCallback<string> InspectBehavior { get; set; }
+
+    private PipelineRow[] _rows = [];
+    private PipelineGroup[] _groups = [];
+    private Dictionary<string, int> _pointCounts = [];
+    private HashSet<string> _expanded = [];
+
+    protected override void OnParametersSet()
+    {
+        _rows = View.Filter(Query);
+        _groups = View.Groups(_rows, Query.Sort == "recent");
+        _pointCounts = View.Filter(Query with { Point = null }).GroupBy(row => row.Point)
+            .ToDictionary(group => group.Key, group => group.Count(), StringComparer.Ordinal);
+        _expanded = Query.Open switch
+        {
+            "all" => _groups.Select(group => group.Point).ToHashSet(StringComparer.Ordinal),
+            "none" => [],
+            { } points => points.Split(',', StringSplitOptions.RemoveEmptyEntries).ToHashSet(StringComparer.Ordinal),
+            _ => _groups.Where(group => Query.Filtered || group.Blocking > 0).Select(group => group.Point).ToHashSet(StringComparer.Ordinal)
+        };
+    }
+
+    private Task SetFilter(ExecutionPipelineQuery next) => ChangeQuery.InvokeAsync(next with { Open = null });
+    private Task SearchChanged(ChangeEventArgs args) => SetFilter(Query with { Q = args.Value?.ToString() });
+    private Task ClearFilters() => SetFilter(Query with { Q = null, Point = null, Status = null, Tx = null, Business = null, Behavior = null, Applied = null });
+
+    private RenderFragment Reason(string label, int count, string status, MoVisualRole role) => @<button type="button"
+        class="ep-reason @role.ToCssClass() @(count == 0 ? "is-zero" : null)" aria-pressed="@PipelineDisplay.Aria(Query.Status == status)"
+        disabled="@(count == 0)" title="@L["Pipeline:ReasonFilter", label]"
+        @onclick="@(() => SetFilter(Query with { Status = Query.Status == status ? null : status }))">
+        <i class="mo-vl-swatch" aria-hidden="true"></i>@label<b class="mo-vl-mono">@count</b>
+    </button>;
+    private RenderFragment Choice(string label, bool active, ExecutionPipelineQuery next) => @<button type="button"
+        aria-pressed="@PipelineDisplay.Aria(active)" @onclick="@(() => SetFilter(next))">@label</button>;
+    private static RenderFragment Text(object value) => builder => builder.AddContent(0, value);
+    private static RenderFragment Mark(object value, MoVisualRole role) => @<span class="mo-vl-mark @role.ToCssClass()">@value</span>;
+    private RenderFragment PlanLink(PipelineRow row, MoVisualRole role) => @<button type="button" class="ep-vlink @role.ToCssClass()"
+        @onclick="@(() => InspectPlan.InvokeAsync(row.Id))">@row.Name</button>;
+    private RenderFragment BehaviorLink(PipelineRegistration reg) => @<button type="button" class="ep-vlink is-reg @reg.Band.Role.ToCssClass()"
+        @onclick="@(() => InspectBehavior.InvokeAsync(reg.Key))">@reg.Name</button>;
+
+    private RenderFragment GuardScope(PipelineRegistration reg) => @<text>
+        @{
+            var reached = View.Points.Where(point => point.Rows.Any(row => row.Ready && row.Applies(reg))).ToArray();
+            var http = View.Points.FirstOrDefault(point => point.Point == ExecutionPipelineView.HttpPoint);
+        }
+        @if (reached.Length == 1) { @L["Pipeline:GuardAllIn", reached[0].Point] }
+        @if (http is not null && !http.Rows.Any(row => row.Applies(reg)))
+        {
+            @PipelineDisplay.Sentence(L[reached.Length == 1 ? "Pipeline:GuardNoneHttpAnd" : "Pipeline:GuardNoneHttp"], HttpLink(reg, http.Rows.Length))
+        }
+    </text>;
+    private RenderFragment HttpLink(PipelineRegistration reg, int count) => @<button type="button" class="ep-vlink mo-vl-role--primary"
+        @onclick="@(() => SetFilter(Query with { Behavior = reg.Key, Applied = "0", Point = ExecutionPipelineView.HttpPoint }))">@L["Pipeline:HttpActions", count]</button>;
+
+    private RenderFragment EmptyMatrix => @<div class="ep-empty">
+        <span class="mo-vl-tile mo-vl-role--neutral"><MoIcon Icon="@(View.Plans.Length == 0 ? MoIcons.Route : MoIcons.FilterOff)" Size="18px" /></span>
+        <div>
+            @if (View.Plans.Length == 0)
+            {
+                <h3>@L["Pipeline:NoPlansTitle"]</h3><p>@L["Pipeline:NoPlans", View.Registrations.Length]</p>
+            }
+            else
+            {
+                <h3>@L["Pipeline:NoMatch"]</h3>
+                <button type="button" class="ep-action ep-action-outline" @onclick="ClearFilters">@L["Pipeline:Clear"]</button>
+            }
+        </div>
+    </div>;
+}

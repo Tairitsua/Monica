@@ -15,6 +15,10 @@ public sealed class ExecutionPipelinePageState(ExecutionPipelineCatalogFacade ca
     /// </summary>
     public ExecutionPipelineCatalogSnapshot? Snapshot { get; private set; }
 
+    internal ExecutionPipelineView? View { get; private set; }
+
+    internal DateTimeOffset? FailedAt { get; private set; }
+
     /// <summary>
     /// Gets whether the page is currently loading a snapshot.
     /// </summary>
@@ -106,8 +110,12 @@ public sealed class ExecutionPipelinePageState(ExecutionPipelineCatalogFacade ca
     /// <returns><see langword="true"/> when the snapshot was refreshed successfully.</returns>
     public async Task<bool> RefreshAsync()
     {
+        if (IsLoading)
+        {
+            return false;
+        }
+
         IsLoading = true;
-        LoadError = null;
         NotifyStateChanged();
 
         var result = await catalogFacade.GetSnapshotAsync();
@@ -117,13 +125,16 @@ public sealed class ExecutionPipelinePageState(ExecutionPipelineCatalogFacade ca
         {
             IsLoading = false;
             LoadError = error.Message ?? "The execution pipeline snapshot was unavailable.";
+            FailedAt = DateTimeOffset.UtcNow;
             NotifyStateChanged();
             return false;
         }
 
+        View = new ExecutionPipelineView(snapshot, Snapshot);
         Snapshot = snapshot;
         IsLoading = false;
         LoadError = null;
+        FailedAt = null;
         NormalizeSelection();
         NotifyStateChanged();
         return true;
