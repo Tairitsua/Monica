@@ -28,6 +28,12 @@ public interface IEventSubscription : IAsyncDisposable
     /// <summary>Gets the stable logical consumer owner, or null for an unowned subscription.</summary>
     string? WorkloadOwner { get; }
 
+    /// <summary>Gets the host run identifier for an instance subscription, or null for shared consumption.</summary>
+    Guid? ReceiverInstanceId { get; }
+
+    /// <summary>Whether the active transport has established its receive position on this host.</summary>
+    bool IsTransportReady { get; }
+
     /// <summary>
     /// Event type this subscription listens to.
     /// </summary>

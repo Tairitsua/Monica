@@ -58,7 +58,7 @@ internal sealed class KafkaEventBusSubscriptionHostedService(
 
     protected override Task CreateExternalSubscriptionForTopicAsync(SubscriptionGroup group, Type eventType, CancellationToken cancellationToken)
     {
-        var consumer = new TopicConsumer(group.TopicName, cancellationToken, Consume, group.WorkloadOwner);
+        var consumer = new TopicConsumer(group.TopicName, cancellationToken, Consume, group.WorkloadOwner, group.ReceiverInstanceId);
         if (!_consumers.TryAddAndStart(consumer))
         {
             return consumer.StopAsync();
@@ -70,7 +70,7 @@ internal sealed class KafkaEventBusSubscriptionHostedService(
 
     protected override async Task RemoveExternalSubscriptionForTopicAsync(SubscriptionGroup group, CancellationToken cancellationToken)
     {
-        var consumer = _consumers.Remove(group.TopicName, group.WorkloadOwner);
+        var consumer = _consumers.Remove(group.TopicName, group.WorkloadOwner, group.ReceiverInstanceId);
         if (consumer is null)
         {
             return;
@@ -82,9 +82,9 @@ internal sealed class KafkaEventBusSubscriptionHostedService(
     protected override async Task DrainExternalSubscriptionForTopicAsync(SubscriptionGroup group, CancellationToken cancellationToken)
     {
         // Keep the consumer visible to host shutdown while a native commit or handler is still outstanding.
-        if (_consumers.Find(group.TopicName, group.WorkloadOwner) is not { } consumer) return;
+        if (_consumers.Find(group.TopicName, group.WorkloadOwner, group.ReceiverInstanceId) is not { } consumer) return;
         try { await consumer.DrainAsync(); }
-        finally { _consumers.Remove(group.TopicName, group.WorkloadOwner); }
+        finally { _consumers.Remove(group.TopicName, group.WorkloadOwner, group.ReceiverInstanceId); }
     }
 
     protected override Task DisposeExternalSubscriptionsAsync(CancellationToken cancellationToken)
@@ -101,7 +101,7 @@ internal sealed class KafkaEventBusSubscriptionHostedService(
 
     private void Consume(TopicConsumer topicConsumer)
     {
-        var group = new SubscriptionGroup(topicConsumer.TopicName, topicConsumer.WorkloadOwner);
+        var group = new SubscriptionGroup(topicConsumer.TopicName, topicConsumer.WorkloadOwner, topicConsumer.ReceiverInstanceId);
         try
         {
             while (!topicConsumer.CancellationToken.IsCancellationRequested)
@@ -140,18 +140,25 @@ internal sealed class KafkaEventBusSubscriptionHostedService(
     private void ConsumeTopic(TopicConsumer topicConsumer)
     {
         var cancellationToken = topicConsumer.CancellationToken;
-        var group = new SubscriptionGroup(topicConsumer.TopicName, topicConsumer.WorkloadOwner);
+        var group = new SubscriptionGroup(topicConsumer.TopicName, topicConsumer.WorkloadOwner, topicConsumer.ReceiverInstanceId);
         var cluster = clusterConfigProvider.GetDirectEventBusCluster();
-        var consumerConfig = KafkaClientConfigFactory.BuildConsumerConfig(cluster, options.Value, ServiceKey, topicConsumer.WorkloadOwner);
+        var consumerConfig = KafkaClientConfigFactory.BuildConsumerConfig(cluster, options.Value, ServiceKey, topicConsumer.WorkloadOwner, topicConsumer.ReceiverInstanceId);
         var hasProvenHealthy = false;
         var assignmentVersion = 0;
         using var consumer = new ConsumerBuilder<byte[], byte[]>(consumerConfig)
-            .SetPartitionsAssignedHandler((_, partitions) =>
+            .SetPartitionsAssignedHandler((client, partitions) =>
             {
                 assignmentVersion++;
-                hasProvenHealthy = true;
-                ReportSubscriptionState(group, TopicSubscriptionRuntimeState.Healthy,
+                // Fix the initial tail before admitting live clients. Persist it even on an idle
+                // partition so recreating this consumer resumes without another jump to latest.
+                var positions = topicConsumer.ReceiverInstanceId.HasValue
+                    ? ResolveInstancePositions(client, partitions, options.Value.ConsumerSessionTimeout)
+                    : partitions.Select(partition => new TopicPartitionOffset(partition, Offset.Unset)).ToList();
+                hasProvenHealthy = !topicConsumer.ReceiverInstanceId.HasValue || partitions.Count > 0;
+                ReportSubscriptionState(group, hasProvenHealthy
+                    ? TopicSubscriptionRuntimeState.Healthy : TopicSubscriptionRuntimeState.Subscribing,
                     $"Kafka group '{consumerConfig.GroupId}' assigned {partitions.Count} partition(s)");
+                return positions;
             })
             .SetPartitionsRevokedHandler((_, _) =>
             {
@@ -173,7 +180,7 @@ internal sealed class KafkaEventBusSubscriptionHostedService(
         var batchSubscription = SubscriptionManager.GetAll().SingleOrDefault(subscription => subscription.IsBatch
             && subscription.Scope == EventSubscriptionScope.Distributed && subscription.ServiceKey == ServiceKey
             && subscription.TopicName == topicConsumer.TopicName && subscription.WorkloadOwner == topicConsumer.WorkloadOwner
-            && subscription.State == EventSubscriptionState.Active);
+            && subscription.ReceiverInstanceId == topicConsumer.ReceiverInstanceId && subscription.State == EventSubscriptionState.Active);
 
         var policy = options.Value.ResolveFailurePolicy(topicConsumer.TopicName, ServiceKey, topicConsumer.WorkloadOwner, batchSubscription is not null);
         using var deadLetterProducer = policy.Action == KafkaFailureAction.DeadLetter
@@ -248,7 +255,7 @@ internal sealed class KafkaEventBusSubscriptionHostedService(
                 }
                 var processed = CommitAfterHandling(
                     () => HandleExternalMessageAsync(
-                        CreateReceivedMessage(result, ServiceKey), cancellationToken, topicConsumer.WorkloadOwner),
+                        CreateReceivedMessage(result, ServiceKey), cancellationToken, topicConsumer.WorkloadOwner, topicConsumer.ReceiverInstanceId),
                     () => consumer.Commit(result),
                     () => consumer.Seek(result.TopicPartitionOffset),
                     failure => HandleExhaustedAsync(result, failure),
@@ -316,6 +323,24 @@ internal sealed class KafkaEventBusSubscriptionHostedService(
 
         // Consumer.Close enters a librdkafka LeaveGroup path that can dereference a missing
         // coordinator. Consumer.Dispose uses NO_CONSUMER_CLOSE instead.
+    }
+
+    private static List<TopicPartitionOffset> ResolveInstancePositions(IConsumer<byte[], byte[]> client,
+        List<TopicPartition> partitions, TimeSpan timeout)
+    {
+        if (partitions.Count == 0) return [];
+        var positions = client.Committed(partitions, timeout);
+        var initial = new List<TopicPartitionOffset>();
+        for (var index = 0; index < positions.Count; index++)
+        {
+            var position = positions[index];
+            if (position.Offset != Offset.Unset) continue;
+            var end = client.QueryWatermarkOffsets(position.TopicPartition, timeout).High;
+            positions[index] = new TopicPartitionOffset(position.TopicPartition, end);
+            initial.Add(positions[index]);
+        }
+        if (initial.Count > 0) client.Commit(initial);
+        return positions;
     }
 
     internal static bool CommitAfterHandling(
@@ -445,14 +470,14 @@ internal sealed class KafkaEventBusSubscriptionHostedService(
     internal sealed class TopicConsumerRegistry
     {
         private readonly object _lifecycleLock = new();
-        private readonly Dictionary<(string TopicName, string? WorkloadOwner), TopicConsumer> _consumers = new();
+        private readonly Dictionary<(string TopicName, string? WorkloadOwner, Guid? ReceiverInstanceId), TopicConsumer> _consumers = new();
         private bool _isAccepting = true;
 
         internal bool TryAddAndStart(TopicConsumer consumer)
         {
             lock (_lifecycleLock)
             {
-                var key = (consumer.TopicName, consumer.WorkloadOwner);
+                var key = (consumer.TopicName, consumer.WorkloadOwner, consumer.ReceiverInstanceId);
                 if (!_isAccepting || !_consumers.TryAdd(key, consumer))
                 {
                     return false;
@@ -468,19 +493,19 @@ internal sealed class KafkaEventBusSubscriptionHostedService(
             }
         }
 
-        internal TopicConsumer? Remove(string topicName, string? workloadOwner = null)
+        internal TopicConsumer? Remove(string topicName, string? workloadOwner = null, Guid? receiverInstanceId = null)
         {
             lock (_lifecycleLock)
             {
-                return _consumers.Remove((topicName, workloadOwner), out var consumer)
+                return _consumers.Remove((topicName, workloadOwner, receiverInstanceId), out var consumer)
                     ? consumer
                     : null;
             }
         }
 
-        internal TopicConsumer? Find(string topicName, string? workloadOwner)
+        internal TopicConsumer? Find(string topicName, string? workloadOwner, Guid? receiverInstanceId = null)
         {
-            lock (_lifecycleLock) return _consumers.GetValueOrDefault((topicName, workloadOwner));
+            lock (_lifecycleLock) return _consumers.GetValueOrDefault((topicName, workloadOwner, receiverInstanceId));
         }
 
         internal IReadOnlyList<TopicConsumer> Drain()
@@ -518,10 +543,11 @@ internal sealed class KafkaEventBusSubscriptionHostedService(
             string topicName,
             CancellationToken cancellationToken,
             Action<TopicConsumer> consume,
-            string? workloadOwner = null)
+            string? workloadOwner = null, Guid? receiverInstanceId = null)
         {
             TopicName = topicName;
             WorkloadOwner = workloadOwner;
+            ReceiverInstanceId = receiverInstanceId;
             _consume = consume;
             _cancellationTokenSource = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
             CancellationToken = _cancellationTokenSource.Token;
@@ -530,6 +556,7 @@ internal sealed class KafkaEventBusSubscriptionHostedService(
         public string TopicName { get; }
 
         public string? WorkloadOwner { get; }
+        public Guid? ReceiverInstanceId { get; }
 
         public CancellationToken CancellationToken { get; }
 

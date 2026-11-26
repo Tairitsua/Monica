@@ -62,6 +62,31 @@ public sealed class EventReceiveDispatcherTests
     }
 
     [Fact]
+    public async Task DispatchAsync_WhenSharedAndInstanceReceiversUseTheSameOwner_ShouldSeparateDeliveries()
+    {
+        var token = TestContext.Current.CancellationToken;
+        await using var app = await new OwnershipFactory().CreateAsync(cancellationToken: token);
+        var registry = app.Services.GetRequiredService<IEventSubscriptionRegistry>();
+        var local = await registry.SubscribeAsync(new EventSubscriptionDescriptor
+        {
+            EventType = typeof(OwnershipNotice),
+            TopicName = "receiver.owned",
+            WorkloadOwner = "policy-owner",
+            ReceiveOnEachInstance = true,
+            Scope = EventSubscriptionScope.Distributed,
+            HandlerFactory = new IocEventHandlerFactory(
+                app.Services.GetRequiredService<IServiceScopeFactory>(), typeof(ExplicitOwnedHandler))
+        }, token);
+        var dispatcher = app.Services.GetRequiredService<IEventReceiveDispatcher>();
+        var recorder = app.Services.GetRequiredService<DeliveryRecorder>();
+        Assert.NotNull(local.ReceiverInstanceId);
+        await dispatcher.DispatchAsync(CreateMessage(), "policy-owner", token);
+        recorder.Owners.Should().Equal("policy-owner");
+        await dispatcher.DispatchAsync(CreateMessage(), "policy-owner", token, local.ReceiverInstanceId);
+        recorder.Owners.Should().Equal("policy-owner", "explicit-owner");
+    }
+
+    [Fact]
     public async Task LocalPublish_WhenExternalOwnersExist_ShouldRetainLocalDispatch()
     {
         var token = TestContext.Current.CancellationToken;

@@ -34,7 +34,7 @@ internal static class KafkaClientConfigFactory
     }
 
     public static ConsumerConfig BuildConsumerConfig(KafkaClusterConfig cluster, ModuleEventBusKafkaOption option,
-        string? serviceKey, string? workloadOwner = null)
+        string? serviceKey, string? workloadOwner = null, Guid? receiverInstanceId = null)
     {
         ArgumentOutOfRangeException.ThrowIfLessThan(option.ConsumerFetchMessageMaxBytes, 1);
         ArgumentOutOfRangeException.ThrowIfLessThan(option.ConsumerFetchMaxBytes, 1);
@@ -56,8 +56,8 @@ internal static class KafkaClientConfigFactory
 
         var config = new ConsumerConfig
         {
-            GroupId = BuildConsumerGroupId(option, serviceKey, workloadOwner),
-            AutoOffsetReset = option.AutoOffsetReset,
+            GroupId = BuildConsumerGroupId(option, serviceKey, workloadOwner, receiverInstanceId),
+            AutoOffsetReset = receiverInstanceId.HasValue ? AutoOffsetReset.Latest : option.AutoOffsetReset,
             MaxPartitionFetchBytes = option.ConsumerFetchMessageMaxBytes,
             FetchMaxBytes = option.ConsumerFetchMaxBytes,
             SessionTimeoutMs = sessionTimeoutMs,
@@ -144,19 +144,18 @@ internal static class KafkaClientConfigFactory
     }
 
     internal static string BuildConsumerGroupId(ModuleEventBusKafkaOption option, string? serviceKey,
-        string? workloadOwner = null)
+        string? workloadOwner = null, Guid? receiverInstanceId = null)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(option.ConsumerGroupId);
+        if (workloadOwner?.Split('.').Contains("bus", StringComparer.Ordinal) == true)
+            throw new ArgumentException("The workload owner cannot contain the reserved 'bus' segment.", nameof(workloadOwner));
         var group = string.IsNullOrWhiteSpace(workloadOwner)
             ? $"{option.ConsumerGroupId.Trim()}.default"
-            : $"{option.ConsumerGroupId.Trim()}.owner.{EscapeGroupSegment(workloadOwner)}";
-        return string.IsNullOrWhiteSpace(serviceKey)
-            ? group
-            : $"{group}.bus.{EscapeGroupSegment(serviceKey)}";
+            : $"{option.ConsumerGroupId.Trim()}.owner.{Uri.EscapeDataString(workloadOwner)}";
+        if (!string.IsNullOrWhiteSpace(serviceKey))
+            group += $".bus.{Uri.EscapeDataString(serviceKey)}";
+        return receiverInstanceId is { } instanceId ? $"{group}.instance.{instanceId:N}" : group;
     }
-
-    private static string EscapeGroupSegment(string value)
-        => Uri.EscapeDataString(value).Replace(".", "%2E", StringComparison.Ordinal);
 
     internal static int NormalizeTimeoutMilliseconds(TimeSpan timeout)
     {

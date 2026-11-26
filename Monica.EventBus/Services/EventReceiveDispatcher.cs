@@ -52,8 +52,8 @@ public sealed class EventReceiveDispatcher(
         => DispatchCoreAsync(message, filterWorkloadOwner: false, workloadOwner: null, cancellationToken);
 
     /// <inheritdoc />
-    public Task DispatchAsync(EventMessage message, string? workloadOwner, CancellationToken cancellationToken)
-        => DispatchCoreAsync(message, filterWorkloadOwner: true, workloadOwner, cancellationToken);
+    public Task DispatchAsync(EventMessage message, string? workloadOwner, CancellationToken cancellationToken, Guid? receiverInstanceId = null)
+        => DispatchCoreAsync(message, filterWorkloadOwner: true, workloadOwner, cancellationToken, receiverInstanceId);
 
     /// <inheritdoc />
     public Task DispatchTestAsync(EventMessage message,
@@ -91,7 +91,7 @@ public sealed class EventReceiveDispatcher(
     }
 
     private async Task DispatchCoreAsync(
-        EventMessage message, bool filterWorkloadOwner, string? workloadOwner, CancellationToken cancellationToken)
+        EventMessage message, bool filterWorkloadOwner, string? workloadOwner, CancellationToken cancellationToken, Guid? receiverInstanceId = null)
     {
         ArgumentNullException.ThrowIfNull(message);
         cancellationToken.ThrowIfCancellationRequested();
@@ -100,6 +100,7 @@ public sealed class EventReceiveDispatcher(
             .Where(subscription => subscription.TopicName == metadata.TopicName &&
                                    subscription.ServiceKey == metadata.ServiceKey &&
                                    subscription.Scope == message.Scope &&
+                                   subscription.ReceiverInstanceId == receiverInstanceId &&
                                    (!filterWorkloadOwner || subscription.WorkloadOwner == workloadOwner))
             .ToArray();
         // A shared broker acknowledgment covers every matching handler. Refuse the whole delivery before

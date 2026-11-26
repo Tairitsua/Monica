@@ -59,7 +59,7 @@ public sealed class KafkaClientConfigFactoryTests
         Assert.Equal(30_000, consumer.SessionTimeoutMs);
         Assert.Equal(600_000, consumer.MaxPollIntervalMs);
         Assert.Equal(AutoOffsetReset.Earliest, consumer.AutoOffsetReset);
-        Assert.Equal("fips.site-a.owner.user%2Erealtime.bus.audit", consumer.GroupId);
+        Assert.Equal("fips.site-a.owner.user.realtime.bus.audit", consumer.GroupId);
     }
 
     [Fact]
@@ -71,15 +71,28 @@ public sealed class KafkaClientConfigFactoryTests
             KafkaClientConfigFactory.BuildConsumerGroupId(option, null),
             KafkaClientConfigFactory.BuildConsumerGroupId(option, null, "default"),
             KafkaClientConfigFactory.BuildConsumerGroupId(option, "b", "a"),
-            KafkaClientConfigFactory.BuildConsumerGroupId(option, null, "a.bus.b"),
             KafkaClientConfigFactory.BuildConsumerGroupId(option, "b.c", "a"),
-            KafkaClientConfigFactory.BuildConsumerGroupId(option, "c", "a.bus.b"),
             KafkaClientConfigFactory.BuildConsumerGroupId(option, null, "a%2Eb"),
             KafkaClientConfigFactory.BuildConsumerGroupId(option, null, "a.b")
         };
 
+        Assert.Throws<ArgumentException>(() => KafkaClientConfigFactory.BuildConsumerGroupId(option, null, "a.bus.b"));
         Assert.Equal(groups.Length, groups.Distinct(StringComparer.Ordinal).Count());
         Assert.Equal(groups[2], KafkaClientConfigFactory.BuildConsumerGroupId(option, "b", "a"));
+    }
+
+    [Fact]
+    public void BuildConsumerConfig_WhenReceivingOnEachInstance_ShouldReuseRunIdentityAndStartNewGroupsAtLatest()
+    {
+        var option = new ModuleEventBusKafkaOption { AutoOffsetReset = AutoOffsetReset.Earliest };
+        var firstRun = Guid.NewGuid();
+        var first = KafkaClientConfigFactory.BuildConsumerConfig(Cluster(), option, null, "updates", firstRun);
+        var reconnect = KafkaClientConfigFactory.BuildConsumerConfig(Cluster(), option, null, "updates", firstRun);
+        var second = KafkaClientConfigFactory.BuildConsumerConfig(Cluster(), option, null, "updates", Guid.NewGuid());
+        Assert.Equal($"monica-eventbus.owner.updates.instance.{firstRun:N}", first.GroupId);
+        Assert.Equal(first.GroupId, reconnect.GroupId);
+        Assert.NotEqual(first.GroupId, second.GroupId);
+        Assert.Equal(AutoOffsetReset.Latest, first.AutoOffsetReset);
     }
 
     [Theory]

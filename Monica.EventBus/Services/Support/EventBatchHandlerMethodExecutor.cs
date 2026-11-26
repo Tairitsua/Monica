@@ -27,7 +27,7 @@ internal sealed class EventBatchHandlerMethodExecutor<TEvent> : IEventHandlerMet
         var features = new ExecutionFeatureCollection();
         features.Set(batch);
         features.Set(new EventHandlerExecutionFeature(subscription.Id, subscription.TopicName,
-            subscription.Scope, subscription.ServiceKey, subscription.IsAutoDiscovered));
+            subscription.Scope, subscription.ServiceKey, subscription.IsAutoDiscovered) { ReceiverInstanceId = subscription.ReceiverInstanceId });
         await serviceProvider.GetRequiredService<IExecutionPipeline>().ExecuteAsync(
             descriptor, (IReadOnlyList<TEvent>)payloads, target,
             () => batch.Indices.Count == 0 ? Task.CompletedTask

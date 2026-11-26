@@ -29,8 +29,9 @@ public interface IEventReceiveDispatcher
     /// <param name="message">The received transport message, with its original producer identity.</param>
     /// <param name="workloadOwner">The intended owner; null targets only unowned subscriptions.</param>
     /// <param name="cancellationToken">Cancels dispatch and prevents successful acknowledgment.</param>
+    /// <param name="receiverInstanceId">The targeted host run, or null for competing subscriptions.</param>
     /// <remarks>Other owners in a combined host do not participate in this delivery.</remarks>
-    Task DispatchAsync(EventMessage message, string? workloadOwner, CancellationToken cancellationToken);
+    Task DispatchAsync(EventMessage message, string? workloadOwner, CancellationToken cancellationToken, Guid? receiverInstanceId = null);
 
     /// <summary>Delivers to exactly the selected active subscriptions, failing if any selection is unavailable or incompatible.</summary>
     /// <remarks>

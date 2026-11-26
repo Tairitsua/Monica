@@ -17,6 +17,9 @@ public sealed record EventSubscriptionDescriptor
     /// </summary>
     public string? ServiceKey { get; init; }
 
+    /// <summary>Gets whether each online host should receive a copy. Defaults to competing within the owner.</summary>
+    public bool ReceiveOnEachInstance { get; init; }
+
     /// <summary>Gets the stable logical consumer owner, or null for an unowned subscription.</summary>
     /// <remarks>
     /// This identity groups competing replicas independently of their host AppId. It does not replace

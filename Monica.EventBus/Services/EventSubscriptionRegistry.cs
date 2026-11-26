@@ -24,6 +24,7 @@ public class EventSubscriptionRegistry(
     private readonly ConcurrentQueue<PendingNotification> _notificationQueue = new();
     private readonly ConcurrentDictionary<EventSubscriptionId, EventSubscription> _subscriptions = new();
     private readonly ConcurrentDictionary<Guid, IObserver<EventSubscriptionChange>> _observers = new();
+    private readonly Guid _hostInstanceId = Guid.NewGuid();
     private int _isDispatchingNotifications;
     private readonly object _registrationLock = new();
 
@@ -52,13 +53,17 @@ public class EventSubscriptionRegistry(
         }
 
         var handler = descriptor.HandlerFactory.GetHandlerType();
+        var eachInstance = descriptor.ReceiveOnEachInstance
+            || handler?.IsDefined(typeof(ReceiveOnEachInstanceAttribute), inherit: true) == true;
+        if (eachInstance && descriptor.Scope != EventSubscriptionScope.Distributed)
+            throw new ArgumentException("Per-instance delivery requires a distributed subscription.", nameof(descriptor));
         var mode = descriptor.Scope == EventSubscriptionScope.Local
             ? ActivationMode.Automatic
             : activation?.GetActivation(handler ?? typeof(EventSubscription),
                 TypeActivationKind.ExternalSubscription, descriptor.RegistrationOwner) ?? ActivationMode.Automatic;
         var roleId = descriptor.Scope == EventSubscriptionScope.Distributed
             ? health?.GetRoleId(handler ?? typeof(EventSubscription), descriptor.RegistrationOwner) : null;
-        var subscription = new EventSubscription(descriptor, mode, roleId, health);
+        var subscription = new EventSubscription(descriptor, mode, roleId, health, eachInstance ? _hostInstanceId : null);
         application?.RecordActivation(new ResourceActivation
         {
             Key = $"EventBus:{descriptor.ServiceKey ?? "default"}:{descriptor.TopicName}:{descriptor.WorkloadOwner ?? "unowned"}:{handler?.FullName ?? subscription.Id.ToString()}",
@@ -85,6 +90,7 @@ public class EventSubscriptionRegistry(
             if (descriptor.Scope == EventSubscriptionScope.Distributed && _subscriptions.Values.Any(existing =>
                     existing.Scope == descriptor.Scope && existing.ServiceKey == descriptor.ServiceKey
                     && existing.TopicName == descriptor.TopicName && existing.WorkloadOwner == descriptor.WorkloadOwner
+                    && existing.ReceiverInstanceId == subscription.ReceiverInstanceId
                     && (isBatch || ((IEventSubscription)existing).IsBatch)))
                 throw new InvalidOperationException("A batch subscription must exclusively own its topic, bus and workload-owner group. Use a separate owner for another consumer.");
             if (!_subscriptions.TryAdd(subscription.Id, subscription))

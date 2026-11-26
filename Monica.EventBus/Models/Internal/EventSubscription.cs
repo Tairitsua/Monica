@@ -9,7 +9,7 @@ namespace Monica.EventBus.Models.Internal;
 /// Concrete subscription implementation with lifecycle management.
 /// </summary>
 internal class EventSubscription(EventSubscriptionDescriptor descriptor, ActivationMode activation = ActivationMode.Automatic,
-    string? roleId = null, IRoleHealthStateProvider? health = null) : IEventSubscription
+    string? roleId = null, IRoleHealthStateProvider? health = null, Guid? receiverInstanceId = null) : IEventSubscription
 {
     private readonly SemaphoreSlim _mutationGate = new(1, 1);
     private volatile EventSubscriptionState _state = activation switch
@@ -50,6 +50,11 @@ internal class EventSubscription(EventSubscriptionDescriptor descriptor, Activat
 
     public EventSubscriptionId Id { get; } = EventSubscriptionId.NewId();
     public string? ServiceKey { get; } = descriptor.ServiceKey;
+    private volatile bool _transportReady;
+    public bool IsTransportReady => State == EventSubscriptionState.Active && _transportReady;
+    internal void SetTransportReady(bool ready) => _transportReady = ready;
+
+    public Guid? ReceiverInstanceId { get; } = receiverInstanceId;
     public string? WorkloadOwner { get; } = descriptor.WorkloadOwner;
     public Type EventType { get; } = descriptor.EventType;
     public string TopicName { get; } = descriptor.TopicName;

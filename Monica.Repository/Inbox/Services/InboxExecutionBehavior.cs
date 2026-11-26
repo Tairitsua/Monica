@@ -32,12 +32,16 @@ public sealed class InboxExecutionBehavior<TInput, TResult>(
         if (descriptor.TransactionMode != ExecutionTransactionMode.Automatic)
             throw new InvalidOperationException($"Inbox handler '{descriptor.ComponentType}' must use an automatic transaction.");
 
+        var consumer = context.Features.TryGet<EventHandlerExecutionFeature>(out var handler)
+            && handler.ReceiverInstanceId is { } instanceId
+            ? $"{attribute.Consumer}.instance.{instanceId:N}"
+            : attribute.Consumer;
         if (descriptor.Point == EventBusExecutionPoints.DistributedBatchHandler)
         {
             if (typeof(TResult) != typeof(ExecutionUnit))
                 throw new InvalidOperationException("Inbox deduplication requires a no-result EventBus handler boundary.");
             var batch = context.Features.GetRequired<EventBatchExecutionFeature>();
-            await StageBatchAsync(batch, attribute.Consumer, context.CancellationToken);
+            await StageBatchAsync(batch, consumer, context.CancellationToken);
             return batch.Metadata.Count == 0 ? (TResult)(object)ExecutionUnit.Value : await next();
         }
 
@@ -47,7 +51,6 @@ public sealed class InboxExecutionBehavior<TInput, TResult>(
             throw new InvalidOperationException($"Inbox handler '{descriptor.ComponentType}' requires stable incoming source and message identity.");
         var db = unitOfWork.RequireInboxOwner();
         var receipts = db.Set<InboxReceipt>();
-        var consumer = attribute.Consumer;
         var source = metadata.Source;
         var messageId = metadata.MessageId;
         if (await receipts.AsNoTracking().AnyAsync(x => x.Consumer == consumer && x.Source == source

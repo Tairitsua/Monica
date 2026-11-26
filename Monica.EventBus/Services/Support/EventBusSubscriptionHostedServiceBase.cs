@@ -58,7 +58,7 @@ public abstract class EventBusSubscriptionHostedServiceBase(
     protected virtual bool SupportsBatchReceiving => false;
 
     /// <summary>Identifies one physical subscription within this bus instance.</summary>
-    protected readonly record struct SubscriptionGroup(string TopicName, string? WorkloadOwner);
+    protected readonly record struct SubscriptionGroup(string TopicName, string? WorkloadOwner, Guid? ReceiverInstanceId = null);
 
     /// <summary>
     /// Tracks subscription information per topic.
@@ -219,6 +219,8 @@ public abstract class EventBusSubscriptionHostedServiceBase(
                         throw new InvalidOperationException(errorMsg);
                     }
 
+                    if (subscription is EventSubscription added)
+                        added.SetTransportReady(topicInfo.RuntimeState == TopicSubscriptionRuntimeState.Healthy);
                     // Add to existing topic's reference set
                     topicInfo.RequiresBatchReceiving |= subscription.IsBatch;
                     if (!topicInfo.SubscriptionIds.Add(subscription.Id))
@@ -249,6 +251,13 @@ public abstract class EventBusSubscriptionHostedServiceBase(
                         "Created new topic {Topic} for subscription {EventSubscriptionId}",
                         topicName, subscription.Id);
                 }
+            }
+
+            if (group.ReceiverInstanceId.HasValue && ProviderKind != EventBusProviderKind.Kafka)
+            {
+                var message = $"{ServiceName} does not support per-instance subscriptions.";
+                ReportSubscriptionState(group, TopicSubscriptionRuntimeState.Failed, message);
+                throw new NotSupportedException(message);
             }
 
             if (subscription.IsBatch && !SupportsBatchReceiving)
@@ -367,7 +376,7 @@ public abstract class EventBusSubscriptionHostedServiceBase(
     }
 
     private SubscriptionGroup GetSubscriptionGroup(IEventSubscription subscription)
-        => new(subscription.TopicName, GroupSubscriptionsByWorkloadOwner ? subscription.WorkloadOwner : null);
+        => new(subscription.TopicName, GroupSubscriptionsByWorkloadOwner ? subscription.WorkloadOwner : null, subscription.ReceiverInstanceId);
 
     /// <summary>
     /// Reports owner-level evidence while retaining the least healthy active owner state in the topic overview.
@@ -387,6 +396,9 @@ public abstract class EventBusSubscriptionHostedServiceBase(
             }
 
             subscription.RuntimeState = state;
+            foreach (var id in subscription.SubscriptionIds)
+                if (SubscriptionManager.GetById(id) is EventSubscription entry)
+                    entry.SetTransportReady(state == TopicSubscriptionRuntimeState.Healthy);
             ReportTopicState(group.TopicName,
                 $"Owner '{group.WorkloadOwner ?? "<unowned>"}': {message}", exception);
         }
@@ -456,6 +468,13 @@ public abstract class EventBusSubscriptionHostedServiceBase(
                 continue;
             }
 
+            if (group.ReceiverInstanceId.HasValue && ProviderKind != EventBusProviderKind.Kafka)
+            {
+                ReportSubscriptionState(group, TopicSubscriptionRuntimeState.Failed,
+                    $"{ServiceName} does not support per-instance subscriptions.");
+                continue;
+            }
+
             ReportSubscriptionState(
                 group, TopicSubscriptionRuntimeState.Subscribing,
                 $"Recreating external subscription for topic {group.TopicName}");
@@ -500,14 +519,15 @@ public abstract class EventBusSubscriptionHostedServiceBase(
     /// <param name="message">The received message with its provider metadata.</param>
     /// <param name="cancellationToken">Cancellation token</param>
     /// <param name="workloadOwner">The target owner for providers that group subscriptions by ownership.</param>
+    /// <param name="receiverInstanceId">The target host run for an independent instance subscription.</param>
     protected async Task HandleExternalMessageAsync(
         EventMessage message,
         CancellationToken cancellationToken,
-        string? workloadOwner = null)
+        string? workloadOwner = null, Guid? receiverInstanceId = null)
     {
         cancellationToken.ThrowIfCancellationRequested();
         var topicName = message.Metadata.TopicName;
-        var group = new SubscriptionGroup(topicName, GroupSubscriptionsByWorkloadOwner ? workloadOwner : null);
+        var group = new SubscriptionGroup(topicName, GroupSubscriptionsByWorkloadOwner ? workloadOwner : null, receiverInstanceId);
         // Get topic information
         if (!_topicSubscriptions.ContainsKey(group))
         {
@@ -523,7 +543,7 @@ public abstract class EventBusSubscriptionHostedServiceBase(
         {
             if (GroupSubscriptionsByWorkloadOwner)
             {
-                await Dispatcher.DispatchAsync(message, workloadOwner, cancellationToken);
+                await Dispatcher.DispatchAsync(message, workloadOwner, cancellationToken, receiverInstanceId);
             }
             else
             {

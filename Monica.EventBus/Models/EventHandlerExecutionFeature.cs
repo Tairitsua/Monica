@@ -13,4 +13,8 @@ public sealed record EventHandlerExecutionFeature(
     string TopicName,
     EventSubscriptionScope Scope,
     string? ServiceKey,
-    bool IsAutoDiscovered);
+    bool IsAutoDiscovered)
+{
+    /// <summary>Gets the receiving host run identifier when each instance owns an independent delivery.</summary>
+    public Guid? ReceiverInstanceId { get; init; }
+}

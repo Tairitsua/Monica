@@ -62,7 +62,7 @@ internal static class EventHandlerExecutionAdapter<TEvent>
             subscription.TopicName,
             subscription.Scope,
             subscription.ServiceKey,
-            subscription.IsAutoDiscovered));
+            subscription.IsAutoDiscovered) { ReceiverInstanceId = subscription.ReceiverInstanceId });
         await serviceProvider.GetRequiredService<IExecutionPipeline>()
             .ExecuteAsync(
                 descriptor,
