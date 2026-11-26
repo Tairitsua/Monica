@@ -1,0 +1,5 @@
+.oi-date { min-width: 0; display: grid; gap: 4px; color: var(--mud-palette-text-secondary); font-size: 12px; }
+.oi-date > div { display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr); gap: 6px; }
+.oi-date ::deep .mud-input-control { margin: 0; }
+.oi-date ::deep .mud-input { font-size: 12px; }
+.oi-date ::deep input { padding: 7px 9px; }

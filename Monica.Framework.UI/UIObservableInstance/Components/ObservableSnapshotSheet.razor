@@ -1,0 +1,195 @@
+@implements IDisposable
+@inject IStringLocalizer<ObservableInstanceResource> L
+@inject NavigationManager Navigation
+@inject MoTimeFormatter Time
+@inject IJSRuntime JS
+@inject ISnackbar Snackbar
+
+<MoSideSheet Open="true" OpenChanged="Close" Width="620px" Compact="true" CloseLabel="@L["Design:Close"]"
+             ActiveTabIndex="@(Query.Timeline == "current" ? 0 : 1)" ActiveTabIndexChanged="ChangeTab"
+             TabPanels="@(_frozen is null ? null : Tabs)">
+    <TitleContent>
+        <div class="oi-sheet-head">
+            <span class="mo-vl-tile @((_frozen?.HealthRole ?? MoVisualRole.Neutral).ToCssClass())"><MoIcon Icon="@MoIcons.Package" Size="16px" /></span>
+            <div class="oi-sheet-id">
+                <p>@L["Design:SheetEyebrow"]</p>
+                <h2>@(_frozen?.Name ?? L["Design:SheetUnknownTitle"].Value)</h2>
+                @if (_frozen is { } item)
+                {
+                    <div class="oi-sheet-flags">
+                        <ObservableStatus Snapshot="item.Snapshot" IncludeLevel="true" />
+                        <span class="mo-vl-capsule mo-vl-capsule--outline mo-vl-role--neutral">@(item.Group ?? L["Design:Ungrouped"].Value)</span>
+                        @if (item.Snapshot.InstanceKey is { Length: > 0 } key)
+                        { <span class="mo-vl-capsule mo-vl-capsule--outline mo-vl-role--neutral mo-vl-mono">@key</span> }
+                    </div>
+                }
+            </div>
+        </div>
+    </TitleContent>
+    <HeaderContent>
+        @if (_frozen is { } item)
+        {
+            var generation = item.Snapshot.Identity.RegistrationId;
+            <div class="oi-sheet-frozen">
+                <MoIcon Icon="@MoIcons.Lock" Size="13px" />
+                <span>@L["Design:SheetFrozenNote", Time.Format(item.Snapshot.CapturedAt), generation[..Math.Min(12, generation.Length)]]</span>
+            </div>
+        }
+    </HeaderContent>
+    <ChildContent>
+        <div class="mo-vl-callout mo-vl-role--warning">
+            <span class="mo-vl-callout-mark"><MoIcon Icon="@MoIcons.Warning" Size="16px" /></span>
+            <div class="mo-vl-callout-content">
+                <h3 class="mo-vl-callout-title">@L["Design:SheetUnknownTitle"]</h3>
+                <p class="mo-vl-callout-body">@L["Design:SheetUnknownBody", InstanceId]</p>
+            </div>
+        </div>
+    </ChildContent>
+</MoSideSheet>
+
+@code {
+    /// <summary>Gets the instance specified by the link, which may be absent in this capture.</summary>
+    [Parameter, EditorRequired] public string InstanceId { get; set; } = "";
+    /// <summary>Gets the latest capture. The sheet freezes the initial value for the instance key.</summary>
+    [Parameter] public ObservableInstanceSnapshot? Snapshot { get; set; }
+    /// <summary>Gets the selected tab, timeline facet, and sequence from the route.</summary>
+    [Parameter, EditorRequired] public ObservableViewQuery Query { get; set; } = default!;
+    /// <summary>Publishes inspection changes without replacing the frozen capture.</summary>
+    [Parameter] public EventCallback<ObservableInspection> ChangeInspection { get; set; }
+    /// <summary>Notifies the route owner after dismissal.</summary>
+    [Parameter] public EventCallback Closed { get; set; }
+    /// <summary>Requests history clear targeted at the frozen registration identity.</summary>
+    [Parameter] public EventCallback<ObservableInstanceSnapshot> Clear { get; set; }
+    /// <summary>Disables maintenance while a command is in progress.</summary>
+    [Parameter] public bool Busy { get; set; }
+
+    private TrackerEvidence? _frozen;
+    private bool _retired;
+    private bool CanClear => !Busy && Snapshot?.History.Count > 0;
+    private ElementReference _clearButton;
+    protected override void OnInitialized() => _frozen = Snapshot is { } snapshot ? new TrackerEvidence(snapshot) : null;
+    private Task Close(bool open) => open ? Task.CompletedTask : Closed.InvokeAsync();
+    private Task ChangeTab(int tab) => ChangeInspection.InvokeAsync(new(InstanceId, tab == 0 ? "current" : "timeline", tab == 0 ? null : Query.Sequence));
+
+    private async Task ClearSelectionAsync()
+    {
+        if (!CanClear || _retired || _frozen is null) return;
+        await Clear.InvokeAsync(_frozen.Snapshot);
+        if (_retired) return;
+        try { await _clearButton.FocusAsync(preventScroll: true); }
+        catch (JSDisconnectedException) { }
+    }
+
+    /// <summary>Retires focus and clipboard feedback when the frozen sheet closes.</summary>
+    public void Dispose() => _retired = true;
+
+    private async Task CopyAsync(string value)
+    {
+        try
+        {
+            await JS.InvokeVoidAsync("navigator.clipboard.writeText", value);
+            if (!_retired) Snackbar.Add(L["Design:Copied"], Severity.Success);
+        }
+        catch (JSDisconnectedException) { }
+        catch (JSException) { if (!_retired) Snackbar.Add(L["Design:CopyFailed"], Severity.Warning); }
+    }
+
+    private RenderFragment Tabs => @<text>
+        <MudTabPanel Text="@L["Design:SheetTabs:Current"]">
+            <div class="oi-sheet-panel">
+                @Actions
+                @Current
+            </div>
+        </MudTabPanel>
+        <MudTabPanel Text="@L["Design:SheetTabs:Timeline"]">
+            <TabContent>
+                <span class="oi-tab-label">@L["Design:SheetTabs:Timeline"]
+                    <span class="oi-tab-count">@_frozen!.Retained</span>
+                    @if (_frozen.RetainedExceptions.Length > 0)
+                    {
+                        <span class="oi-tab-count is-error">@_frozen.RetainedExceptions.Length @L["Design:ExShort"]</span>
+                    }
+                </span>
+            </TabContent>
+            <ChildContent>
+                <div class="oi-sheet-panel">
+                    @Actions
+                    <ObservableTimeline Snapshot="_frozen!.Snapshot" Query="Query" ChangeInspection="ChangeInspection" />
+                </div>
+            </ChildContent>
+        </MudTabPanel>
+    </text>;
+
+    private RenderFragment Actions => @<div class="oi-sheet-actions">
+        @if (_frozen!.RetainedExceptions.Length > 0)
+        {
+            <MudButton Href="@ObservableViewQuery.Link(Navigation, ObservableViewQuery.ExceptionsPath, ("source", InstanceId))"
+                       Size="Size.Small" Variant="Variant.Outlined" StartIcon="@MoIcons.Error">@L["Design:OpenInExceptions"]</MudButton>
+        }
+        <button type="button" class="mo-vl-soft-action mo-vl-role--warning oi-clear" @ref="_clearButton"
+                aria-disabled="@(CanClear ? "false" : "true")" @onclick="ClearSelectionAsync">
+            <MoIcon Icon="@MoIcons.Delete" Size="14px" />@L["Design:ClearHistory"]
+        </button>
+    </div>;
+
+    private RenderFragment Current => @<text>
+        @{
+            var item = _frozen!;
+            var snapshot = item.Snapshot;
+        }
+        <section class="oi-sheet-sec">
+            <h3>@L["Design:SheetValueTitle"]</h3>
+            <ObservableStateValue Value="snapshot.CurrentState" Label="@L["Design:SheetValueTitle"]" />
+        </section>
+        <section class="oi-sheet-sec">
+            <h3>@L["Design:SheetBufferTitle"]</h3>
+            <div class="oi-sheet-buf">
+                <div class="oi-sheet-buf-top">
+                    <span><b class="mo-vl-mono">@item.Retained</b> <span class="mo-vl-mono">/ @snapshot.MaxHistorySize</span> @L["Design:SheetMeta:Retention"]</span>
+                    @if (item.EvictedRecords > 0)
+                    { <span class="oi-sheet-evicted mo-vl-mono">@L["Design:EvictedNote", item.EvictedRecords]</span> }
+                </div>
+                <ObservableBufferBar Snapshot="snapshot" Tall="true" />
+                <div class="oi-sheet-counters">
+                    <div><span>@L["Design:SheetMeta:LifetimeRec"]</span><b class="mo-vl-mono">@snapshot.TotalRecords.ToString("N0")</b></div>
+                    <div><span>@L["Design:Facts:RetainedEx"]</span><b class="mo-vl-mono @(item.RetainedExceptions.Length > 0 ? "is-err" : null)">@item.RetainedExceptions.Length</b></div>
+                    <div><span>@L["Design:SheetMeta:LifetimeEx"]</span><b class="mo-vl-mono @(snapshot.TotalExceptions > 0 ? "is-warn" : null)">@snapshot.TotalExceptions</b></div>
+                </div>
+            </div>
+            @if (item.EvictedExceptions > 0)
+            {
+                <div class="mo-vl-callout mo-vl-role--warning">
+                    <span class="mo-vl-callout-mark"><MoIcon Icon="@MoIcons.Warning" Size="16px" /></span>
+                    <p class="mo-vl-callout-body">@L["Design:EvictedInSheetNote", item.EvictedExceptions]</p>
+                </div>
+            }
+        </section>
+        <section class="oi-sheet-sec">
+            <h3>@L["Design:SheetMetaTitle"]</h3>
+            <dl class="oi-sheet-meta">
+                @IdentityRow("Id", snapshot.Identity.InstanceId, copy: true)
+                @IdentityRow("Type", snapshot.InstanceTypeName ?? L["Design:NoType"], copy: snapshot.InstanceTypeName is not null)
+                @IdentityRow("Group", item.Group ?? L["Design:Ungrouped"])
+                @IdentityRow("Key", snapshot.InstanceKey ?? "—")
+                @IdentityRow("RegId", snapshot.Identity.RegistrationId, copy: true)
+                @IdentityRow("Registered", Time.Format(snapshot.RegisteredAt))
+                @IdentityRow("LastRecorded", Time.Format(snapshot.TotalRecords == 0 ? (DateTime?)null : snapshot.LastRecordedAt))
+                @IdentityRow("Captured", Time.Format(snapshot.CapturedAt))
+                <div><dt>@L["Design:SheetMeta:Health"]</dt><dd><ObservableStatus Snapshot="snapshot" IncludeLevel="true" Pill="false" /></dd></div>
+            </dl>
+        </section>
+    </text>;
+
+    private RenderFragment IdentityRow(string key, string value, bool copy = false) => @<div>
+        <dt>@L[$"Design:SheetMeta:{key}"]</dt>
+        <dd>
+            <span class="@(key == "Group" ? null : "mo-vl-mono")">@ObservableMarkup.Breakable(value)</span>
+            @if (copy)
+            {
+                <button class="oi-copy" type="button" aria-label="@L["Design:CopyField", L[$"Design:SheetMeta:{key}"]]" @onclick="() => CopyAsync(value)">
+                    <MoIcon Icon="@MoIcons.Copy" Size="14px" />
+                </button>
+            }
+        </dd>
+    </div>;
+}

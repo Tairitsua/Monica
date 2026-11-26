@@ -1,0 +1,2 @@
+.oi-pager { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 11px 18px; border-top: 1px solid var(--mud-palette-divider); font-size: 12px; color: var(--mud-palette-text-secondary); }
+.oi-pager > div { display: flex; gap: 6px; }

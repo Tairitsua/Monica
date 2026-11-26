@@ -1,0 +1,26 @@
+@inject IStringLocalizer<ObservableInstanceResource> L
+
+@if (Count > Size)
+{
+    <footer class="oi-pager">
+        <span role="status">@L["Design:PageInfo", Page + 1, PageCount, Count]</span>
+        <div>
+            <MudIconButton Icon="@MoIcons.ChevronLeft" Variant="Variant.Outlined" Size="MudBlazor.Size.Small" Disabled="@(Page == 0)"
+                           aria-label="@L["Design:PrevPage"]" OnClick="() => PageChanged.InvokeAsync(Page - 1)" />
+            <MudIconButton Icon="@MoIcons.ChevronRight" Variant="Variant.Outlined" Size="MudBlazor.Size.Small" Disabled="@(Page + 1 >= PageCount)"
+                           aria-label="@L["Design:NextPage"]" OnClick="() => PageChanged.InvokeAsync(Page + 1)" />
+        </div>
+    </footer>
+}
+
+@code {
+    /// <summary>Gets the zero-based selected page.</summary>
+    [Parameter] public int Page { get; set; }
+    /// <summary>Gets the maximum number of records on each page.</summary>
+    [Parameter, EditorRequired] public int Size { get; set; }
+    /// <summary>Gets the total matching record count.</summary>
+    [Parameter] public int Count { get; set; }
+    /// <summary>Requests another zero-based page from the caller.</summary>
+    [Parameter] public EventCallback<int> PageChanged { get; set; }
+    private int PageCount => (Count + Size - 1) / Size;
+}

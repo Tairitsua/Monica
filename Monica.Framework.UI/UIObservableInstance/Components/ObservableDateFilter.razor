@@ -1,0 +1,24 @@
+@inject IStringLocalizer<ObservableInstanceResource> L
+
+<div class="oi-date">
+    <span>@Label</span>
+    <div>
+        <MudDatePicker Date="@Value?.Date" DateChanged="ChangeDate" aria-label="@Label"
+                       Placeholder="@L["Design:DatePlaceholder"]" Margin="Margin.Dense" Variant="Variant.Outlined" Clearable="true" />
+        <MudTimePicker Time="@Value?.TimeOfDay" TimeChanged="ChangeTime" Disabled="@(Value is null)" aria-label="@L["Design:TimePart", Label]"
+                       Placeholder="@L["Design:TimePlaceholder"]" Margin="Margin.Dense" Variant="Variant.Outlined" />
+    </div>
+</div>
+
+@code {
+    /// <summary>Gets the localized description of this registration bound.</summary>
+    [Parameter, EditorRequired] public string Label { get; set; } = "";
+    /// <summary>Gets a deployment-clock wall time, or null when the filter is unset.</summary>
+    [Parameter] public DateTime? Value { get; set; }
+    /// <summary>Emits an edited wall time, preserving the untouched date or time portion.</summary>
+    [Parameter] public EventCallback<DateTime?> ValueChanged { get; set; }
+
+    private Task ChangeDate(DateTime? date) => ValueChanged.InvokeAsync(date?.Date.Add(Value?.TimeOfDay ?? TimeSpan.Zero));
+    private Task ChangeTime(TimeSpan? time) => Value is { } date && time is { } clock
+        ? ValueChanged.InvokeAsync(date.Date.Add(clock)) : Task.CompletedTask;
+}

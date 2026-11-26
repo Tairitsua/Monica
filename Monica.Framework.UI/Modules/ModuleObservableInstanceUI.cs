@@ -54,19 +54,19 @@ public class ModuleObservableInstanceUI : MonicaModule<ModuleObservableInstanceU
 
                 registry.RegisterLocalizedPage<UIObservableInstanceMonitorPage, ObservableInstanceResource>(
                     UIObservableInstanceMonitorPage.PAGE_URL,
-                    "Pages:ObservableInstance:Title",
+                    "Design:MonitorTitle",
                     MoIcons.Package,
                     category,
                     addToNav: true,
                     navOrder: 50);
                 registry.RegisterLocalizedPage<UIObservableInstanceRegistryPage, ObservableInstanceResource>(
                     UIObservableInstanceRegistryPage.PAGE_URL, "Workbench:InstancesTitle", MoIcons.Package,
-                    category, addToNav: true, navOrder: 51);
+                    category, addToNav: false, navOrder: 51);
                 registry.RegisterLocalizedPage<UIObservableInstanceGroupsPage, ObservableInstanceResource>(
                     UIObservableInstanceGroupsPage.PAGE_URL, "Workbench:GroupsTitle", MoIcons.Workspace,
-                    category, addToNav: true, navOrder: 52);
+                    category, addToNav: false, navOrder: 52);
                 registry.RegisterLocalizedPage<UIObservableInstanceExceptionsPage, ObservableInstanceResource>(
-                    UIObservableInstanceExceptionsPage.PAGE_URL, "Workbench:ExceptionsTitle", MoIcons.Error,
+                    UIObservableInstanceExceptionsPage.PAGE_URL, "Design:ExceptionsTitle", MoIcons.Error,
                     category, addToNav: true, navOrder: 53);
             }));
     }

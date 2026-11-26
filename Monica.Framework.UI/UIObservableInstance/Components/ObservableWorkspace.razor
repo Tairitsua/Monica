@@ -1,96 +1,120 @@
-@using Monica.UI.Shared.Components.States
-@inject Monica.UI.Shared.Services.MoTimeFormatter UiTime
-@using Microsoft.Extensions.Logging
-@using Monica.Core.ObservableInstance.Models
-@using Monica.Framework.UI.UIObservableInstance.Models
-@using Monica.Framework.UI.UIObservableInstance.Components
-@using Monica.Framework.UI.UIObservableInstance.Support
-@inject ObservableInstanceMonitorService MonitorService
-@inject ObservableWorkspaceState Workspace
-@inject NavigationManager Navigation
-@inject IDialogService DialogService
-@inject IStringLocalizer<ObservableInstanceResource> L
+@using Microsoft.Extensions.Options
+@using Monica.Modules
 @implements IAsyncDisposable
+@inject ObservableWorkspaceState Workspace
+@inject ObservableInstanceMonitorService MonitorService
+@inject NavigationManager Navigation
+@inject MoTimeFormatter Time
+@inject IStringLocalizer<ObservableInstanceResource> L
+@inject IOptions<ModuleShellUIOption> Shell
+@inject IJSRuntime JS
+@inject IDialogService Dialogs
+@inject ISnackbar Snackbar
 
-<PageTitle>@L[$"Workbench:{View}Title"]</PageTitle>
-<div class="observable-workbench" data-view="@View">
-    <header class="observable-heading">
-        <div><span class="observable-eyebrow">@L["Workbench:Eyebrow"]</span><h1>@L[$"Workbench:{View}Title"]</h1><p>@L[$"Workbench:{View}Intro"]</p></div>
-        <div class="observable-refresh"><span>@L["Workbench:ReadAt"]<time datetime="@Workspace.Capture?.ReadAt.ToString("O")">@(UiTime.FormatTime(Workspace.Capture?.ReadAt) ?? "—")</time></span><MudButton Variant="Variant.Outlined" Color="Color.Default" StartIcon="@MoIcons.Refresh" Disabled="@_busy" OnClick="RefreshAsync">@L["Shared:Actions:Refresh"]</MudButton></div>
-    </header>
-    <nav class="observable-navigation" aria-label="@L["Workbench:Navigation"]">
-        @foreach (var entry in Routes) { <a href="@Url(entry.Path)" aria-current="@(View == entry.View ? "page" : null)"><MoIcon Icon="@entry.Icon" Size="1.25rem" />@L[$"Workbench:{entry.View}"]</a> }
-    </nav>
-    @if (_error is not null) { <div class="observable-error" role="alert"><strong>@L["Workbench:ReadFailed"]</strong><p>@_error</p><span>@L["Workbench:StaleHelp"]</span></div> }
-    @if (_busy && Workspace.Capture is null) { <MoContentState Loading="true" role="status"><MudProgressCircular Indeterminate="true" Color="Color.Primary" Size="Size.Small" />@L["Page:States:LoadingInstances"]</MoContentState> }
-    else if (Workspace.Capture is { } capture)
-    {
-        @if (View == "Overview")
-        {
-            <section class="registry-census" aria-labelledby="census-title">
-                <div class="census-main"><span>@L["Workbench:RegistryCensus"]</span><h2 id="census-title"><strong>@capture.Instances.Count.ToString("N0")</strong>@L["Workbench:Tracked"]</h2><p>@L["Workbench:CensusHelp"]</p><a href="@Url(INSTANCES_URL)">@L["Workbench:ExploreInstances"]<MoIcon Icon="@MoIcons.ArrowRight" Size="1.25rem" /></a></div>
-                <div class="census-distribution"><h3>@L["Workbench:CurrentMapping"]</h3>
-                    @foreach (var health in HealthStates) { <button type="button" @onclick="() => OpenHealth(health)"><span><i class="is-@health.ToString().ToLowerInvariant()" aria-hidden="true"></i>@L[$"Shared:HealthStates:{health}"]</span><strong>@CountHealth(health)</strong></button> }
-                    <p>@L["Workbench:MappingHelp"]</p>
-                </div>
-            </section>
-            <section class="registry-facts" aria-label="@L["Workbench:RecordScope"]">
-                <div><span>@L["Workbench:RetainedRecords"]</span><strong>@capture.RetainedRecords.ToString("N0")</strong></div>
-                <div><span>@L["Workbench:RetainedExceptions"]</span><a href="@Url(EXCEPTIONS_URL)">@capture.RetainedExceptions.ToString("N0")</a></div>
-                <div><span>@L["Workbench:LifetimeRecords"]</span><strong>@capture.LifetimeRecords.ToString("N0")</strong></div>
-                <div><span>@L["Workbench:LifetimeExceptions"]</span><strong>@capture.LifetimeExceptions.ToString("N0")</strong></div>
-            </section>
-            <div class="registry-overview-grid">
-                <section class="registry-composition"><header><span>@L["Workbench:Composition"]</span><h2>@L["Workbench:GroupsTitle"]</h2></header>
-                    @foreach (var group in Groups) { <button type="button" @onclick="() => OpenGroup(group.Key)"><span>@GroupLabel(group.Key)</span><span class="composition-bar" aria-hidden="true"><i style="width:@(group.Count() * 100 / Math.Max(1, capture.Instances.Count))%"></i></span><strong>@group.Count()</strong></button> }
-                    @if (Groups.Count == 0) { <p>@L["Workbench:EmptyRegistry"]</p> }
-                </section>
-                <section class="registry-composition"><header><span>@L["Workbench:Composition"]</span><h2>@L["Workbench:TypesTitle"]</h2></header>
-                    @foreach (var type in Types) { <button type="button" @onclick="() => OpenType(type.Key)"><span>@(type.First().InstanceTypeShortName ?? L["Workbench:NoType"].Value)</span><span class="composition-bar" aria-hidden="true"><i style="width:@(type.Count() * 100 / Math.Max(1, capture.Instances.Count))%"></i></span><strong>@type.Count()</strong></button> }
-                    @if (Types.Count == 0) { <p>@L["Workbench:EmptyRegistry"]</p> }
-                </section>
+<div class="mo-page-shell mo-page-shell--workbench mo-page-shell--full-width oi-page" @ref="_root">
+    <MoPageMasthead Icon="@(IsExceptions ? MoIcons.Error : MoIcons.Pulse)" Title="@L[IsExceptions ? "Design:ExceptionsTitle" : "Design:MonitorTitle"]" Crumb="@L["Design:Eyebrow"]">
+        <Meta>
+            <span class="mo-vl-status mo-vl-status--pill @StatusRole.ToCssClass()">
+                <i class="mo-vl-status-dot" aria-hidden="true"></i>@L[StatusKey]
+            </span>
+            <button type="button" class="mo-vl-capsule mo-vl-capsule--outline mo-vl-role--neutral oi-host" title="@Environment.MachineName"
+                    aria-label="@L["Design:CopyHost", Environment.MachineName]" @onclick="CopyHostAsync">
+                <MoIcon Icon="@MoIcons.Server" Size="13px" />
+                <span>@L["Design:ScopeChip", Shell.Value.GetAppName()]</span>
+            </button>
+            <span class="mo-vl-capsule mo-vl-capsule--outline mo-vl-role--neutral" title="@Time.TimeZone.Id">
+                @L["Design:TzChip", Time.FormatZoneLabel(Workspace.Evidence?.ReadAt)]
+            </span>
+        </Meta>
+        <Actions>
+            <div class="oi-stamp">
+                <span>@L["Design:Captured"]</span>
+                @if (Workspace.Evidence is { } read)
+                {
+                    <time datetime="@read.ReadAt.ToString("O")" title="@Time.Format(read.ReadAt)">@Time.FormatTime(read.ReadAt)</time>
+                }
+                else
+                {
+                    <b>@L["Design:NotCaptured"]</b>
+                }
             </div>
-            <section class="registry-concerns"><header><div><span>@L["Workbench:CurrentMapping"]</span><h2>@L["Workbench:NeedsAttention"]</h2><p>@L["Workbench:AttentionHelp"]</p></div><a href="@Url(EXCEPTIONS_URL)">@L["Workbench:ReviewExceptions"]<MoIcon Icon="@MoIcons.ArrowRight" Size="1.25rem" /></a></header>
-                @if (capture.UnhealthyCount == 0) { <p class="registry-good">@L["Workbench:NoCurrentConcerns"]</p> }
-                else { <ObservableRegistryTable Instances="@capture.Instances.Where(i => ObservableInstanceCapture.Health(i) == HealthState.Unhealthy).ToArray()" Inspect="InspectAsync" /> }
-            </section>
+            <MudButton Color="Color.Primary" Variant="Variant.Filled" Size="Size.Small" StartIcon="@MoIcons.Refresh" Class="oi-refresh"
+                       Disabled="@_busy" OnClick="RefreshAsync">@L["Design:Refresh"]</MudButton>
+        </Actions>
+    </MoPageMasthead>
+
+    <MoWorkbenchNavigation Label="@L["Design:NavLabel"]" Class="oi-nav" Compact="true">
+        <a href="@Link(ObservableViewQuery.MonitorPath)" aria-current="@(!IsExceptions ? "page" : null)">
+            <MoIcon Icon="@MoIcons.Pulse" />
+            @L["Design:MonitorTitle"]
+            @if (Workspace.Evidence is { } counts)
+            {
+                <span class="oi-nav-count @ReviewRole(counts).ToCssClass()">@(counts.ReviewCount == 0 ? counts.Trackers.Length.ToString() : $"{counts.ReviewCount}/{counts.Trackers.Length}")</span>
+            }
+        </a>
+        <a href="@Link(ObservableViewQuery.ExceptionsPath)" aria-current="@(IsExceptions ? "page" : null)">
+            <MoIcon Icon="@MoIcons.Error" />
+            @L["Design:ExceptionsTitle"]
+            @if (Workspace.Evidence is { } exceptionCounts)
+            {
+                <span class="oi-nav-count @((exceptionCounts.Exceptions.Length > 0 ? MoVisualRole.Error : MoVisualRole.Neutral).ToCssClass())">@exceptionCounts.Exceptions.Length</span>
+            }
+        </a>
+    </MoWorkbenchNavigation>
+
+    @if (Workspace.ReadError is { } error && Workspace.Evidence is { } prior)
+    {
+        <div class="mo-vl-callout mo-vl-role--warning oi-stale" role="status">
+            <span class="mo-vl-callout-mark"><MoIcon Icon="@MoIcons.Warning" Size="16px" /></span>
+            <div class="mo-vl-callout-content">
+                <h2 class="mo-vl-callout-title">@L["Design:StaleTitle"]</h2>
+                <p class="mo-vl-callout-body">@L["Design:StaleBody", Time.Format(prior.ReadAt)] <code class="mo-vl-mono">@error</code></p>
+            </div>
+        </div>
+    }
+
+    @if (Workspace.Evidence is not { } evidence || evidence.Trackers.Length == 0)
+    {
+        var initial = Workspace.Evidence is null;
+        var loading = initial && _busy;
+        var failed = initial && Workspace.ReadError is not null;
+        <section class="mo-vl-surface oi-state">
+            <MoContentState Loading="@loading">
+                <div class="mo-vl-tile @StatusRole.ToCssClass()"><MoIcon Icon="@(loading ? MoIcons.Refresh : failed ? MoIcons.Error : MoIcons.Package)" Size="18px" /></div>
+                <h2>@L[loading ? "Design:LoadingTitle" : failed ? "Design:LoadFailedTitle" : "Design:EmptyTitle"]</h2>
+                <p>@L[loading ? "Design:LoadingBody" : failed ? "Design:LoadFailedBody" : "Design:EmptyBody"]</p>
+                @if (!loading)
+                {
+                    <MudButton Color="Color.Primary" Variant="@(failed ? Variant.Filled : Variant.Outlined)"
+                               Size="Size.Small" StartIcon="@MoIcons.Refresh" Disabled="@_busy" OnClick="RefreshAsync">
+                        @L[failed ? "Design:Retry" : "Design:Refresh"]
+                    </MudButton>
+                }
+            </MoContentState>
+        </section>
+    }
+    else
+    {
+        @if (IsExceptions)
+        {
+            <ObservableExceptions Evidence="evidence" Query="_query" ChangeFilters="SetFilters" Inspect="OpenInspection" />
+            @ScopeFooter
         }
         else
         {
-            <section class="registry-work-area">
-                <div class="registry-search-rail"><label class="registry-search"><MoIcon Icon="@MoIcons.Search" Size="1.25rem" /><input type="search" aria-label="@L["Workbench:Search"]" placeholder="@L[View == "Exceptions" ? "Workbench:SearchExceptions" : "Workbench:Search"]" @bind="Workspace.Search" @bind:event="oninput" /></label><button type="button" class="reset-filters" @onclick="ResetFilters">@L["Shared:Actions:ClearFilters"]</button></div>
-                <div class="registry-filter-rail">
-                    <div class="registry-health-filters" role="group" aria-label="@L["Workbench:MappedHealth"]"><button type="button" class="@(Workspace.Status.Length == 0 ? "is-active" : "")" @onclick="() => Workspace.Status = string.Empty">@L["Workbench:All"]<span>@capture.Instances.Count</span></button>
-                        @foreach (var health in HealthStates) { <button type="button" class="@(Workspace.Status == health.ToString() ? "is-active" : "")" @onclick="() => Workspace.Status = health.ToString()">@L[$"Shared:HealthStates:{health}"]<span>@CountHealth(health)</span></button> }
-                    </div>
-                    <details class="registry-advanced"><summary>@L["Workbench:MoreFilters"]</summary><div class="advanced-content">
-                        <label>@L["Shared:Fields:Group"]<select @bind="Workspace.Group"><option value="">@L["Workbench:AllGroups"]</option>@foreach (var group in Groups) { <option value="@GroupValue(group.Key)">@GroupLabel(group.Key)</option> }</select></label>
-                        <label>@L["Shared:Fields:Type"]<select @bind="Workspace.Type"><option value="">@L["Workbench:AllTypes"]</option>@foreach (var type in Types) { <option value="@TypeValue(type.Key)">@(type.First().InstanceTypeName ?? L["Workbench:NoType"].Value)</option> }</select></label>
-                        <fieldset class="level-selection"><legend>@L["Shared:Fields:LogLevel"]</legend>@foreach (var level in Enum.GetValues<LogLevel>()) { <label class="exceptions-toggle"><input type="checkbox" checked="@Workspace.Levels.Contains(level)" @onchange="e => SelectLevel(level, e.Value is true)" />@L[$"Shared:LogLevels:{level}"]</label> }</fieldset>
-                        <label>@L["Workbench:RegisteredFrom"]<input type="datetime-local" value="@Workspace.From" @onchange="e => Workspace.From = e.Value?.ToString() ?? string.Empty" /></label><label>@L["Workbench:RegisteredTo"]<input type="datetime-local" value="@Workspace.To" @onchange="e => Workspace.To = e.Value?.ToString() ?? string.Empty" /></label><label class="exceptions-toggle"><input type="checkbox" @bind="Workspace.ExceptionsOnly" />@L["Workbench:HasRetainedExceptions"]</label><label class="exceptions-toggle"><input type="checkbox" @bind="Workspace.CriticalErrorOnly" />@L["Filter:Options:CriticalErrorOnly"]</label>
-                    </div></details>
-                </div>
-                @if (View == "Groups")
-                {
-                    <div class="registry-group-layout"><aside class="registry-group-index" aria-label="@L["Workbench:GroupIndex"]"><h2>@L["Workbench:GroupIndex"]</h2><button type="button" class="@(Workspace.Group.Length == 0 ? "is-active" : "")" @onclick="() => Workspace.Group = string.Empty"><span>@L["Workbench:AllGroups"]</span><strong>@capture.Instances.Count</strong></button>
-                        @foreach (var group in Groups) { <button type="button" class="@(Workspace.Group == GroupValue(group.Key) ? "is-active" : "")" @onclick="() => Workspace.Group = GroupValue(group.Key)"><span>@GroupLabel(group.Key)</span><strong>@group.Count()</strong></button> }
-                    </aside><div class="registry-group-roster"><div class="registry-results"><h2>@SelectedGroupLabel</h2><span>@L["Workbench:Results", Matches.Count, capture.Instances.Count]</span></div><ObservableRegistryTable Instances="@Matches" Inspect="InspectAsync" ClearHistory="ClearAsync" Busy="@_busy" /></div></div>
-                }
-                else if (View == "Exceptions")
-                {
-                    <div class="registry-results"><div><h2>@L["Workbench:RetainedExceptions"]</h2><p>@L["Workbench:ExceptionScope"]</p></div><span>@L["Workbench:ExceptionResults", ExceptionEntries.Count, capture.RetainedExceptions]</span></div>
-                    <div class="exception-ledger">
-                        @if (ExceptionEntries.Count == 0) { <div class="exception-empty"><MoIcon Icon="@MoIcons.Success" Size="1.5rem" /><strong>@L["Shared:States:NoExceptions"]</strong><p>@L["Workbench:NoExceptionHelp"]</p></div> }
-                        @foreach (var item in ExceptionEntries.Skip(ExceptionPage * 12).Take(12))
-                        {
-                            <article data-instance-id="@item.Instance.Identity.InstanceId" data-sequence="@item.Entry.Sequence"><div class="exception-sequence"><span>#@item.Entry.Sequence</span><time datetime="@item.Entry.Timestamp.ToString("O")">@UiTime.Format(item.Entry.Timestamp)</time></div><div class="exception-evidence"><strong>@item.Entry.Exception!.TypeName</strong><p>@item.Entry.Exception.Message</p><code>@item.Instance.Identity.InstanceId</code><span>@item.Instance.InstanceName · @L[$"Shared:LogLevels:{item.Entry.LogLevel?.ToString() ?? "Unknown"}"]</span></div><button type="button" @onclick="() => InspectExceptionAsync(item.Instance, item.Entry.Sequence)" aria-label="@L["Workbench:InspectExceptionNamed", item.Instance.InstanceName, item.Entry.Sequence]">@L["Workbench:Inspect"]<MoIcon Icon="@MoIcons.ArrowUpRight" Size="1.25rem" /></button></article>
-                        }
-                        <footer class="exception-pager"><span>@L["Workbench:PageCount", ExceptionPage + 1, ExceptionPageCount, ExceptionEntries.Count]</span><div><button type="button" disabled="@(ExceptionPage == 0)" @onclick="() => _exceptionPage = ExceptionPage - 1" aria-label="@L["Workbench:Previous"]"><MoIcon Icon="@MoIcons.ChevronLeft" Size="1.5rem" /></button><button type="button" disabled="@(ExceptionPage + 1 >= ExceptionPageCount)" @onclick="() => _exceptionPage = ExceptionPage + 1" aria-label="@L["Workbench:Next"]"><MoIcon Icon="@MoIcons.ChevronRight" Size="1.5rem" /></button></div></footer>
-                    </div>
-                }
-                else { <div class="registry-results"><h2>@L["Workbench:Registrations"]</h2><span>@L["Workbench:Results", Matches.Count, capture.Instances.Count]</span></div><ObservableRegistryTable Instances="@Matches" Inspect="InspectAsync" ClearHistory="ClearAsync" Busy="@_busy" /> }
-                <footer class="registry-scope"><MoIcon Icon="@MoIcons.Info" Size="1.25rem" /><span>@L["Workbench:RegistryScope"]</span></footer>
-            </section>
+            <ObservableRegistry Evidence="evidence" Query="_query" ChangeFilters="SetFilters" Inspect="OpenInspection" Clear="ClearHistoryAsync" Busy="_busy">
+                @ScopeFooter
+            </ObservableRegistry>
         }
     }
+
+    @if (_query.Inspector is { } id && Workspace.Evidence is { } capture)
+    {
+        <ObservableSnapshotSheet @key="id" InstanceId="@id" Snapshot="@(capture.ById.GetValueOrDefault(id)?.Snapshot)"
+                                 Query="_query" ChangeInspection="OpenInspection" Closed="CloseInspection" Clear="ClearHistoryAsync" Busy="_busy" />
+    }
 </div>
+
+@code {
+    private RenderFragment ScopeFooter => @<footer class="oi-scope-foot"><MoIcon Icon="@MoIcons.Info" Size="14px" /><span>@L["Design:ScopeFooter"]</span></footer>;
+}

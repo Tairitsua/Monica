@@ -237,6 +237,8 @@
     }
   },
   "StackTrace": {
+    "Highlighted": "Highlighted",
+    "Raw": "Raw",
     "Caption": "Diagnostic text",
     "WrapLines": "Wrap lines",
     "Copy": "Copy",

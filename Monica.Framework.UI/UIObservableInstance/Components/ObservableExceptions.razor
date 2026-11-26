@@ -1,0 +1,236 @@
+@inject IStringLocalizer<ObservableInstanceResource> L
+@inject MoTimeFormatter Time
+
+<section class="mo-vl-surface oi-sig oi-ex-sig" aria-labelledby="oi-ex-count">
+    <div class="oi-decision">
+        <div>
+            <p class="oi-display-label" id="oi-ex-count">@L["Design:ExDisplayLabel"]</p>
+            <div class="mo-vl-display mo-vl-display--compact">
+                <strong class="mo-vl-display__value">@_matches.Length.ToString("N0")</strong>
+                <span class="mo-vl-display__unit">@L["Design:ExUnit"]</span>
+            </div>
+            <p class="oi-reg-sub">@L["Design:ExSub", Evidence.Capture.LifetimeExceptions.ToString("N0"), Evidence.EvictedExceptions.ToString("N0"), Evidence.SourceCount]</p>
+        </div>
+        <p class="mo-vl-lede">@Finding()</p>
+    </div>
+    <div class="oi-exstrip" data-oi-exceptions>
+        <header class="oi-hz-head">
+            <div class="oi-hz-title">
+                <h2>@L["Design:ExStripTitle"]</h2>
+                <p>@L["Design:ExStripDesc"]</p>
+            </div>
+            <div class="oi-hz-controls">
+                @if (_from is not null || _to is not null)
+                {
+                    <MudButton Size="Size.Small" Variant="Variant.Outlined" StartIcon="@MoIcons.ZoomOut" OnClick="ResetWindow">@L["Design:ExZoomReset"]</MudButton>
+                }
+                <div class="mo-vl-segment" role="group" aria-label="@L["Design:ExLaneModeLabel"]">
+                    <button type="button" aria-pressed="@On(!ByInstance)" @onclick='() => Change("lane", null)'>@L["Design:ExLaneModes:Type"]</button>
+                    <button type="button" aria-pressed="@On(ByInstance)" @onclick='() => Change("lane", "instance")'>@L["Design:ExLaneModes:Instance"]</button>
+                </div>
+            </div>
+        </header>
+        @if (_lanes.Length == 0)
+        {
+            <p class="oi-none">@L["Design:ExEmptyTitle"]</p>
+        }
+        else
+        {
+            <div class="oi-explot-grid">
+                <div class="oi-explot-labels">
+                    @foreach (var lane in _lanes)
+                    {
+                        <button type="button" class="oi-exlane-label" title="@lane.Label" aria-pressed="@On(Query[LaneKey] == lane.Key)"
+                                @onclick="() => Toggle(LaneKey, lane.Key)">
+                            <span class="oi-exlane-name"><i class="mo-vl-swatch mo-vl-role--error" aria-hidden="true"></i><span>@lane.Label</span><b class="mo-vl-mono">@lane.Total</b></span>
+                            <small class="mo-vl-mono">@L["Design:BucketMax", lane.Peak]</small>
+                        </button>
+                    }
+                </div>
+                <div class="oi-explot-canvas">
+                    <div class="oi-explot-lanes" aria-hidden="true">
+                        @foreach (var lane in _lanes)
+                        {
+                            <div class="oi-exlane">
+                                @for (var index = 0; index < _buckets.Length; index++)
+                                {
+                                    var count = _buckets[index].Counts.GetValueOrDefault(lane.Key);
+                                    if (count > 0)
+                                    {
+                                        <i class="oi-exbar" style="@BarStyle(index, count, lane.Peak)"></i>
+                                    }
+                                }
+                            </div>
+                        }
+                    </div>
+                    <div class="oi-explot-hit" tabindex="0" role="slider" aria-label="@L["Design:ExStripTitle"]" aria-valuemin="1" aria-valuemax="@_buckets.Length"
+                         aria-valuenow="1" aria-valuetext="@BucketLabel(_buckets[0])" data-oi-plot>
+                        @foreach (var bucket in _buckets)
+                        {
+                            <span hidden data-oi-bucket data-from="@ObservableViewQuery.Epoch(bucket.From)" data-to="@ObservableViewQuery.Epoch(bucket.To)" data-hint="@BucketLabel(bucket)"></span>
+                        }
+                        <span class="oi-explot-highlight" aria-hidden="true"></span>
+                    </div>
+                </div>
+                <div class="oi-explot-axis mo-vl-mono">
+                    <time>@Time.Format(_buckets[0].From, "HH:mm")</time>
+                    <time>@Time.Format(_buckets[_buckets.Length / 2].From, "HH:mm")</time>
+                    <time>@Time.Format(_buckets[^1].To, "HH:mm")</time>
+                </div>
+            </div>
+            <div class="oi-caption">
+                <i class="oi-caption-dot" aria-hidden="true"></i>
+                <span class="oi-hz-readout" role="status" aria-live="polite" data-oi-status data-default="@L["Design:ExScopeNote"]">@L["Design:ExScopeNote"]</span>
+                <button class="oi-caption-button" type="button" aria-expanded="@On(_table)" @onclick="() => _table = !_table">
+                    <MoIcon Icon="@MoIcons.Table" Size="14px" />@L[_table ? "Design:HorizonTableHide" : "Design:HorizonTableShow"]
+                </button>
+            </div>
+            @if (_table)
+            {
+                <div class="oi-htable-wrap" role="region" tabindex="0" aria-label="@L["Design:ExStripTitle"]">
+                    <table class="oi-htable">
+                        <thead><tr>
+                            <th scope="col">@L["Design:BucketInterval"]</th>
+                            @foreach (var lane in _lanes)
+                            { <th scope="col" class="is-num">@lane.Label</th> }
+                            <th scope="col" class="is-num">Σ</th>
+                        </tr></thead>
+                        <tbody>
+                            @foreach (var bucket in _buckets)
+                            {
+                                <tr>
+                                    <th scope="row" class="mo-vl-mono">@Time.FormatTime(bucket.From) – @Time.FormatTime(bucket.To)</th>
+                                    @foreach (var lane in _lanes)
+                                    { <td class="is-num mo-vl-mono">@bucket.Counts.GetValueOrDefault(lane.Key)</td> }
+                                    <td class="is-num mo-vl-mono"><b>@bucket.Total</b></td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            }
+        }
+    </div>
+</section>
+
+@if (Evidence.Evicted.Length > 0)
+{
+    <aside class="mo-vl-callout mo-vl-role--warning oi-eviction-banner">
+        <span class="mo-vl-callout-mark"><MoIcon Icon="@MoIcons.Warning" Size="16px" /></span>
+        <div class="mo-vl-callout-content">
+            <h2 class="mo-vl-callout-title">@L["Design:ExEvictionBannerTitle"]</h2>
+            <p class="mo-vl-callout-body">
+                @L["Design:ExEvictionBannerBody"]
+                @for (var index = 0; index < Evidence.Evicted.Length; index++)
+                {
+                    var item = Evidence.Evicted[index];
+                    if (index != 0) { <text>, </text> }
+                    <button type="button" class="mo-vl-mark mo-vl-role--warning"
+                            @onclick='() => Inspect.InvokeAsync(new(item.Id, "exceptions"))'>@item.Name (@item.RetainedExceptions.Length / @item.Snapshot.TotalExceptions)</button>
+                }
+            </p>
+        </div>
+    </aside>
+}
+
+<section class="mo-vl-surface oi-inv" aria-labelledby="oi-ex-list-title">
+    <header class="oi-inv-head">
+        <div class="oi-inv-title">
+            <h2 id="oi-ex-list-title">@L["Design:ExceptionsTitle"]</h2>
+            <span class="oi-count">@L["Design:ExResults", _matches.Length, Evidence.Exceptions.Length]</span>
+        </div>
+        @if (HasFilters) { <MudButton Size="Size.Small" OnClick="ClearAllAsync">@L["Design:ClearFilters"]</MudButton> }
+    </header>
+
+    <div class="oi-filters">
+        <div class="mo-vl-chips" role="group" aria-label="@L["Design:EntryLevelLabel"]">
+            <button type="button" class="mo-vl-chip mo-vl-chip--pill mo-vl-role--primary" aria-pressed="@On(Query["level"] is null)" @onclick='() => Change("level", null)'>
+                @L["Design:AllLevels"] <span class="mo-vl-chip-count">@_levelBase.Length</span>
+            </button>
+            @foreach (var level in VisibleLevels())
+            {
+                var total = _levelBase.Count(item => item.Level == level);
+                var role = Enum.TryParse<LogLevel>(level, out var value) ? TrackerEvidence.LevelRole(value) : MoVisualRole.Neutral;
+                <button type="button" class="mo-vl-chip mo-vl-chip--pill @role.ToCssClass()" aria-pressed="@On(Query["level"] == level)"
+                        @onclick='() => Toggle("level", level)'>
+                    <i class="mo-vl-swatch @role.ToCssClass()" aria-hidden="true"></i>
+                    @L[$"Design:Levels:{level}"] <span class="mo-vl-chip-count">@total</span>
+                </button>
+            }
+        </div>
+        <div class="oi-tools">
+            <label class="oi-search">
+                <MoIcon Icon="@MoIcons.Search" Size="15px" />
+                <input type="search" aria-label="@L["Design:SearchExceptions"]" value="@Query["q"]" placeholder="@L["Design:SearchExceptions"]"
+                       autocomplete="off" spellcheck="false" @oninput='args => Change("q", args.Value?.ToString())' />
+            </label>
+            <div class="oi-select">
+                <MudSelect T="string" Value="@(Query["exType"] ?? "")" ValueChanged='value => Change("exType", value)'
+                           Variant="Variant.Outlined" Margin="Margin.Dense" Dense="true" aria-label="@L["Design:AllExTypes"]">
+                    <MudSelectItem T="string" Value="@string.Empty">@L["Design:AllExTypes"]</MudSelectItem>
+                    @foreach (var type in Evidence.ExceptionTypes)
+                    { <MudSelectItem T="string" Value="@type.Key">@type.First().ShortType (@type.Count())</MudSelectItem> }
+                </MudSelect>
+            </div>
+            <div class="oi-select">
+                <MudSelect T="string" Value="@(Query["source"] ?? "")" ValueChanged='value => Change("source", value)'
+                           Variant="Variant.Outlined" Margin="Margin.Dense" Dense="true" aria-label="@L["Design:AllSources"]">
+                    <MudSelectItem T="string" Value="@string.Empty">@L["Design:AllSources"]</MudSelectItem>
+                    @foreach (var tracker in Evidence.Trackers.Where(item => item.RetainedExceptions.Length > 0))
+                    { <MudSelectItem T="string" Value="@tracker.Id">@tracker.Name (@tracker.RetainedExceptions.Length)</MudSelectItem> }
+                </MudSelect>
+            </div>
+            <div class="oi-select">
+                <MudSelect T="string" Value="@(Query["group"] ?? "")" ValueChanged='value => Change("group", value)'
+                           Variant="Variant.Outlined" Margin="Margin.Dense" Dense="true" aria-label="@L["Design:AllGroups"]">
+                    <MudSelectItem T="string" Value="@string.Empty">@L["Design:AllGroups"]</MudSelectItem>
+                    @foreach (var group in Evidence.Groups.Where(group => group.Any(item => item.RetainedExceptions.Length > 0)))
+                    { <MudSelectItem T="string" Value="@group.Key">@GroupName(group.First()) (@group.Sum(item => item.RetainedExceptions.Length))</MudSelectItem> }
+                </MudSelect>
+            </div>
+        </div>
+    </div>
+
+    @if (_matches.Length == 0)
+    {
+        <MoContentState Compact="true" Class="oi-nomatch">
+            <div class="mo-vl-tile mo-vl-role--success"><MoIcon Icon="@MoIcons.Success" Size="18px" /></div>
+            <h3>@L["Design:ExEmptyTitle"]</h3>
+            <p>@L["Design:ExEmptyBody"]</p>
+            @if (HasFilters) { <MudButton Variant="Variant.Outlined" Size="Size.Small" OnClick="ClearAllAsync">@L["Design:ClearFilters"]</MudButton> }
+        </MoContentState>
+    }
+    else
+    {
+        <ol class="oi-ex-ledger">
+            @foreach (var row in _matches.Skip(Page * PageSize).Take(PageSize))
+            {
+                <li class="oi-ex-item" @key="(row.Tracker.Id, row.Entry.Sequence)">
+                    <div class="oi-ex-seqcol">
+                        <span class="oi-ex-seqnum mo-vl-mono">#@row.Entry.Sequence</span>
+                        <time class="mo-vl-mono" datetime="@row.Entry.Timestamp.ToString("O")">@Time.Format(row.Entry.Timestamp)</time>
+                        <span class="mo-vl-capsule @TrackerEvidence.LevelRole(row.Entry.LogLevel).ToCssClass()">@L[$"Design:Levels:{row.Level}"]</span>
+                    </div>
+                    <div class="oi-ex-body">
+                        <div class="oi-ex-type mo-vl-mono">@ObservableMarkup.Breakable(row.Type)</div>
+                        <p class="oi-ex-msg">@row.Exception.Message</p>
+                        <p class="oi-ex-ctx">@row.Entry.Message</p>
+                        <div class="oi-ex-src">
+                            <strong>@row.Tracker.Name</strong>
+                            <ObservableStatus Snapshot="row.Tracker.Snapshot" />
+                            <span class="mo-vl-capsule mo-vl-capsule--outline mo-vl-role--neutral">@GroupName(row.Tracker)</span>
+                            <code class="mo-vl-mono">@ObservableMarkup.Breakable(row.Tracker.Id)</code>
+                        </div>
+                    </div>
+                    <div class="oi-ex-act">
+                        <MudButton Size="Size.Small" Variant="Variant.Outlined" EndIcon="@MoIcons.ArrowUpRight"
+                                   OnClick='() => Inspect.InvokeAsync(new(row.Tracker.Id, "exceptions", row.Entry.Sequence))'>
+                            @L["Design:InspectSeq", row.Entry.Sequence]
+                        </MudButton>
+                    </div>
+                </li>
+            }
+        </ol>
+        <ObservablePager Size="PageSize" Count="_matches.Length" Page="Page" PageChanged="page => _page = page" />
+    }
+</section>

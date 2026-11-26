@@ -1,0 +1,18 @@
+@inject IStringLocalizer<ObservableInstanceResource> L
+
+@{
+    var item = new TrackerEvidence(Snapshot);
+}
+<span class="mo-vl-status @(Pill ? "mo-vl-status--pill" : null) @item.HealthRole.ToCssClass()">
+    <i class="mo-vl-status-dot" aria-hidden="true"></i>
+    <span>@L[$"Design:Health:{item.Health}"]@if (IncludeLevel) { <text> · @L[$"Design:Levels:{item.Level}"]</text> }</span>
+</span>
+
+@code {
+    /// <summary>Gets the frozen tracker whose current mapped level determines health.</summary>
+    [Parameter, EditorRequired] public ObservableInstanceSnapshot Snapshot { get; set; } = default!;
+    /// <summary>Includes the current mapped level alongside localized health when true.</summary>
+    [Parameter] public bool IncludeLevel { get; set; }
+    /// <summary>Uses the compact status capsule. Defaults to true.</summary>
+    [Parameter] public bool Pill { get; set; } = true;
+}

@@ -1,0 +1,182 @@
+@inject IStringLocalizer<ObservableInstanceResource> L
+@inject MoTimeFormatter Time
+
+<div class="oi-hz" data-oi-horizon>
+    <header class="oi-hz-head">
+        <div class="oi-hz-title">
+            <h2>@L["Design:HorizonTitle"]</h2>
+            <p>@L["Design:HorizonDesc"]</p>
+        </div>
+        <div class="oi-hz-controls">
+            <div class="mo-vl-segment" role="group" aria-label="@L["Design:WindowLabel"]">
+                <button type="button" aria-pressed="@On(!_lastHour)" @onclick="() => ChangeWindow(false)">@L["Design:Windows:SinceBoot"]</button>
+                <button type="button" aria-pressed="@On(_lastHour)" @onclick="() => ChangeWindow(true)">@L["Design:Windows:LastHour"]</button>
+            </div>
+            <div class="mo-vl-segment" role="group" aria-label="@L["Design:GroupByLabel"]">
+                <button type="button" aria-pressed="@On(!_byGroup)" @onclick="() => _byGroup = false">@L["Design:GroupModes:Priority"]</button>
+                <button type="button" aria-pressed="@On(_byGroup)" @onclick="() => _byGroup = true">@L["Design:GroupModes:Group"]</button>
+            </div>
+        </div>
+    </header>
+
+    <div class="oi-hz-legend mo-vl-legend">
+        <span><i class="mo-vl-swatch oi-hatch-swatch" aria-hidden="true"></i>@L["Design:Legend:Evicted"]</span>
+        <span><i class="mo-vl-swatch mo-vl-role--info" aria-hidden="true"></i>@L["Design:Legend:Retained"]</span>
+        <span><i class="mo-vl-swatch mo-vl-role--warning" aria-hidden="true"></i>@L["Design:Legend:Warning"]</span>
+        <span><i class="mo-vl-swatch mo-vl-swatch--diamond mo-vl-role--error" aria-hidden="true"></i>@L["Design:Legend:Exception"]</span>
+        <span><i class="oi-evicted-diamond-swatch" aria-hidden="true"></i>@L["Design:Legend:EvictedEx"]</span>
+    </div>
+
+    <div class="oi-hz-row is-axis">
+        <span class="oi-hz-axis-label">@L["Design:HorizonCols:Instance"]</span>
+        <div class="oi-hz-cell is-axis">
+            @foreach (var tick in _ticks.Where(tick => Ratio(tick) is > 4 and < 86))
+            {
+                <time class="oi-hz-tick" style="@X(tick)">@Time.Format(tick, "HH:mm")</time>
+            }
+            @foreach (var burst in _bursts)
+            {
+                var first = burst.Entries[0];
+                <button type="button" class="oi-burst-flag" style="@X(burst.Center)" title="@BurstLabel(burst)"
+                        data-oi-readout="@BurstLabel(burst)" data-oi-burst="@Ratio(burst.Center).ToString(CultureInfo.InvariantCulture)"
+                        @onclick='() => Inspect.InvokeAsync(new ObservableInspection(first.Tracker.Id, "exceptions", first.Entry.Sequence))'>
+                    <i class="oi-burst-dot" aria-hidden="true"></i>@L["Design:BurstTag", burst.Trackers.Length] · @Time.Format(burst.Start, "HH:mm")
+                </button>
+            }
+            <span class="oi-hz-cap-flag mo-vl-mono" title="@Time.Format(Evidence.ReadAt)">@L["Design:CapturedAtAxis"] @Time.FormatTime(Evidence.ReadAt)</span>
+            <span class="oi-hz-cross-tag mo-vl-mono" data-oi-clock aria-hidden="true"></span>
+        </div>
+        <span class="oi-hz-axis-meta">@L["Design:HorizonCols:Buffer"]</span>
+    </div>
+
+    <div class="oi-hz-lanes">
+        @if (_byGroup)
+        {
+            var number = 0;
+            @foreach (var group in Evidence.Groups)
+            {
+                <div class="oi-hz-row is-group-head">
+                    <div class="oi-hz-group-title"><span>@(group.First().Group ?? L["Design:Ungrouped"].Value)</span><span class="oi-count">@group.Count()</span></div>
+                </div>
+                @foreach (var item in group)
+                {
+                    @Lane(_lanes[item.Id], number++)
+                }
+            }
+        }
+        else
+        {
+            @for (var index = 0; index < Evidence.Trackers.Length; index++)
+            {
+                @Lane(_lanes[Evidence.Trackers[index].Id], index)
+            }
+        }
+    </div>
+
+    <div class="oi-caption">
+        <i class="oi-caption-dot" aria-hidden="true"></i>
+        <span class="oi-hz-readout" role="status" aria-live="polite" data-oi-status data-default="@L["Design:HorizonHint"]">@L["Design:HorizonHint"]</span>
+        <button class="oi-caption-button" type="button" aria-expanded="@On(_table)" @onclick="() => _table = !_table">
+            <MoIcon Icon="@MoIcons.Table" Size="14px" />@L[_table ? "Design:HorizonTableHide" : "Design:HorizonTableShow"]
+        </button>
+    </div>
+
+    @if (_table)
+    {
+        <div class="oi-htable-wrap" role="region" tabindex="0" aria-label="@L["Design:HorizonTitle"]">
+            <table class="oi-htable">
+                <thead><tr>
+                    @foreach (var column in HorizonColumns)
+                    { <th scope="col">@L[$"Design:HorizonCols:{column}"]</th> }
+                </tr></thead>
+                <tbody>
+                    @foreach (var item in Evidence.Trackers)
+                    {
+                        <tr>
+                            <th scope="row"><button class="mo-vl-link" type="button" @onclick="() => Inspect.InvokeAsync(new(item.Id))">@item.Name</button>
+                                <small>@(item.Group ?? L["Design:Ungrouped"].Value)</small>
+                            </th>
+                            <td><span class="mo-vl-capsule @item.HealthRole.ToCssClass()">@Value(item)</span></td>
+                            <td class="mo-vl-mono">@(item.Oldest is not null ? L["Design:SpanNote", Time.FormatTime(item.Oldest), Time.FormatTime(item.Latest)].Value : "—")</td>
+                            <td class="mo-vl-mono">@L["Design:BufferText", item.Retained, item.Snapshot.MaxHistorySize]</td>
+                            <td class="mo-vl-mono">@L["Design:BufferText", item.RetainedExceptions.Length, item.Snapshot.TotalExceptions]</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    }
+</div>
+
+@code {
+    private RenderFragment Lane(HorizonLane lane, int index) => @<div class="oi-hz-row is-lane @(SelectedId == lane.Item.Id ? "is-selected" : null)" @key="lane.Item.Id">
+        @{
+            var item = lane.Item;
+            var fallback = L["Design:HorizonReadout", item.Name, L[$"Design:Standings:{Capital(item.Standing)}"], L["Design:BufferText", item.Retained, item.Snapshot.MaxHistorySize]].Value;
+        }
+        <button type="button" class="oi-hz-label" @onclick="() => Inspect.InvokeAsync(new(item.Id))">
+            <span class="oi-hz-name">
+                <i class="mo-vl-swatch @item.StandingRole.ToCssClass()" aria-hidden="true"></i>
+                <span class="oi-hz-name-text" title="@item.Name">@item.Name</span>
+            </span>
+            <span class="oi-hz-sub">
+                <span class="oi-hz-flag @item.StandingRole.ToCssClass()">@L[$"Design:Standings:{Capital(item.Standing)}"]</span>
+                @if (!_byGroup)
+                { <span class="oi-hz-group">@(item.Group ?? L["Design:Ungrouped"].Value)</span> }
+            </span>
+        </button>
+
+        <div class="oi-hz-cell">
+            <div class="oi-hz-track" role="button" tabindex="@(index == 0 ? "0" : "-1")" data-oi-track
+                 data-id="@item.Id" data-exception="@item.LatestException" data-hint="@fallback" aria-label="@fallback">
+                @foreach (var burst in _bursts)
+                {
+                    <span class="oi-burst-band" style="@Band(burst.Start, burst.End)" aria-hidden="true"></span>
+                }
+                @foreach (var tick in _ticks)
+                {
+                    <span class="oi-hz-grid" style="@X(tick)" aria-hidden="true"></span>
+                }
+                @if (lane.EvictedUntil is { } until)
+                {
+                    <span class="oi-hz-evicted" style="@Band(item.Snapshot.RegisteredAt, until)" aria-hidden="true">
+                        @if (item.EvictedExceptions > 0)
+                        {
+                            <span class="oi-evicted-ex-pill" title="@L["Design:EvictedBadge", item.EvictedExceptions]">
+                                <i class="oi-evicted-diamond"></i>@item.EvictedExceptions
+                            </span>
+                        }
+                    </span>
+                }
+                @if (item.Snapshot.TotalRecords == 0)
+                {
+                    <span class="oi-hz-unrecorded" style="@Band(item.Snapshot.RegisteredAt, Evidence.ReadAt)" aria-hidden="true">
+                        <span>@L["Design:NoHistoryLabel"]</span>
+                    </span>
+                }
+                @foreach (var ribbon in lane.Ribbons)
+                {
+                    <span class="oi-ribbon @ribbon.Role.ToCssClass()" style="@Band(ribbon.From, ribbon.To)" aria-hidden="true"></span>
+                }
+                @foreach (var point in lane.Points)
+                {
+                    var marker = point.Entry?.Exception is not null ? "oi-point-ex" : point.Entry is not null && !point.Boundary ? "oi-point-change" : "oi-point-hidden";
+                    var pointRole = TrackerEvidence.LevelRole(point.Entry?.LogLevel);
+                    <span class="@marker @pointRole.ToCssClass()" style="@X(point.At)" aria-hidden="true" data-oi-point
+                          data-position="@Ratio(point.At).ToString(CultureInfo.InvariantCulture)" data-time="@Time.FormatTime(point.At)"
+                          data-seq="@point.Entry?.Sequence" data-tab="@(point.Entry?.Exception is not null ? "exceptions" : point.Entry is not null ? "timeline" : null)"
+                          data-hint="@PointLabel(item, point)"></span>
+                }
+                <span class="oi-hz-cross" aria-hidden="true"></span>
+            </div>
+        </div>
+
+        <div class="oi-hz-meta">
+            <b class="mo-vl-mono @(item.AtCapacity && item.EvictedRecords > 0 ? "is-warn" : null)">@L["Design:BufferText", item.Retained, item.Snapshot.MaxHistorySize]</b>
+            <small class="mo-vl-mono @(item.RetainedExceptions.Length > 0 ? "is-err" : item.EvictedExceptions > 0 ? "is-warn" : "is-dim")">
+                @(item.Snapshot.TotalExceptions > 0 ? $"{item.RetainedExceptions.Length}/{item.Snapshot.TotalExceptions} {L["Design:ExShort"]}"
+                    : item.Snapshot.TotalRecords == 0 ? "—" : Time.FormatTime(item.Snapshot.LastRecordedAt))
+            </small>
+        </div>
+    </div>;
+}
