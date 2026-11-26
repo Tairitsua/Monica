@@ -28,14 +28,19 @@ every push, `ui-tests.yml` is a manual workflow, and the release gate still runs
 Test assemblies retain xUnit collection parallelism, while collections that deliberately park
 worker threads opt into exclusive execution.
 
-When changing canonical Agent Skills, also run:
+### Agent Skill checks
+
+When changing canonical Agent Skills, also run these checks on the final integrated tree, including after merging Skill changes from another branch or worktree:
 
 ```bash
 python3 scripts/validate_agent_skills.py
 python3 scripts/sync_agent_skills.py --write
 python3 scripts/sync_agent_skills.py --check
+python3 -m unittest discover -s scripts/tests -p 'test_agent_skill_infrastructure.py'
 python3 scripts/test_agent_skills.py
 ```
+
+The repository test validates links against the Skills actually installed by supported profiles. Use a named Skill and exact reference path for an optional target that is not installed in every supported profile; do not add a dependency just to resolve a link.
 
 Edit Monica-owned skills only under `skills/<name>/`. The entire `.agents/` and `.claude/` roots are ignored local agent state, including commands and settings. Their `.agents/skills/<name>` and `.claude/skills/<name>` subdirectories are generated projections and must not be edited or committed. Run `python3 scripts/sync_agent_skills.py --write` after cloning or changing skills to refresh repository-local discovery. The generator owns only catalog-managed Monica directories: unrelated external skills, files, and caches are preserved; commands and settings are not generated. Monica-owned skills use portable `SKILL.md` frontmatter containing only `name` and `description`. Skill release versions live in `.monica/agent-skill-catalog.json` and `.monica/agent-skill-index.json`, not in skill frontmatter.
 
