@@ -2,6 +2,7 @@
  * A directed atlas of compiled API usages, with observed service membership. Dashed endpoints
  * identify domain names absent from the catalog; they are not registered domains.
  */
+import * as d3 from '../../Monica.UI/lib/d3.min.mjs';
 import { GraphBase } from '../../Monica.UI/js/d3js/d3-graph-base.js';
 
 const roleColors = {

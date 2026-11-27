@@ -162,7 +162,8 @@ public class MoMudMarkdown : MudMarkdown
         public RenderFragment Content { get; } = content;
     }
 
-    protected override void RenderCodeBlock(in RenderTreeBuilder builder, ref int elementIndex, in CodeBlock code, in string? info)
+    /// <inheritdoc />
+    protected override void RenderCodeBlock(in RenderTreeBuilder builder, ref int elementIndex, in CodeBlock code, in string? info, Typo typo)
     {
         if (EnableMermaid && string.Equals(info?.Trim(), "mermaid-tabs", StringComparison.OrdinalIgnoreCase))
         {
@@ -191,7 +192,7 @@ public class MoMudMarkdown : MudMarkdown
             return;
         }
 
-        base.RenderCodeBlock(builder, ref elementIndex, code, info);
+        base.RenderCodeBlock(builder, ref elementIndex, code, info, typo);
     }
 
     private static string CreateCodeBlockText(CodeBlock code)

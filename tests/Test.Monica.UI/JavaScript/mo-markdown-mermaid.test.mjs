@@ -1,9 +1,19 @@
 import assert from 'node:assert/strict';
-import { readFile } from 'node:fs/promises';
+import { registerHooks } from 'node:module';
 import test from 'node:test';
 
-const source = await readFile(new URL('../../../Monica.UI/wwwroot/js/mo-markdown-mermaid.js', import.meta.url), 'utf8');
-const { renderMermaid } = await import(`data:text/javascript;base64,${Buffer.from(source).toString('base64')}`);
+const renderer = new URL('../../../Monica.UI/wwwroot/js/mo-markdown-mermaid.js', import.meta.url);
+const mockSource = 'export default new Proxy({}, { get: (_, key) => globalThis.window.mermaid[key] });';
+const hook = registerHooks({
+    resolve(specifier, context, nextResolve) {
+        if (specifier === '../lib/mermaid/mermaid.min.mjs' && context.parentURL === renderer.href) {
+            return { url: 'data:text/javascript,' + encodeURIComponent(mockSource), shortCircuit: true };
+        }
+        return nextResolve(specifier, context);
+    }
+});
+test.after(() => hook.deregister());
+const { renderMermaid } = await import(renderer.href);
 
 function diagramSurface(bounds, viewBox) {
     const attributes = new Map([['viewBox', viewBox], ['height', '2000']]);
@@ -42,7 +52,6 @@ test('rendered diagrams fit their content when staging bounds are oversized or c
     let config;
     let boundElement;
     const mermaid = {
-        registerLayoutLoaders() {},
         detectType() { return 'flowchart-v2'; },
         initialize(value) { config = value; },
         async render() { return { svg: '<svg></svg>', bindFunctions: element => { boundElement = element; } }; }
@@ -63,7 +72,7 @@ test('rendered diagrams fit their content when staging bounds are oversized or c
             assert.equal(attributes.has('height'), false);
             assert.equal(Number.parseFloat(svg.style.maxWidth), width);
             assert.equal(config.htmlLabels, false);
-            assert.equal(config.flowchart.htmlLabels, false);
+            assert.equal(config.layout, 'elk');
             assert.equal(config.securityLevel, 'strict');
             assert.equal(boundElement, element);
         }
@@ -75,7 +84,6 @@ test('rendered diagrams fit their content when staging bounds are oversized or c
 test('an empty or invalid measurement does not replace the renderer viewport', async () => {
     const previousWindow = globalThis.window;
     globalThis.window = { mermaid: {
-        registerLayoutLoaders() {},
         detectType() { return 'flowchart-v2'; },
         initialize() {},
         async render() { return { svg: '<svg></svg>' }; }
@@ -98,7 +106,6 @@ test('retiring an in-flight render leaves the existing diagram and handlers unto
     let bound = false;
     const previousWindow = globalThis.window;
     globalThis.window = { mermaid: {
-        registerLayoutLoaders() {},
         detectType() { return 'flowchart-v2'; },
         initialize() {},
         async render() {
@@ -130,7 +137,6 @@ test('a retired queued request skips Mermaid without blocking following diagrams
     let current = true;
     const previousWindow = globalThis.window;
     globalThis.window = { mermaid: {
-        registerLayoutLoaders() {},
         detectType() { return 'flowchart-v2'; },
         initialize() {},
         async render(_, definition) {
@@ -171,7 +177,6 @@ test('each async diagram keeps its global theme and a failed render does not poi
     let rendering = false;
     const previousWindow = globalThis.window;
     globalThis.window = { mermaid: {
-        registerLayoutLoaders() {},
         detectType() { return 'flowchart-v2'; },
         initialize(config) {
             assert.equal(rendering, false, 'Another request must not reconfigure an in-flight diagram');

@@ -8,6 +8,8 @@ Record the actual host process, .NET SDK/runtime, Monica version, environment na
 
 In browser Network and Console, inspect the script URL rendered by the document and the first failed startup request. The shared document uses `Assets["_framework/blazor.web.js"]`, so the deployed URL may be fingerprinted or include the application's base path. Inspect the requested URL, status, content type, and response body. A `200 OK` response containing HTML or zero bytes is not a successfully loaded script or stylesheet. Server prerendering can populate a page before any interactive circuit exists.
 
+D3 graphs and Markdown diagrams import local ES modules when rendered. If the surrounding page is interactive and a visualization fails, inspect the failed module request under the owning Razor library and the nested chunks under `_content/Monica.UI/lib/mermaid/chunks/`. Confirm the host serves `.mjs` as JavaScript and the proxy preserves the chunk paths.
+
 For a separate response check, replace the example origin and path with the observed resource URL:
 
 ```sh

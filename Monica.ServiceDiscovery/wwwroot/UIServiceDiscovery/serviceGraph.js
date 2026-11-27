@@ -2,6 +2,7 @@
  * A service membership atlas. The provider does not expose service-to-service
  * dependencies, so this controller deliberately renders no inferred links.
  */
+import * as d3 from '../../Monica.UI/lib/d3.min.mjs';
 import { GraphBase } from '../../Monica.UI/js/d3js/d3-graph-base.js';
 
 const roleColors = {

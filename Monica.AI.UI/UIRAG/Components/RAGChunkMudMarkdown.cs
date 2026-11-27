@@ -18,7 +18,7 @@ namespace Monica.AI.UI.UIRAG.Components;
 /// </summary>
 public sealed class RAGChunkMudMarkdown : MoMudMarkdown
 {
-    private delegate void BlockRenderer(RenderTreeBuilder builder, ref int elementIndex, MarkdownBlock block);
+    private delegate void BlockRenderer(RenderTreeBuilder builder, ref int elementIndex, MarkdownBlock block, Typo bodyTypo);
 
     private readonly Stack<string> _activeChunkWrapperKeys = [];
     private List<ChunkHighlight> _orderedChunks = [];
@@ -95,6 +95,7 @@ public sealed class RAGChunkMudMarkdown : MoMudMarkdown
         Func<int, MarkdownBlock> blockAccessor,
         BlockRenderer renderer)
     {
+        var bodyTypo = Props.Body.OverrideTypo ?? Typo.body1;
         var inheritedChunkKey = GetCurrentChunkWrapperKey();
         string? localWrapperKey = null;
 
@@ -114,19 +115,19 @@ public sealed class RAGChunkMudMarkdown : MoMudMarkdown
                 }
             }
 
-            renderer(builder, ref elementIndex, block);
+            renderer(builder, ref elementIndex, block, bodyTypo);
         }
 
         CloseChunkWrapper(builder, ref localWrapperKey);
     }
 
-    private void RenderMarkdownBlock(RenderTreeBuilder builder, ref int elementIndex, MarkdownBlock block)
+    private void RenderMarkdownBlock(RenderTreeBuilder builder, ref int elementIndex, MarkdownBlock block, Typo bodyTypo)
     {
         switch (block)
         {
             case ParagraphBlock paragraph:
             {
-                RenderParagraphBlock(builder, ref elementIndex, paragraph);
+                RenderParagraphBlock(builder, ref elementIndex, paragraph, bodyTypo);
                 break;
             }
             case HeadingBlock heading:
@@ -162,12 +163,12 @@ public sealed class RAGChunkMudMarkdown : MoMudMarkdown
             }
             case FencedCodeBlock code:
             {
-                RenderCodeBlock(builder, ref elementIndex, code, code.Info);
+                RenderCodeBlock(builder, ref elementIndex, code, code.Info, bodyTypo);
                 break;
             }
             case CodeBlock code:
             {
-                RenderCodeBlock(builder, ref elementIndex, code, info: null);
+                RenderCodeBlock(builder, ref elementIndex, code, info: null, bodyTypo);
                 break;
             }
             case HtmlBlock html:
@@ -191,7 +192,7 @@ public sealed class RAGChunkMudMarkdown : MoMudMarkdown
         }
     }
 
-    private void RenderListBlock(RenderTreeBuilder builder, ref int elementIndex, MarkdownBlock block)
+    private void RenderListBlock(RenderTreeBuilder builder, ref int elementIndex, MarkdownBlock block, Typo bodyTypo)
     {
         switch (block)
         {
@@ -202,22 +203,22 @@ public sealed class RAGChunkMudMarkdown : MoMudMarkdown
             }
             case ParagraphBlock paragraph:
             {
-                RenderParagraphBlock(builder, ref elementIndex, paragraph);
+                RenderParagraphBlock(builder, ref elementIndex, paragraph, bodyTypo);
                 break;
             }
             case FencedCodeBlock code:
             {
-                RenderCodeBlock(builder, ref elementIndex, code, code.Info);
+                RenderCodeBlock(builder, ref elementIndex, code, code.Info, bodyTypo);
                 break;
             }
             case CodeBlock code:
             {
-                RenderCodeBlock(builder, ref elementIndex, code, info: null);
+                RenderCodeBlock(builder, ref elementIndex, code, info: null, bodyTypo);
                 break;
             }
             default:
             {
-                OnRenderListDefault(builder, ref elementIndex, block);
+                OnRenderListDefault(builder, ref elementIndex, block, bodyTypo);
                 break;
             }
         }

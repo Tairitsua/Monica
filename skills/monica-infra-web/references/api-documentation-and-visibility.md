@@ -24,6 +24,8 @@ monica.AddSwagger(options =>
 
 The UI prefix changes the HTML location while generated documents remain in the `swagger/{documentName}/swagger.json` namespace. Monica's default document destinations resolve relative to the final UI location, including an empty or nested prefix and the current PathBase. The host's UI extension can replace those destinations and retains ownership of any changed or external URL. For shared themes, saved appearance and application toolbar links, register the separate Swagger workbench in `$monica-infra-ui` (`references/swagger-ui.md`); it preserves native generation and request execution.
 
+If the index opens but the operation list stays blank, verify the native Swagger JavaScript bundle under the active UI prefix and the selected document JSON. The optional Monica workbench then loads its own theme assets from the referenced Razor libraries.
+
 Swagger-specific extension modules can register singleton `Monica.WebApi.Swagger.Abstractions.ISwaggerUIOptionsEnhancer` implementations. Swagger invokes `Apply` during middleware composition after the host's `ExtendSwaggerUIAction` and default URL resolution, in registration order. Keep request-specific work inside the resulting request factory; do not capture scoped circuit state or mutate shared options per request. An index decorator must preserve the host's final factory and native initializer and retain explicit ownership of every produced stream. Ordinary hosts continue to configure `ExtendSwaggerUIAction`; registering an enhancer is a module-extension contract.
 
 Set routing and document overrides in `ExtendSwaggerUIAction`. An enhancer that changes the prefix afterward must also own matching document URLs; automatic URL resolution is not repeated after enhancement.

@@ -5,6 +5,8 @@
  * @module d3-graph-base
  */
 
+import * as d3 from '../../lib/d3.min.mjs';
+
 /**
  * Create SVG canvas
  * @param {string} containerId - container element ID

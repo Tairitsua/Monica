@@ -5,6 +5,8 @@
  * @module d3-force-layout
  */
 
+import * as d3 from '../../lib/d3.min.mjs';
+
 /**
  * Force-directed layout configuration
  */

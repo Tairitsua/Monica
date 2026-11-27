@@ -1,54 +1,4 @@
-let mermaidLoadPromise;
 let renderQueue = Promise.resolve();
-const configuredRuntimes = new WeakSet();
-
-function registerFlowchartLayout(mermaid) {
-    if (configuredRuntimes.has(mermaid)) return;
-    mermaid.registerLayoutLoaders([{
-        name: 'monica-flowchart',
-        algorithm: 'elk.layered',
-        loader: () => import('./mo-markdown-mermaid-flowchart.js')
-    }]);
-    configuredRuntimes.add(mermaid);
-}
-
-function getMermaidSource() {
-    return '/_content/Monica.UI/lib/mermaid/mermaid.min.js';
-}
-
-async function ensureMermaid() {
-    if (window.mermaid) {
-        return window.mermaid;
-    }
-
-    if (!mermaidLoadPromise) {
-        mermaidLoadPromise = new Promise((resolve, reject) => {
-            const existingScript = document.querySelector('script[data-mo-markdown-mermaid]');
-            if (existingScript) {
-                existingScript.addEventListener('load', () => resolve(window.mermaid), { once: true });
-                existingScript.addEventListener('error', () => reject(new Error('Failed to load Mermaid runtime.')), { once: true });
-                return;
-            }
-
-            const script = document.createElement('script');
-            script.src = getMermaidSource();
-            script.async = true;
-            script.dataset.moMarkdownMermaid = 'true';
-            script.onload = () => {
-                if (window.mermaid) {
-                    resolve(window.mermaid);
-                    return;
-                }
-
-                reject(new Error('Mermaid runtime loaded without exposing the global API.'));
-            };
-            script.onerror = () => reject(new Error('Failed to load Mermaid runtime.'));
-            document.head.appendChild(script);
-        });
-    }
-
-    return mermaidLoadPromise;
-}
 
 function normalizeDiagramText(definition) {
     return (definition ?? '').replace(/\r\n/g, '\n').trim();
@@ -66,9 +16,7 @@ function createConfig(theme) {
     return {
         startOnLoad: false,
         securityLevel: 'strict',
-        // Nodes use the global setting; edges and clusters use the flowchart setting.
         htmlLabels: false,
-        flowchart: { htmlLabels: false },
         theme: 'base',
         fontFamily: getFontFamily(theme),
         themeVariables: {
@@ -126,7 +74,8 @@ function createConfig(theme) {
 function createFlowchartConfig(config, theme) {
     return {
         ...config,
-        layout: 'monica-flowchart',
+        layout: 'elk',
+        flowchart: { padding: 18, nodeSpacing: 42, rankSpacing: 58 },
         themeVariables: { ...config.themeVariables, fontSize: '14px', lineColor: theme.textSecondary },
         themeCSS: `
             .node text, .node tspan { font-size: 14px; font-weight: 600; }
@@ -135,6 +84,7 @@ function createFlowchartConfig(config, theme) {
                 stroke: color-mix(in srgb, ${theme.primary} 30%, ${theme.surface});
                 stroke-width: 1px;
             }
+            .node rect.label-container { rx: 12px; ry: 12px; }
             .node.mo-persistent .label-container { fill: color-mix(in srgb, ${theme.success} 12%, ${theme.surface}); stroke: ${theme.success}; }
             .node.mo-process .label-container { fill: color-mix(in srgb, ${theme.info} 9%, ${theme.surface}); stroke: color-mix(in srgb, ${theme.info} 65%, ${theme.surface}); }
             .node.mo-external .label-container { fill: ${theme.surface}; stroke: ${theme.textSecondary}; stroke-dasharray: 5 4; }
@@ -145,7 +95,7 @@ function createFlowchartConfig(config, theme) {
             @media (prefers-reduced-motion: reduce) { .node .label-container { transition: none; } }
             .edgeLabels text, .edgeLabels tspan { font-size: 13px; font-weight: 600; fill: ${theme.primary}; }
             .edgeLabel .label rect {
-                opacity: 1; rx: 13px; ry: 13px;
+                opacity: 1; rx: 6px; ry: 6px;
                 fill: ${theme.surface}; stroke: ${theme.primary}; stroke-width: 1px;
             }
             .edgePaths .flowchart-link { stroke-width: 1px; stroke-linecap: round; stroke-linejoin: round; }
@@ -193,9 +143,8 @@ function renderDiagram(definition, theme, isCurrent) {
     // Mermaid has global configuration: serialize configuration and rendering across Markdown blocks.
     const pending = renderQueue.then(async () => {
         if (!isCurrent()) return null;
-        const mermaid = await ensureMermaid();
+        const { default: mermaid } = await import('../lib/mermaid/mermaid.min.mjs');
         if (!isCurrent()) return null;
-        registerFlowchartLayout(mermaid);
         const config = createConfig(theme);
         mermaid.initialize(config);
         const diagramType = mermaid.detectType(definition, config);
@@ -231,13 +180,16 @@ export async function renderMermaid(element, definition, theme, isCurrent = () =
     return true;
 }
 
-function isNodeAlias(alias) { return /^[A-Za-z][A-Za-z0-9_]*$/.test(alias); }
-
 function decorateNodes(surface, nodes, interactive) {
+    const svg = surface.querySelector('svg');
+    if (!svg) return;
+
     const svgNamespace = 'http://www.w3.org/2000/svg';
-    for (const node of surface.querySelectorAll('g.node')) {
-        const alias = Object.keys(nodes).find(key => isNodeAlias(key) && new RegExp(`^flowchart-${key}-\\d+$`).test(node.id));
-        if (!alias) continue;
+    const nodePrefix = svg.id + '-flowchart-';
+    for (const node of svg.querySelectorAll('g.node')) {
+        if (!node.id.startsWith(nodePrefix)) continue;
+        const alias = /^([A-Za-z][A-Za-z0-9_]*)-\d+$/.exec(node.id.slice(nodePrefix.length))?.[1];
+        if (!alias || !Object.hasOwn(nodes, alias)) continue;
         const presentation = nodes[alias];
         const label = [presentation.kind, presentation.label].filter(Boolean).join(' · ');
         const title = document.createElementNS(svgNamespace, 'title');

@@ -71,3 +71,6 @@
 # Preserve the exact copied review/gate bytes for these bounded UI batches.
 .ui-design/ui-modernization/file-ops/create-v1/evidence/** -text
 .ui-design/ui-modernization/guide-app/overview-v1/evidence/** -text
+
+# Keep upstream template-string whitespace in the generated Mermaid modules.
+/Monica.UI/wwwroot/lib/mermaid/**/*.mjs -whitespace linguist-generated

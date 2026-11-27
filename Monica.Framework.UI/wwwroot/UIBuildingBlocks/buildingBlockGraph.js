@@ -2,6 +2,7 @@
  * One component-owned architecture graph. Data identities and links come from the
  * real Building Blocks catalog; camera, observers, and callbacks share this lifetime.
  */
+import * as d3 from '../../Monica.UI/lib/d3.min.mjs';
 import { GraphBase } from '../../Monica.UI/js/d3js/d3-graph-base.js';
 import { ForceLayoutManager } from '../../Monica.UI/js/d3js/d3-force-layout.js';
 import { createStaticDragBehavior } from '../../Monica.UI/js/d3js/d3-node-interaction.js';

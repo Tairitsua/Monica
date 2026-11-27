@@ -1,14 +1,10 @@
 import assert from "node:assert/strict";
-import { readFile } from "node:fs/promises";
 
-const moduleUrl = new URL("../../../Monica.UI/wwwroot/js/module-dependency-graph.js", import.meta.url);
-const moduleSource = await readFile(moduleUrl, "utf8");
-const moduleDataUrl = `data:text/javascript;base64,${Buffer.from(moduleSource).toString("base64")}`;
 const {
     calculateDependencyEdgeEndpoints,
     calculateLayeredDependencyLayout,
     calculateRadialDependencyLayout
-} = await import(moduleDataUrl);
+} = await import("../../../Monica.UI/wwwroot/js/module-dependency-graph.js");
 
 const forward = calculateDependencyEdgeEndpoints(
     { x: 0, y: 0 },

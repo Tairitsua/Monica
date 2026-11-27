@@ -5,6 +5,7 @@
  * @module d3-node-interaction
  */
 
+import * as d3 from '../../lib/d3.min.mjs';
 import { getModernLinkStyle } from './d3-graph-base.js';
 
 /**

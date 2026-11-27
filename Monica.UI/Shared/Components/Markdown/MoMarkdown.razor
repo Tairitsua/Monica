@@ -116,6 +116,7 @@
         resolved.Link.DisableTargetBlank = source?.Link.DisableTargetBlank ?? false;
         resolved.Link.OverrideUrl = link => ResolveUrl(link, source?.Link.OverrideUrl?.Invoke(link) ?? link.Url);
         resolved.Heading.OverrideTypo = source?.Heading.OverrideTypo;
+        resolved.Body.OverrideTypo = source?.Body.OverrideTypo;
 
         return resolved;
     }

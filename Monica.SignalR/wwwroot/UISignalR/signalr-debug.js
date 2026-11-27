@@ -16,7 +16,7 @@ const DEFAULT_MESSAGES = {
 
 export async function createSession(callback, localizedMessages) {
     if (!globalThis.signalR) {
-        await import("./signalr.js");
+        await import("./signalr.min.js");
     }
 
     const signalRApi = globalThis.signalR;

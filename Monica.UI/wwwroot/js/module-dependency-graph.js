@@ -1,3 +1,5 @@
+import * as d3 from "../lib/d3.min.mjs";
+
 const EDGE_SOURCE_PADDING = 2;
 const EDGE_TARGET_PADDING = 6;
 const DEFAULT_NODE_RADIUS = 24;
@@ -116,9 +118,6 @@ export function createDotNetCallbackGate(initialReference) {
 }
 
 export function createGraph(element, initialModel, dotNetReference) {
-    if (!globalThis.d3) throw new Error("D3.js is required to render the module dependency graph.");
-
-    const d3 = globalThis.d3;
     let model = initialModel ?? {};
     let nodes = [];
     let links = [];

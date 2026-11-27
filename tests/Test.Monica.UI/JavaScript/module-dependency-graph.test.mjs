@@ -1,13 +1,7 @@
 import assert from "node:assert/strict";
-import { readFile } from "node:fs/promises";
 import test from "node:test";
 
-const sourceUrl = new URL(
-    "../../../Monica.UI/wwwroot/js/module-dependency-graph.js",
-    import.meta.url);
-const source = await readFile(sourceUrl, "utf8");
-const moduleUrl = `data:text/javascript;base64,${Buffer.from(source).toString("base64")}`;
-const { createDotNetCallbackGate } = await import(moduleUrl);
+const { createDotNetCallbackGate } = await import("../../../Monica.UI/wwwroot/js/module-dependency-graph.js");
 
 function deferred() {
     let resolve;
