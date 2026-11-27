@@ -38,6 +38,7 @@ Verify the panel at the viewport edge with full viewport height after scrolling 
 
 ## Reflow
 
+- Give operational pages the full content width supplied by the shell — do not cap `.page` or page-root containers with an arbitrary `max-width` (such as `1480px` or `1280px`) or centered fixed-width wrapper so tables, timelines, topologies, and diagnostic columns use the available space instead of leaving empty side gutters. If working on an older branch whose shared stylesheet still caps `.page`, clear it on the page root (`.<prefix>-page { max-width: none; }`). Keep line-length limits (`60ch`–`74ch`) strictly on local reading or explanatory text, never on the page root or working surfaces (matching [surface width rules](../../monica-ui-development/references/monica-workbench-design-language.md#give-surfaces-distinct-roles-and-character)).
 - Reflow from the page's own width with container queries; the shell's navigation changes the width a page receives at the same viewport.
 - Check a wide desktop, an intermediate width with the sidebar open (about 930px) and a phone (390px). Tables become labelled rows on phones, a matrix becomes labelled lines, and numeric columns stay end-aligned at wide widths.
 - Measure in the DOM instead of trusting a capture: `scrollWidth` against `clientWidth` at each owner, header and cell alignment, and text insets against the painted surface.
