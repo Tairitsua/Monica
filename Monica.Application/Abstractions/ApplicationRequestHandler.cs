@@ -7,9 +7,10 @@ namespace Monica.Application.Abstractions;
 /// Defines one application use case executed through Monica's mediator pipeline.
 /// </summary>
 /// <remarks>
-/// Resolve handlers through Monica dependency injection and invoke them through the mediator so execution
-/// policies and transaction boundaries apply. The response is explicit: use <see cref="Result{T}"/>,
-/// <see cref="Result"/>, or the request's custom response contract without implicit result wrapping.
+/// Callers inject the generated domain API for published requests and dispatch internal requests through
+/// the mediator. The dispatcher resolves the handler so execution policies and transaction boundaries apply.
+/// The response is explicit: use <see cref="Result{T}"/>, <see cref="Result"/>, or the request's custom
+/// response contract without implicit result wrapping.
 /// </remarks>
 /// <typeparam name="TRequest">The request contract accepted by this handler.</typeparam>
 /// <typeparam name="TResponse">The exact full mediator response, including any result envelope.</typeparam>
