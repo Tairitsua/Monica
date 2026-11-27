@@ -124,7 +124,7 @@ Use an unversioned CLR name for the initial event contract. Add a version suffix
 ## Boundary Rules
 
 - Keep `Result` and `Result<T>` at public application/Facade boundaries. Internal domain services and repositories use normal return types and exceptions.
-- Keep orchestration in handlers and business rules at their state/domain owner. Handler length alone does not justify a DomainService; select one only for a meaningful domain responsibility.
+- Handlers own the application boundary. A domain service can coordinate the business steps within it. Handler length alone does not justify a service.
 - Keep entity invariants on the entity. Do not let handlers or repositories directly toggle domain state through scattered property assignments.
 - Keep repository interfaces on the domain side of the boundary and repository implementations on the infrastructure side.
 - The domain core owns persistence in every deployment: implementations stay in `Domains/{Domain}/Domains.{Domain}/Repository/`; role libraries consume their narrow interfaces.
@@ -137,7 +137,7 @@ Use an unversioned CLR name for the initial event contract. Add a version suffix
 
 ## Practical Heuristics
 
-- Consider a `DomainService` when a meaningful domain rule has no natural entity owner; reuse is supporting evidence, not a reason to move an entity's invariant out of it.
+- Choose a `DomainService` for a domain rule or operation with no single entity owner. Keep each entity's invariants on the entity.
 - Add a value object when a concept has rules but no identity.
 - Add a new repository method only for meaningful domain queries. Do not wrap every basic CRUD call in a bespoke method.
 - Add a new event only when another building block can react without depending on the caller's internal flow.

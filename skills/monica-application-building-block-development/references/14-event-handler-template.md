@@ -15,7 +15,7 @@ Use `$ApplicationNamespace$`, `$DomainNamespace$`, and `$ContractNamespace$` for
 - Use `LocalEventHandler<TEvent>` for in-process reactions.
 - Use the inherited `Logger` in handler methods when logging is needed. Monica resolves it after activation from the
   host that owns the handler instance; do not access it from a constructor.
-- Keep handlers focused on the reaction. Entities own invariants; delegate to a DomainService only when a meaningful domain rule warrants one.
+- Keep the handler focused on reacting to the event. It may delegate the resulting business operation to a [DomainService](11-domain-service-template.md).
 - Make the event type stable before adding consumers.
 - Use `$ApplicationNamespace$` for the application-layer namespace chosen by the architecture skill.
 - Place handlers in `HandlersEvent/`.

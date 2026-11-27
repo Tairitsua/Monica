@@ -12,7 +12,7 @@ Runtime and source discovery recognize the kinds below from inheritance, interfa
 | --- | --- | --- | --- |
 | `ApplicationRequestHandler` | `ApplicationRequestHandler<TRequest, TResponse>`; `TResponse` is the complete mediator response | `CommandHandler*`, `QueryHandler*`, or another `*Handler*` name | Transport-independent mediator use-case orchestration (HTTP exposure is opt-in) with a deliberate result boundary |
 | `RequestDto` | `IQuery<TData>` or `ICommand<TData>`/`ICommand` | `Command*`, `Query*`, `Request*` | Stable request contract for a use case |
-| `DomainService` | `DomainService` | `Domain*` | Meaningful domain rule with no natural entity owner, often spanning aggregates |
+| `DomainService` | `DomainService` | `Domain*` | Domain rule or business operation coordinating several domain objects |
 | `Entity` | `Entity<TKey>` or `Entity` plus `IEntity` | Place under `Entities/` | Own state, invariants, and behavior |
 | `Repository` | Minimal `IRepository<TEntity>` or keyed contract plus concrete implementation | `IRepository{Aggregate}` / exact `Repository{Aggregate}` | Tracked aggregate loading, staging, and materialized business reads |
 | `DomainEvent` | `DomainEvent` | `Event*` | An application fact or shared notification contract worth publishing or reacting to |
@@ -75,7 +75,7 @@ An empty catalog reports no data, not 100% coverage. Use [03-building-block-cont
 
 The `monica-building-blocks-source/v1` analysis contract reports public instance properties (including inherited members), source nullability, required initialization, setter access, annotations, XML summaries and public/protected behavior signatures. Each available source location is retained. These are declared CLR facts, not inferred persistence mappings. For physical mappings use an explicitly selected EF design model through the persistence skill's [entity model inspection](../../monica-infra-persistence/references/repository-diagnostics.md#inspect-an-explicitly-selected-entity-design-model). Keep business meanings and null semantics near their chosen source or owned design; avoid copying type/schema inventories into every delivery plan.
 - Create a new `ApplicationRequestHandler` when you need a new externally visible use case.
-- Create a `DomainService` only for a meaningful domain rule without a natural entity owner, including a rule reused across entry points or spanning aggregates. A one-entity transition normally stays on the entity and the handler calls it directly.
+- A one-entity transition normally stays on the entity. Use the [DomainService template](11-domain-service-template.md) for rules and multi-step operations that belong to the domain as a whole.
 - Create or extend an `Entity` when the rule belongs to the state owner itself.
 - Create a `Repository` only when persistence access is needed. Do not hide pure business rules inside repositories.
 - Create a `DomainEvent` only when the fact itself matters to other handlers or modules. Do not emit events for trivial internal control flow.

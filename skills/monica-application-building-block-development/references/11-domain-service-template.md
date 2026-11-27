@@ -4,10 +4,9 @@ Use `$DomainNamespace$` for the domain project namespace selected by the archite
 
 ## Use When
 
-- A meaningful business rule has no natural entity owner, often because it spans aggregates.
-- Multiple entry points need that rule. Reuse can justify a service, but does not move an entity's invariant out of it.
+Use a `DomainService` for a rule with no single entity owner, or for a named business operation that coordinates entities, repositories, and other domain services within one bounded context. A single command, event handler, or job can be its only caller. The service may perform the whole business sequence, choose the order of its steps, apply business rejection rules, and return the outcome to the caller. Each entity still protects its own invariants.
 
-A handler that loads one order and calls `order.Approve()` does not need a DomainService. Keep use-case orchestration in the handler; do not add a forwarding service for structural symmetry.
+The entry point and execution pipeline own dispatch, scope, transaction participation, and retry policy. When a retry requires fresh tracked state, obtain the domain service inside the new attempt's scope and use that instance for the business sequence. The handler can then map its outcome to the public response. A simple handler that loads an order and calls `order.Approve()` needs no additional service.
 
 ## Rules
 
@@ -22,7 +21,7 @@ A handler that loads one order and calls `order.Approve()` does not need a Domai
 
 ## Minimal Example
 
-`Order`, `Warehouse`, and their repositories are application-owned example types. Here fulfillment is a cross-aggregate rule; the order still protects its own approval transition.
+`Order`, `Warehouse`, and their repositories are application-owned example types. One approval command checks warehouse capacity, reserves stock, and approves the order in the caller's transaction. The warehouse rejects a reservation when stock is insufficient. The order owns its approval transition. The handler can return the approved order's identifier after the operation succeeds.
 
 ```csharp
 using Monica.ApplicationModel.Annotations;
@@ -32,7 +31,7 @@ namespace $DomainNamespace$.DomainServices;
 
 [BuildingBlockMetadata(
     "$FeatureName$ Domain Rules",
-    Description = "Enforces reusable domain rules for $FeatureName$.",
+    Description = "Coordinates stock reservation and order approval.",
     Tags = ["$SubdomainTag$", "$FeatureTag$"])]
 [BuildingBlockRequirement("$RequirementId$")]
 public sealed class Domain$FeatureName$(
@@ -46,11 +45,7 @@ public sealed class Domain$FeatureName$(
     {
         var order = await orders.GetAsync(orderId, cancellationToken);
         var warehouse = await warehouses.GetAsync(warehouseId, cancellationToken);
-        if (!warehouse.CanFulfill(order))
-        {
-            throw new InvalidOperationException("Warehouse cannot fulfill this order.");
-        }
-
+        warehouse.ReserveStock(order);
         order.Approve();
         return order;
     }

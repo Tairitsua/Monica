@@ -29,7 +29,7 @@ Create:
 - `ApplicationRequestHandler`
 - Update or add `Entity`
 - Optional `Repository` for tracked loading and staging
-- Optional `DomainService` for a meaningful rule spanning aggregates or with no natural entity owner
+- Optional `DomainService` to carry out a business operation spanning domain objects
 - Optional `DomainEvent` when another building block needs the resulting fact
 
 Load:
@@ -37,7 +37,7 @@ Load:
 - [10-application-request-handler-template.md](10-application-request-handler-template.md)
 - [12-entity-request-event-template.md](12-entity-request-event-template.md)
 - [13-repository-and-persistence-template.md](13-repository-and-persistence-template.md)
-- [11-domain-service-template.md](11-domain-service-template.md) only when such a domain rule exists
+- [11-domain-service-template.md](11-domain-service-template.md) when the command delegates a domain operation
 - [17-connected-use-case-example.md](17-connected-use-case-example.md) for a handler that loads an aggregate and calls its invariant directly
 
 ## 3. New aggregate or persistent entity
@@ -60,7 +60,7 @@ Create:
 
 - `DomainEvent`
 - `DistributedEventHandler` or `LocalEventHandler`
-- Optional `DomainService` if the reaction contains reusable business logic
+- Optional `DomainService` for a business operation triggered by the event
 - Optional `TriggeredJob` if the work needs the [independent execution lifecycle](15-job-template.md) of a job
 
 Load:

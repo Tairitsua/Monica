@@ -10,7 +10,7 @@
 
 - Use `RecurringJob` for scheduled work and name it `Worker*`.
 - Use `TriggeredJob<TArgs>` for on-demand asynchronous work and name it `Job*`.
-- Keep the job focused on its execution lifecycle and orchestration. Entities own invariants; use a DomainService only for a meaningful rule without a natural entity owner. Retry or durability configuration needs an actual feature requirement.
+- Keep the job focused on its execution lifecycle. It may delegate a domain operation to a [DomainService](11-domain-service-template.md). Retry or durability configuration needs an actual feature requirement.
 - Add `[JobConfig]` only when defaults are not enough. Use `$monica-infra-jobs` for scheduler registration, durable store, owner/scope identity, and execution semantics.
 - Inject `ILogger<TConcreteJob>` and pass it to the job base constructor.
 - Use `$ApplicationNamespace$` for the application-layer namespace chosen by the architecture skill.
