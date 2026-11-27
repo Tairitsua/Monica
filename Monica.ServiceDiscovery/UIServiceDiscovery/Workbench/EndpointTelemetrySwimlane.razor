@@ -1,0 +1,91 @@
+@inherits DiscoveryComponent
+
+<div class="sv-ep-viz" @onmouseleave="Clear">
+    <div class="sv-hz-head">
+        <div class="sv-hz-title"><h2>@T("epLaneTitle")</h2><p>@T("epLaneDesc", Num(Snapshot.Retention.TotalMinutes), Num(Snapshot.ResolutionTimeout.TotalSeconds))</p></div>
+        <div class="sv-hz-legend">
+            <span><span class="sw is-diamond role-primary"></span>@T("epLaneLegendAttempt")</span>
+            <span><span class="sv-ep-retained-mark"></span>@T("epLaneLegendRetained")</span>
+            <span><span class="sw role-success"></span>@T("epLaneLegendSuccess")</span>
+            <span><span class="sw role-warning"></span>@T("epLaneLegendHttpErr")</span>
+            <span><span class="sw role-error"></span>@T("epLaneLegendFail")</span>
+            <span><span class="sw role-third"></span>@T("epLaneLegendCancel")</span>
+        </div>
+    </div>
+    <div class="sv-ep-axis-row" aria-hidden="true">
+        <span class="sv-ep-axis-label">@T("epLaneColTarget")</span>
+        <div class="sv-ep-axis-track">
+            <span class="sv-hz-tick" style="left:0%"><b>@T("epLaneAgo", Num(Snapshot.Retention.TotalMinutes))</b></span>
+            <span class="sv-hz-tick" style="left:33.33%"><b>@T("epLaneAgo", Num(Snapshot.Retention.TotalMinutes * (2d / 3)))</b></span>
+            <span class="sv-hz-tick" style="left:66.67%"><b>@T("epLaneAgo", Num(Snapshot.Retention.TotalMinutes / 3))</b></span>
+            <span class="sv-hz-tick is-end" style="left:100%"><b>@T("epLaneNow")</b></span>
+        </div>
+        <span class="sv-ep-axis-meta">@T("epLaneColMeta")</span>
+    </div>
+    <div class="sv-ep-lanes" data-sv-keygrid role="group" aria-label="@T("epLaneTitle")">
+        @foreach (var target in _targets)
+        {
+            var address = target.Target.Address.AbsoluteUri;
+            var state = EndpointState(Snapshot, target);
+            var current = Selected == address;
+            var p95 = P95(target);
+            <div @key="address" class="sv-ep-lane @(current ? "is-selected" : null)" data-sv-keyrow>
+                <button type="button" class="sv-ep-lane-btn" data-sv-keymark aria-current="@(current ? "true" : null)"
+                        aria-label="@Describe(target)" @onmouseenter="() => _active = address" @onfocus="() => _active = address"
+                        @onkeydown="DismissReadout" @onclick='() => Workbench.SetQuery(false, ("target", address), ("endpoint", null))'>
+                    <span class="sv-ep-lane-label"><span class="sv-ep-lane-top"><b>@target.Target.Scope / @target.Target.AppId</b><span class="sv-hz-pill role-@EndpointRole(state)">@T("epStates:" + state)</span></span><small class="mono">@address</small></span>
+                    <span class="sv-ep-lane-track" aria-hidden="true">
+                        <span class="sv-hz-rule" style="left:33.33%"></span><span class="sv-hz-rule" style="left:66.67%"></span><span class="sv-hz-baseline"></span>
+                        @if (target.Calls.Count == 0)
+                        {
+                            <span class="sv-ep-nocalls @(state == "Empty" ? "hatch" : null)">@T("epLaneNoCalls")</span>
+                        }
+                        @foreach (var call in target.Calls)
+                        {
+                            var size = Math.Round(10 + Math.Log10(Math.Max(10, call.DurationMs)) / Math.Log10(_latencyScale) * 18);
+                            <span class="sv-ep-tick role-@OutcomeRole(call.Outcome)" style="left:@Position(call.At);height:@(size)px" title="@($"{T("epOutcomes:" + call.Outcome)} · {Latency(call.DurationMs)} ms")"></span>
+                        }
+                        @if (target.ResolvedAt is { } success && InWindow(success) && RetainedPrior(target))
+                        {
+                            <span class="sv-ep-retained-pin" style="left:@Position(success)" title="@($"{T("epLastSuccess")}: {UiTime.FormatTime(success)}")"></span>
+                        }
+                        @if (target.AttemptedAt is { } attempt && InWindow(attempt))
+                        {
+                            var role = state == "Resolved" ? "primary" : EndpointRole(state);
+                            <span class="sv-ep-attempt-pin role-@role" style="left:@Position(attempt)" title="@($"{T("epLastAttempt")}: {UiTime.FormatTime(attempt)}")"></span>
+                        }
+                    </span>
+                    <span class="sv-ep-lane-meta mono"><b>@T("epLaneCandCount", target.Candidates.Count)</b><small>@(p95 is not null ? $"{Latency(p95)} ms" : "—")</small></span>
+                </button>
+            </div>
+        }
+    </div>
+    <div class="sv-hz-readout @(Active is null ? null : "is-active")" aria-live="polite">
+        <span class="sv-hz-readout-dot role-@(Active is { } activeTarget ? EndpointRole(EndpointState(Snapshot, activeTarget)) : "neutral")"></span>
+        <span>@(Active is { } hovered ? Describe(hovered) : T("epLaneReadoutIdle"))</span>
+    </div>
+</div>
+
+@code {
+    [Parameter, EditorRequired] public ServiceEndpointDiagnosticsSnapshot Snapshot { get; set; } = default!;
+    [Parameter] public string? Selected { get; set; }
+    private string? _active;
+    private double _latencyScale;
+    private IReadOnlyList<ServiceEndpointSnapshot> _targets = [];
+    private ServiceEndpointSnapshot? Active => _targets.FirstOrDefault(target => target.Target.Address.AbsoluteUri == _active);
+
+    protected override void OnParametersSet()
+    {
+        _targets = Snapshot.Targets.OrderByDescending(target => EndpointAttention(Snapshot, target))
+            .ThenBy(target => target.Target.Scope).ThenBy(target => target.Target.AppId).ToArray();
+        _latencyScale = Snapshot.Targets.SelectMany(target => target.Calls).Select(call => call.DurationMs).Append(100).Max();
+    }
+
+    private string Describe(ServiceEndpointSnapshot target) => T("epTimelineReadout", target.Target.Scope, target.Target.AppId,
+        T("epStates:" + EndpointState(Snapshot, target)), target.Candidates.Count, target.Calls.Count, Latency(P95(target)));
+
+    private bool InWindow(DateTimeOffset timestamp) => Snapshot.CapturedAt - timestamp <= Snapshot.Retention;
+    private string Position(DateTimeOffset timestamp) => Pct(Snapshot.Retention.TotalSeconds - (Snapshot.CapturedAt - timestamp).TotalSeconds, Snapshot.Retention.TotalSeconds);
+    private void DismissReadout(KeyboardEventArgs e) { if (e.Key == "Escape") Clear(); }
+    private void Clear() => _active = null;
+}

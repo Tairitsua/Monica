@@ -643,44 +643,5 @@
     "atlasOrdinaryHint": "源制品包含处理器时，普通调用在进程内执行。证据不完整的调用会单独标记。",
     "targetInstanceEvidence": "观测到 {0} 个目标实例",
     "splitImpact": "拆分后将通过 HTTP 路由"
-  },
-  "Endpoints": {
-    "KnownTargets": "已声明的调用目标",
-    "Scope": "证据来源：{0} · 进程 {1}",
-    "Retention": "最近 {0} 分钟 · 每个目标最多保留 {1} 条 HTTP 观测",
-    "Captured": "采集时间",
-    "Refresh": "刷新解析",
-    "EvidenceBoundary": "注册、解析、HTTP 响应与业务成功是不同证据。本页仅显示当前进程。刷新只解析已知目标，不发送业务请求；DNS 地址不代表实际处理请求的 Pod。",
-    "Filter": "筛选范围、AppId 或逻辑服务",
-    "FailuresOnly": "仅失败或无端点",
-    "Empty": "尚未声明目标。请配置 ModuleServiceEndpointDiscoveryOption.Targets 后查看。",
-    "NoMatch": "没有符合筛选条件的目标。",
-    "CallCount": "{0} 条 HTTP 观测",
-    "Resolution": "解析证据",
-    "LastAttempt": "最近尝试",
-    "LastSuccess": "最近成功采集",
-    "Providers": "提供程序顺序",
-    "Candidates": "候选端点",
-    "CandidateLimit": "最多展示 128 个候选地址，省略路径、凭据与查询串。刷新失败时保留上次成功的候选快照。",
-    "Calls": "已观测的 HTTP 交换",
-    "NoCalls": "没有保留的 HTTP 观测，可达性与业务成功状态未知。",
-    "Percentile": "保留样本到响应头的 p95：{0} ms",
-    "NoSelection": "未选择端点",
-    "Trace": "追踪",
-    "NotObserved": "尚未观测",
-    "States": {
-      "Unknown": "尚未观测",
-      "Resolved": "解析成功",
-      "Empty": "无端点",
-      "Failed": "解析失败",
-      "Timeout": "解析超时",
-      "Stale": "证据已过期"
-    },
-    "Outcomes": {
-      "HttpSuccess": "HTTP 2xx",
-      "HttpFailure": "HTTP 错误",
-      "Failure": "传输或解析失败",
-      "Canceled": "已取消"
-    }
   }
 }
