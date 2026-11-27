@@ -2,36 +2,37 @@ using Microsoft.Extensions.Localization;
 using Monica.EventBus.Models;
 using Monica.Framework.UI.Localization;
 using Monica.UI.Icons;
+using Monica.UI.Shared.Components.Visual;
 
 namespace Monica.Framework.UI.UIEventBus.Support;
 
 internal static class EventBusVisuals
 {
-    internal static string Role(EventBusCoverage coverage) => coverage switch
+    internal static MoVisualRole Role(EventBusCoverage coverage) => coverage switch
     {
-        EventBusCoverage.Failed => "error",
-        EventBusCoverage.Recovering or EventBusCoverage.HealthyErr => "warning",
-        EventBusCoverage.Healthy => "success",
-        EventBusCoverage.Subscribing or EventBusCoverage.Local => "info",
-        _ => "neutral"
+        EventBusCoverage.Failed => MoVisualRole.Error,
+        EventBusCoverage.Recovering or EventBusCoverage.HealthyErr => MoVisualRole.Warning,
+        EventBusCoverage.Healthy => MoVisualRole.Success,
+        EventBusCoverage.Subscribing or EventBusCoverage.Local => MoVisualRole.Info,
+        _ => MoVisualRole.Neutral
     };
 
-    internal static string Role(EventSubscriptionState state) => state switch
+    internal static MoVisualRole Role(EventSubscriptionState state) => state switch
     {
-        EventSubscriptionState.Active => "success",
-        EventSubscriptionState.Held => "info",
-        EventSubscriptionState.Pending => "warning",
-        EventSubscriptionState.Disposed => "error",
-        _ => "neutral"
+        EventSubscriptionState.Active => MoVisualRole.Success,
+        EventSubscriptionState.Held => MoVisualRole.Info,
+        EventSubscriptionState.Pending => MoVisualRole.Warning,
+        EventSubscriptionState.Disposed => MoVisualRole.Error,
+        _ => MoVisualRole.Neutral
     };
 
-    internal static string Role(EventSubscriptionChangeType change) => change switch
+    internal static MoVisualRole Role(EventSubscriptionChangeType change) => change switch
     {
-        EventSubscriptionChangeType.Added => "success",
-        EventSubscriptionChangeType.Activated => "info",
-        EventSubscriptionChangeType.Deactivated => "warning",
-        EventSubscriptionChangeType.Removed => "error",
-        _ => "neutral"
+        EventSubscriptionChangeType.Added => MoVisualRole.Success,
+        EventSubscriptionChangeType.Activated => MoVisualRole.Info,
+        EventSubscriptionChangeType.Deactivated => MoVisualRole.Warning,
+        EventSubscriptionChangeType.Removed => MoVisualRole.Error,
+        _ => MoVisualRole.Neutral
     };
 
     internal static string CoverageText(this IStringLocalizer<EventBusResource> text, EventBusCoverage coverage) => coverage switch

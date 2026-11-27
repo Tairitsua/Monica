@@ -14,7 +14,7 @@ else if (coverage == EventBusCoverage.Unreported)
 else
 {
     <span class="eb-rt-group">
-        <span class="status is-pill mo-vl-role--@EventBusVisuals.Role(coverage == EventBusCoverage.HealthyErr ? EventBusCoverage.Healthy : coverage)"><span class="status-dot" aria-hidden="true"></span>@L.GetTopicRuntimeStateText(Status!.State)</span>
+        <span class="status is-pill @EventBusVisuals.Role(coverage == EventBusCoverage.HealthyErr ? EventBusCoverage.Healthy : coverage).ToCssClass()"><span class="status-dot" aria-hidden="true"></span>@L.GetTopicRuntimeStateText(Status!.State)</span>
         @if (coverage == EventBusCoverage.HealthyErr)
         {
             <span class="eb-err-pip mo-vl-role--warning" title="@L["Precision:InspRetainedErrorNote"]">+@Status.MessageErrorCount</span>

@@ -1,0 +1,27 @@
+.mo-compact-pager {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px 16px;
+    padding: 10px clamp(12px, 2%, 20px);
+    border-block-start: 1px solid var(--mud-palette-divider);
+    color: var(--mud-palette-text-secondary);
+    font: 500 .75rem/1.4 var(--mo-font-family-mono);
+    font-variant-numeric: tabular-nums;
+}
+.mo-pager-controls { display: flex; gap: 8px; align-items: center; margin-inline-start: auto; }
+.mo-pager-controls button {
+    display: grid;
+    place-items: center;
+    width: 30px;
+    height: 30px;
+    border: 1px solid var(--mud-palette-lines-inputs);
+    border-radius: 6px;
+    color: var(--mud-palette-text-primary);
+    background: var(--mud-palette-surface);
+    cursor: pointer;
+}
+.mo-pager-controls button:hover:enabled { color: var(--mud-palette-primary); background: var(--mud-palette-action-default-hover); }
+.mo-pager-controls button:focus-visible { outline: 2px solid var(--mud-palette-primary); outline-offset: 2px; }
+.mo-pager-controls button:disabled { border-color: var(--mud-palette-divider); color: var(--mud-palette-action-disabled); cursor: default; }

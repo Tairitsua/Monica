@@ -1,3 +1,4 @@
+@using Monica.UI.Shared.Components.Visual
 @inject IStringLocalizer<JobSchedulerResource> L
 @inject SchedulerTimePresentation TimePresentation
 @inject NavigationManager Navigation
@@ -26,7 +27,7 @@
                     <tr><td data-label="@L["Runtime:Coordinators:Partition"]">
                         @if (owner is not null) { <a class="mono" href="@($"/job-scheduler/catalog?owner={Uri.EscapeDataString(owner)}")">@owner <MoIcon Icon="@MoIcons.ArrowRight" Size="12px" /></a><small>@L["Runtime:Coordination:OwnerRole"]</small> }
                         else { <b>@L["Runtime:Coordination:MaintenanceRole"]</b><small class="mono">@row.CoordinatorKey</small> }
-                    </td><td data-label="@L["Runtime:Coordinators:Holder"]"><span class="mono rt-holder">@row.WorkerInstanceId <SchedulerCopyButton Value="@row.WorkerInstanceId" /></span>@if (state == "expired") { <small>@L["Runtime:Coordination:PreviousHolder"]</small> }</td>
+                    </td><td data-label="@L["Runtime:Coordinators:Holder"]"><span class="mono rt-holder">@row.WorkerInstanceId <MoCopyButton Value="@row.WorkerInstanceId" Label="@L["Workspace:CopyId"]" /></span>@if (state == "expired") { <small>@L["Runtime:Coordination:PreviousHolder"]</small> }</td>
                     <td data-label="@L["Runtime:Coordinators:Expiry"]"><time class="mono" datetime="@row.ExpiresAtUtc.ToString("O")">@TimePresentation.FormatTimestamp(row.ExpiresAtUtc)</time><small>@L[state == "expired" ? "Runtime:Coordination:Elapsed" : "Runtime:Coordination:Remaining", TimePresentation.FormatDuration((row.ExpiresAtUtc - Overview.Coordination.ObservedAtUtc).Duration())]</small></td>
                     <td data-label="@L["Runtime:Coordinators:State"]"><span class="status" data-role="@SchedulerCoordinationPresentation.Role(state)"><i></i>@L[$"Runtime:Coordination:States:{state}"]</span></td></tr>
                 }

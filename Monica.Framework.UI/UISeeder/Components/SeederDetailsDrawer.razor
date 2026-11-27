@@ -30,7 +30,7 @@
                     <h2 class="seeder-detail-name" id="seeder-detail-title">@seeder.SeederName</h2>
                     <div class="seeder-detail-type">
                         <code>@seeder.SeederTypeName</code>
-                        <SeederCopyButton Text="@seeder.SeederTypeName" Label="@L["Actions:CopyType"]" />
+                        <MoCopyButton Value="@seeder.SeederTypeName" Label="@L["Actions:CopyType"]" />
                     </div>
                     <div class="seeder-detail-status">
                         <SeederStatusMark Text="@L.GetText(seeder.Status)" Tone="@tone" Pill="true" />

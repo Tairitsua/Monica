@@ -114,7 +114,7 @@ public partial class ObservableExceptions
     {
         void Add(LocalizedString message, params RenderFragment[] values)
         {
-            builder.AddContent(0, ObservableMarkup.Format(message.Value, values));
+            builder.AddContent(0, MoRichFinding.Compose(message.Value, values));
             builder.AddContent(1, " ");
         }
 

@@ -36,7 +36,7 @@
             @if (latest is not null)
             {
                 @L["Precision:ChLatest"]
-                <a class="vmark is-link mo-vl-role--@EventBusVisuals.Role(latest.ChangeType)" href="@Workbench.InspectionLink("changeId", latest.ObservationId)">@L.GetSubscriptionChangeTypeText(latest.ChangeType) · @latest.Subscription.EventTypeShortName</a>
+                <a class="vmark is-link @EventBusVisuals.Role(latest.ChangeType).ToCssClass()" href="@Workbench.InspectionLink("changeId", latest.ObservationId)">@L.GetSubscriptionChangeTypeText(latest.ChangeType) · @latest.Subscription.EventTypeShortName</a>
                 <time class="mono" datetime="@EventBusVisuals.TimeTag(latest.Timestamp)">(@UiTime.FormatTime(latest.Timestamp))</time>
             }
             else { @L["Precision:ChScopeNote"] }
@@ -63,11 +63,13 @@
 <section class="surface eb-ch-surface" aria-label="@L["Precision:ChLabel"]">
     <div class="eb-toolbar">
         <div class="fchips" role="group" aria-label="@L["Precision:ChColType"]">
-            <EventBusFilterChip Count="@pool.Length" Selected="@(type is null)" Select='() => Filter("type", null)'>@L["Precision:ChFilterAll"]</EventBusFilterChip>
+            <MoFilterChip Label="@L["Precision:ChFilterAll"]" Pill="true" Class="mo-vl-chip--instrument"
+                          Role="MoVisualRole.Primary" Count="@pool.Length" Selected="@(type is null)" SelectedChanged='() => Filter("type", null)' />
             @foreach (var kind in types)
             {
-                <EventBusFilterChip Role="@EventBusVisuals.Role(kind)" Count="@pool.Count(change => change.ChangeType == kind)" Marked="true" Selected="@(type == kind)"
-                                    Select='() => Filter("type", type == kind ? null : kind.ToString())'>@L.GetSubscriptionChangeTypeText(kind)</EventBusFilterChip>
+                <MoFilterChip Label="@L.GetSubscriptionChangeTypeText(kind)" Pill="true" Class="mo-vl-chip--instrument"
+                              Role="@EventBusVisuals.Role(kind)" Count="@pool.Count(change => change.ChangeType == kind)" ShowDot="true" Selected="@(type == kind)"
+                              SelectedChanged='() => Filter("type", type == kind ? null : kind.ToString())' />
             }
         </div>
         <div class="eb-toolbar-end"><label class="eb-search"><MoIcon Class="i" Icon="@MoIcons.Search" Size="15px" />
@@ -105,7 +107,7 @@
                         var kind = row.TopicStatus?.Provider ?? change.ReportedProvider ?? EventBusProviderKind.Unknown;
                         <tr @key="change.ObservationId">
                             <td data-label="@L["Precision:ChColType"]"><div class="eb-cell-stack">
-                                <span class="status is-pill mo-vl-role--@EventBusVisuals.Role(change.ChangeType)"><span class="status-dot"></span>@L.GetSubscriptionChangeTypeText(change.ChangeType)</span>
+                                <span class="status is-pill @EventBusVisuals.Role(change.ChangeType).ToCssClass()"><span class="status-dot"></span>@L.GetSubscriptionChangeTypeText(change.ChangeType)</span>
                                 <time class="mono eb-row-sub" datetime="@EventBusVisuals.TimeTag(change.Timestamp)">@UiTime.Format(change.Timestamp)</time>
                             </div></td>
                             <td data-label="@L["Precision:ChColEvent"]"><div class="eb-cell-stack">
@@ -115,7 +117,7 @@
                                 <code class="eb-topic-code mono eb-break">@row.TopicName</code>
                                 <EventBusTransportBadge Distributed="@(row.Scope == EventSubscriptionScope.Distributed)" Kind="@kind" ServiceKey="@row.ServiceKey" />
                             </div></td>
-                            <td data-label="@L["Precision:ChColRegistration"]"><span class="status is-pill mo-vl-role--@EventBusVisuals.Role(row.State)"><span class="status-dot"></span>@L.GetSubscriptionStateText(row.State)</span></td>
+                            <td data-label="@L["Precision:ChColRegistration"]"><span class="status is-pill @EventBusVisuals.Role(row.State).ToCssClass()"><span class="status-dot"></span>@L.GetSubscriptionStateText(row.State)</span></td>
                             <td data-label="@L["Precision:ChColRuntime"]"><EventBusRuntimeBadge Scope="@row.Scope" Status="@row.TopicStatus" /></td>
                             <td class="eb-col-act" data-label="@L["Precision:ChColEvidence"]">
                                 <a class="btn btn-ghost btn-sm" href="@Workbench.InspectionLink("changeId", change.ObservationId)">@L["Precision:ChInspectFrozen"]<MoIcon Icon="@MoIcons.ChevronRight" Size="14px" /></a>
@@ -125,7 +127,7 @@
                 </tbody>
             </table>
         </div>
-        <EventBusPager Page="@(page)" PageSize="@PageSize" Total="@shown.Length" Changed='value => Workbench.EditQuery(("page", value == 1 ? null : value.ToString(System.Globalization.CultureInfo.InvariantCulture)))' />
+        <MoCompactPager ShowSinglePage="true" Page="@(page)" PageSize="@PageSize" Total="@shown.Length" PageChanged='value => Workbench.EditQuery(("page", value == 1 ? null : value.ToString(System.Globalization.CultureInfo.InvariantCulture)))' />
     }
     <footer class="eb-surface-foot"><MoIcon Icon="@MoIcons.Info" Size="14px" />@L["Precision:ChFoot"]</footer>
 </section>

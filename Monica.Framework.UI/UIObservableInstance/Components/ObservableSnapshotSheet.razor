@@ -2,8 +2,6 @@
 @inject IStringLocalizer<ObservableInstanceResource> L
 @inject NavigationManager Navigation
 @inject MoTimeFormatter Time
-@inject IJSRuntime JS
-@inject ISnackbar Snackbar
 
 <MoSideSheet Open="true" OpenChanged="Close" Width="620px" Compact="true" CloseLabel="@L["Design:Close"]"
              ActiveTabIndex="@(Query.Timeline == "current" ? 0 : 1)" ActiveTabIndexChanged="ChangeTab"
@@ -80,19 +78,8 @@
         catch (JSDisconnectedException) { }
     }
 
-    /// <summary>Retires focus and clipboard feedback when the frozen sheet closes.</summary>
+    /// <summary>Retires focus restoration when the frozen sheet closes.</summary>
     public void Dispose() => _retired = true;
-
-    private async Task CopyAsync(string value)
-    {
-        try
-        {
-            await JS.InvokeVoidAsync("navigator.clipboard.writeText", value);
-            if (!_retired) Snackbar.Add(L["Design:Copied"], Severity.Success);
-        }
-        catch (JSDisconnectedException) { }
-        catch (JSException) { if (!_retired) Snackbar.Add(L["Design:CopyFailed"], Severity.Warning); }
-    }
 
     private RenderFragment Tabs => @<text>
         <MudTabPanel Text="@L["Design:SheetTabs:Current"]">
@@ -186,9 +173,7 @@
             <span class="@(key == "Group" ? null : "mo-vl-mono")">@ObservableMarkup.Breakable(value)</span>
             @if (copy)
             {
-                <button class="oi-copy" type="button" aria-label="@L["Design:CopyField", L[$"Design:SheetMeta:{key}"]]" @onclick="() => CopyAsync(value)">
-                    <MoIcon Icon="@MoIcons.Copy" Size="14px" />
-                </button>
+                <MoCopyButton Value="@value" Label="@L["Design:CopyField", L[$"Design:SheetMeta:{key}"]]" />
             }
         </dd>
     </div>;

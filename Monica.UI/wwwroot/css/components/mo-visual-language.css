@@ -220,6 +220,11 @@ button.mo-vl-spine-node { cursor: pointer; }
 .mo-vl-chip--diamond .mo-vl-chip-dot { width: 9px; height: 9px; border-radius: 2px; transform: rotate(45deg) scale(.9); }
 .mo-vl-chip--instrument .mo-vl-chip-dot--empty { background: transparent; box-shadow: inset 0 0 0 1.5px color-mix(in srgb, var(--mo-vl-role) 55%, var(--mud-palette-lines-inputs)); }
 .mo-vl-chip--instrument[aria-pressed="true"].mo-vl-role--neutral { border-color: color-mix(in srgb, var(--mo-vl-role) 28%, var(--mud-palette-divider)); background: color-mix(in srgb, var(--mo-vl-role) 10%, var(--mud-palette-surface)); color: var(--mud-palette-text-primary); }
+.mo-vl-chip--hatched .mo-vl-chip-dot {
+    background: repeating-linear-gradient(135deg, var(--mo-vl-role) 0 1px, transparent 1px 3px);
+    box-shadow: inset 0 0 0 1px var(--mo-vl-role);
+}
+.mo-vl-chip:focus-visible { outline: 2px solid var(--mud-palette-primary); outline-offset: 2px; }
 .mo-vl-chip-count { color: inherit; font-family: var(--mo-font-family-mono); font-size: .75rem; font-variant-numeric: tabular-nums; }
 
 .mo-vl-inspector-heading { margin: 0; color: var(--mud-palette-text-primary); font-size: 1.25rem; font-weight: 600; line-height: 1.4; letter-spacing: -.025em; overflow-wrap: anywhere; }

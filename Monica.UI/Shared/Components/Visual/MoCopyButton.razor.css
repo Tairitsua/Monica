@@ -1,0 +1,32 @@
+.mo-copy-button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    max-width: 100%;
+    min-width: 24px;
+    min-height: 24px;
+    padding: 3px;
+    border: 1px solid transparent;
+    border-radius: 5px;
+    background: transparent;
+    color: var(--mud-palette-text-secondary);
+    vertical-align: middle;
+    cursor: pointer;
+}
+.mo-copy-button.is-labelled {
+    padding-inline: 8px;
+    border-color: var(--mud-palette-divider);
+    border-radius: 999px;
+    background: var(--mud-palette-surface);
+    color: var(--mud-palette-text-primary);
+    font-size: .75rem;
+    overflow-wrap: anywhere;
+}
+.mo-copy-button:hover:enabled, .mo-copy-button:focus-visible {
+    background: var(--mud-palette-action-default-hover);
+    color: var(--mud-palette-primary);
+}
+.mo-copy-button:focus-visible { outline: 2px solid var(--mud-palette-primary); outline-offset: 2px; }
+.mo-copy-button:active:enabled { background: color-mix(in srgb, var(--mud-palette-primary) 14%, var(--mud-palette-surface)); }
+.mo-copy-button:disabled { color: var(--mud-palette-action-disabled); cursor: default; }

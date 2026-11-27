@@ -1,0 +1,34 @@
+@inject IStringLocalizer<SharedResource> L
+
+@if (Total > 0 && (ShowSinglePage || Pages > 1))
+{
+    <nav class="mo-compact-pager" aria-label="@L["Pager:Navigation"]">
+        <span class="mo-pager-range" role="status">@L["Pager:Range", (Page - 1L) * PageSize + 1, Math.Min((long)Page * PageSize, Total), Total]</span>
+        <div class="mo-pager-controls">
+            <button type="button" aria-label="@L["Pager:Previous"]" title="@L["Pager:Previous"]"
+                    disabled="@(Page <= 1)" @onclick="() => PageChanged.InvokeAsync(Page - 1)">
+                <MoIcon Icon="@MoIcons.ChevronLeft" Size="15px" />
+            </button>
+            <span>@L["Pager:Position", Page, Pages]</span>
+            <button type="button" aria-label="@L["Pager:Next"]" title="@L["Pager:Next"]"
+                    disabled="@(Page >= Pages)" @onclick="() => PageChanged.InvokeAsync(Page + 1)">
+                <MoIcon Icon="@MoIcons.ChevronRight" Size="15px" />
+            </button>
+        </div>
+    </nav>
+}
+
+@code {
+    /// <summary>Current one-based page, bounded by the caller whenever the results change.</summary>
+    [Parameter, EditorRequired] public int Page { get; set; }
+    /// <summary>Positive number of records on a full page.</summary>
+    [Parameter, EditorRequired] public int PageSize { get; set; }
+    /// <summary>Total filtered result count. Empty results have no pager.</summary>
+    [Parameter, EditorRequired] public int Total { get; set; }
+    /// <summary>Show the range and disabled controls for a single page. Defaults to false.</summary>
+    [Parameter] public bool ShowSinglePage { get; set; }
+    /// <summary>Requests a one-based page. Callers own navigation and selection.</summary>
+    [Parameter] public EventCallback<int> PageChanged { get; set; }
+
+    private int Pages => 1 + (Total - 1) / PageSize;
+}

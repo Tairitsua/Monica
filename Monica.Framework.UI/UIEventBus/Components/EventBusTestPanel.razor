@@ -108,7 +108,7 @@
                             </header>
                             <p class="eb-receipt-msg">@data.Message</p>
                             <dl class="eb-receipt-meta">
-                                <div><dt>@L["Precision:TtMessageId"]</dt><dd class="mono eb-break">@data.MessageId <button class="icon-btn" type="button" aria-label="@L["Precision:CopyField", L["Precision:TtMessageId"]]" @onclick="() => Workbench.CopyAsync(data.MessageId)"><MoIcon Icon="@MoIcons.Copy" Size="14px" /></button></dd></div>
+                                <div><dt>@L["Precision:TtMessageId"]</dt><dd class="mono eb-break">@data.MessageId <MoCopyButton Value="@data.MessageId" Label="@L["Precision:CopyField", L["Precision:TtMessageId"]]" /></dd></div>
                                 <div><dt>@L["Precision:TtCreatedAt"]</dt><dd><time class="mono" datetime="@createdAt.ToUniversalTime().ToString("O")">@UiTime.Format(createdAt)</time></dd></div>
                                 <div class="is-wide"><dt>@L["Precision:TtPublishTopic"]</dt><dd class="mono eb-break">@message.TopicName</dd></div>
                             </dl>

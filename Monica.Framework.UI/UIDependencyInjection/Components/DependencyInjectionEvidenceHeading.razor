@@ -1,15 +1,12 @@
 @inject IStringLocalizer<DependencyInjectionResource> L
 @inject IJSRuntime JS
-@inject ISnackbar Snackbar
 
 <h2 class="di-sheet-title" tabindex="-1" @ref="_heading">@Title</h2>
 @if (TechnicalName is not null)
 {
     <div class="di-sheet-sub">
         <span class="mono">@TechnicalName</span>
-        <button type="button" class="di-icon-btn" title="@L["Workbench:Copy"]" aria-label="@L["Workbench:Copy"]" @onclick="CopyAsync">
-            <MoIcon Icon="@MoIcons.Copy" Size="14px" />
-        </button>
+        <MoCopyButton Value="@TechnicalName" Label="@L["Workbench:Copy"]" />
     </div>
 }
 
@@ -30,15 +27,5 @@
             }
             catch (JSDisconnectedException) { }
         }
-    }
-
-    private async Task CopyAsync()
-    {
-        try
-        {
-            var copied = await JS.InvokeAsync<bool>("MoClipboard.copyText", TechnicalName);
-            Snackbar.Add(copied ? L["Workbench:Copied"] : L["Workbench:CopyFailed"], copied ? Severity.Success : Severity.Warning);
-        }
-        catch (JSDisconnectedException) { }
     }
 }

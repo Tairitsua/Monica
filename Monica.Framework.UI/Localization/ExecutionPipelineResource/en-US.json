@@ -281,7 +281,6 @@
     "FaultBody": "Every call to this operation rethrows this exception before any behavior or the handler runs. The failure stays cached until the host restarts: fix the behavior registration or the operation's metadata, then restart the host.",
     "ExceptionType": "Exception type",
     "CopyDiagnostics": "Copy diagnostics",
-    "Copied": "Execution diagnostics copied.",
     "StalledTitle": "Chain construction has stalled",
     "StalledBody": "This plan has been building for {0}. Construction normally completes within milliseconds, so a descriptor filter may be blocked; every call to the operation waits on it.",
     "BuildingTitle": "Chain still building",
@@ -369,7 +368,6 @@
     "Minutes": "{0} min",
     "Seconds": "{0} s",
     "CopyValue": "Copy {0}",
-    "CopyFailed": "Clipboard copy failed.",
     "ExceptionMessage": "Exception message"
   }
 }

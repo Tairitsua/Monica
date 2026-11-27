@@ -281,7 +281,6 @@
     "FaultBody": "每次调用这个操作，都会在任何行为或处理程序运行之前重新抛出这个异常。失败结果会缓存到宿主重启：先修正行为注册或操作的元数据，再重启宿主。",
     "ExceptionType": "异常类型",
     "CopyDiagnostics": "复制诊断信息",
-    "Copied": "执行诊断信息已复制。",
     "StalledTitle": "行为链构建停滞",
     "StalledBody": "这个计划已构建 {0}。构建通常在几毫秒内完成，可能有描述符筛选器被阻塞；该操作的每次调用都在等待它。",
     "BuildingTitle": "行为链仍在构建",
@@ -369,7 +368,6 @@
     "Minutes": "{0} 分钟",
     "Seconds": "{0} 秒",
     "CopyValue": "复制{0}",
-    "CopyFailed": "无法复制到剪贴板。",
     "ExceptionMessage": "异常消息"
   }
 }

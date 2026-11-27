@@ -55,22 +55,6 @@ internal static partial class PipelineDisplay
         }
     };
 
-    internal static RenderFragment Sentence(LocalizedString template, params RenderFragment[] parts) => builder =>
-    {
-        foreach (var part in Placeholders().Split(template.Value))
-        {
-            if (part.StartsWith('{') && int.TryParse(part.AsSpan(1, part.Length - 2), out var index) &&
-                index < parts.Length)
-            {
-                builder.AddContent(0, parts[index]);
-            }
-            else builder.AddContent(1, part);
-        }
-    };
-
     [GeneratedRegex(@"(?<=[a-z0-9])(?=[A-Z])|(?<=\.)")]
     private static partial Regex NameBoundaries();
-
-    [GeneratedRegex(@"(\{\d+\})")]
-    private static partial Regex Placeholders();
 }

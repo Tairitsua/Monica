@@ -1,5 +1,4 @@
 .ep-page { display:flex; flex-direction:column; gap:18px; min-width:0; padding:24px 32px 32px; container:epPage / inline-size; }
-.ep-mh-actions { display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
 .ep-stamp { display:flex; flex-direction:column; align-items:flex-end; margin-right:10px; color:var(--mud-palette-text-secondary);
     font-size:11.5px; line-height:1.35; }
 .ep-stamp time { color:var(--mud-palette-text-primary); font:500 13px var(--mo-font-family-mono); }
@@ -10,9 +9,6 @@
 .ep-failed h2 { font-size:16px; font-weight:600; }
 .ep-failed p { max-width:62ch; font-size:13px; color:var(--mud-palette-text-secondary); }
 @container epPage (max-width:520px) {
-    .ep-mh { gap:16px; }
-    .ep-mh .mo-vl-title { font-size:24px; }
-    .ep-mh .mo-vl-masthead__seal { width:48px; height:48px; }
     .ep-stamp { align-items:flex-start; margin-right:0; }
 }
 @media (prefers-reduced-motion:reduce) { .ep-skel, .ep-spin { animation:none; } }

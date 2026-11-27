@@ -35,7 +35,7 @@
             {
                 var listenerBlocked = !_listenerSnapshot.IsListening && _subscription.Activation != ActivationMode.Automatic;
                 <div class="runtime-test-target">
-                    <span class="mo-vl-status mo-vl-status--pill mo-vl-role--@EventBusVisuals.Role(_subscription.State)">
+                    <span class="mo-vl-status mo-vl-status--pill @EventBusVisuals.Role(_subscription.State).ToCssClass()">
                         <span class="mo-vl-status-dot"></span>@L.GetSubscriptionStateText(_subscription.State)
                     </span>
                     <EventBusTransportBadge Distributed="@(_subscription.Scope == EventSubscriptionScope.Distributed)" Kind="@ProviderKind" ServiceKey="@_subscription.ServiceKey" />

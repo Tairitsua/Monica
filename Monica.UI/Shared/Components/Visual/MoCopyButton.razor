@@ -1,0 +1,49 @@
+@using Microsoft.Extensions.Logging
+@using Monica.UI.Shared.Support
+@implements IAsyncDisposable
+@inject IJSRuntime JS
+@inject ILogger<MoCopyButton> Logger
+@inject IStringLocalizer<SharedResource> L
+@inject ISnackbar Snackbar
+
+<button type="button" class="mo-copy-button @(ChildContent is null ? "is-icon" : "is-labelled")"
+        aria-label="@Label" title="@Label" disabled="@string.IsNullOrEmpty(Value)"
+        aria-busy="@(_session.State.IsCopying ? "true" : null)" @onclick="CopyAsync">
+    @ChildContent
+    <MoIcon Icon="@MoIcons.Copy" Size="14px" />
+</button>
+
+@code {
+    /// <summary>Exact clipboard payload. An empty or missing value disables the action.</summary>
+    [Parameter, EditorRequired] public string? Value { get; set; }
+
+    /// <summary>Localized accessible name identifying what is copied.</summary>
+    [Parameter, EditorRequired] public string Label { get; set; } = string.Empty;
+
+    /// <summary>Optional visible content preceding the copy icon. Defaults to an icon button.</summary>
+    [Parameter] public RenderFragment? ChildContent { get; set; }
+
+    private TextCopySession _session = null!;
+
+    protected override void OnInitialized() => _session = new(JS, Logger);
+    protected override void OnParametersSet() => _session.SetSource(Value);
+
+    private async Task CopyAsync()
+    {
+        if (!_session.State.CanCopy) return;
+
+        await _session.CopyAsync();
+        switch (_session.State.Feedback)
+        {
+            case TextCopyFeedback.Copied:
+                Snackbar.Add(L["Clipboard:Copied"], Severity.Success);
+                break;
+            case TextCopyFeedback.Failed:
+                Snackbar.Add(L["Clipboard:Failed"], Severity.Warning);
+                break;
+        }
+    }
+
+    /// <summary>Retires feedback and drains the admitted clipboard write.</summary>
+    public ValueTask DisposeAsync() => _session.DisposeAsync();
+}

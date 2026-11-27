@@ -142,16 +142,13 @@
 
         <div class="oi-filters">
             <div class="mo-vl-chips" role="group" aria-label="@L["Design:HealthFilter"]">
-                <button type="button" class="mo-vl-chip mo-vl-chip--pill mo-vl-role--primary" aria-pressed="@Pressed(Query["health"] is null)" @onclick='() => Change("health", null)'>
-                    @L["Design:AllRegistrations"] <span class="mo-vl-chip-count">@_healthBase.Length</span>
-                </button>
+                <MoFilterChip Label="@L["Design:AllRegistrations"]" Count="@_healthBase.Length" Role="MoVisualRole.Primary" Pill="true"
+                              Class="mo-vl-chip--instrument" Selected="@(Query["health"] is null)" SelectedChanged='() => Change("health", null)' />
                 @foreach (var facet in HealthFacets)
                 {
                     var count = _healthBase.Count(item => item.Health.ToString() == facet.Name);
-                    <button type="button" class="mo-vl-chip mo-vl-chip--pill @facet.Role.ToCssClass()" aria-pressed="@Pressed(Query["health"] == facet.Name)" @onclick='() => Toggle("health", facet.Name)'>
-                        <i class="mo-vl-swatch @facet.Role.ToCssClass()" aria-hidden="true"></i>
-                        @L[$"Design:Health:{facet.Name}"] <span class="mo-vl-chip-count">@count</span>
-                    </button>
+                    <MoFilterChip Label="@L[$"Design:Health:{facet.Name}"]" Count="@count" Role="facet.Role" Pill="true" ShowDot="true"
+                              Class="mo-vl-chip--instrument" Selected="@(Query["health"] == facet.Name)" SelectedChanged='() => Toggle("health", facet.Name)' />
                 }
             </div>
 
@@ -229,7 +226,7 @@
         else
         {
             @Table(_matches.Skip(Page * PageSize).Take(PageSize))
-            <ObservablePager Size="PageSize" Count="_matches.Length" Page="Page" PageChanged="page => _page = page" />
+            <MoCompactPager PageSize="@PageSize" Total="@_matches.Length" Page="@(Page + 1)" PageChanged="page => _page = page - 1" />
         }
     </section>
     @ChildContent

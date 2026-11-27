@@ -36,7 +36,7 @@
                 {
                     var total = rows.Sum(row => model.MatrixCount(row, column));
                     <div class="eb-mx-ch" role="columnheader">
-                        <span class="eb-mx-ch-title"><span class="sw mo-vl-role--@EventBusVisuals.Role(column) @(column == EventBusCoverage.Unreported ? "is-hatch" : null)"></span><span>@ColumnText(column)</span></span>
+                        <span class="eb-mx-ch-title"><span class="sw @EventBusVisuals.Role(column).ToCssClass() @(column == EventBusCoverage.Unreported ? "is-hatch" : null)"></span><span>@ColumnText(column)</span></span>
                         <span class="eb-mx-ch-n mono @(total == 0 ? "is-zero" : null)">@total</span>
                     </div>
                 }
@@ -106,7 +106,7 @@
         ("Orphan", _) or ("Active", EventBusCoverage.Unreported) => "mo-vl-role--warning",
         (_, EventBusCoverage.Unreported) => "is-hatch",
         (not "Active", EventBusCoverage.Healthy) => "mo-vl-role--neutral",
-        _ => $"mo-vl-role--{EventBusVisuals.Role(column)}"
+        _ => EventBusVisuals.Role(column).ToCssClass()
     };
 
     private string Readout(string row, EventBusCoverage column, int count)

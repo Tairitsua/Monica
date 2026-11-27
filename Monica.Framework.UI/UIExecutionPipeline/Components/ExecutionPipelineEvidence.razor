@@ -9,7 +9,6 @@
 @inject MoTimeFormatter UiTime
 @inject IStringLocalizer<ExecutionPipelineResource> L
 @inject IJSRuntime JS
-@inject ISnackbar Snackbar
 
 <MoSideSheet Open="true" OpenChanged="Dismiss" Width="560px" Compact="true" CloseLabel="@L["Pipeline:Close"]">
     <TitleContent>
@@ -60,9 +59,7 @@
         @if (_row is { } planRow)
         {
             <div class="ep-sheet-foot">
-                <button type="button" class="ep-action ep-action-outline" @onclick="@(() => CopyAsync(DiagnosticsText(planRow)))">
-                    <MoIcon Icon="@MoIcons.Copy" Size="15px" />@L["Pipeline:CopyDiagnostics"]
-                </button>
+                <MoCopyButton Value="@DiagnosticsText(planRow)" Label="@L["Pipeline:CopyDiagnostics"]">@L["Pipeline:CopyDiagnostics"]</MoCopyButton>
             </div>
         }
         else if (_registration is { } reg)
@@ -152,7 +149,7 @@
                 <p class="ep-sec-note">@L["Pipeline:ChainNote"]</p>
                 @if (plan.Behaviors.Any(link => link.HasDistinctResolvedType))
                 {
-                    <p class="ep-closed-over">@PipelineDisplay.Sentence(L["Pipeline:ClosedOver"], Code(descriptor.InputType.Name), Code(descriptor.ResultType.Name))</p>
+                    <p class="ep-closed-over">@MoRichFinding.Compose(L["Pipeline:ClosedOver"].Value, Code(descriptor.InputType.Name), Code(descriptor.ResultType.Name))</p>
                 }
                 <ol class="ep-spine">
                     <li class="ep-spine-end"><i class="ep-spine-dot" aria-hidden="true"></i><span>@L["Pipeline:Caller"]</span></li>
@@ -316,10 +313,8 @@
     private RenderFragment Fact(string label, RenderFragment value, string? copy = null) => @<div>
         <dt>@label</dt><dd>@value @if (copy is not null) { @CopyIcon(label, copy) }</dd>
     </div>;
-    private RenderFragment CopyIcon(string label, string value) => @<button type="button" class="ep-copy"
-        aria-label="@L["Pipeline:CopyValue", label]" title="@L["Pipeline:CopyValue", label]" @onclick="@(() => CopyAsync(value))">
-        <MoIcon Icon="@MoIcons.Copy" Size="14px" />
-    </button>;
+    private RenderFragment CopyIcon(string label, string value) => @<MoCopyButton
+        Value="@value" Label="@L["Pipeline:CopyValue", label]" />;
     private static RenderFragment Callout(MoVisualRole role, string icon, string? title, string body) => @<div class="mo-vl-callout @role.ToCssClass()">
         <span class="mo-vl-callout-mark"><MoIcon Icon="@icon" Size="16px" /></span>
         <div class="mo-vl-callout-content">
@@ -355,20 +350,6 @@
 
     private (string, string) Exact(string label, ExecutionTypeSnapshot type) => (L["Pipeline:Exact", label], type.Diagnostics.AssemblyQualifiedName);
     private string DiagnosticsText(PipelineRow row) => string.Join(Environment.NewLine, Diagnostics(row).Select(line => $"{line.Label}: {line.Value}"));
-
-    private async Task CopyAsync(string value)
-    {
-        try
-        {
-            var copied = await JS.InvokeAsync<bool>("MoClipboard.copyText", value);
-            if (!_retired) Snackbar.Add(copied ? L["Pipeline:Copied"] : L["Pipeline:CopyFailed"], copied ? Severity.Success : Severity.Warning);
-        }
-        catch (JSDisconnectedException) { }
-        catch (JSException)
-        {
-            if (!_retired) Snackbar.Add(L["Pipeline:CopyFailed"], Severity.Warning);
-        }
-    }
 
     /// <summary>Stops pending focus work when the route retires the drawer.</summary>
     public async ValueTask DisposeAsync()

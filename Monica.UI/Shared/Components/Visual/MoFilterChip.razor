@@ -4,7 +4,11 @@
         aria-pressed="@PressedText"
         aria-label="@AriaLabel"
         @onclick="ToggleAsync">
-    @if (ShowDot)
+    @if (Icon is not null)
+    {
+        <MoIcon Icon="@Icon" Size="14px" />
+    }
+    else if (ShowDot)
     {
         <span class="mo-vl-chip-dot @(Count == 0 ? "mo-vl-chip-dot--empty" : null)" aria-hidden="true"></span>
     }
@@ -27,6 +31,9 @@
 
     /// <summary>Gets or sets the semantic palette role; the pressed fill and dot keep this hue.</summary>
     [Parameter] public MoVisualRole Role { get; set; } = MoVisualRole.Neutral;
+
+    /// <summary>Optional leading icon identifying the filter. Takes precedence over the semantic dot.</summary>
+    [Parameter] public string? Icon { get; set; }
 
     /// <summary>Gets or sets a value indicating whether a semantic dot renders inside the chip.</summary>
     [Parameter] public bool ShowDot { get; set; }

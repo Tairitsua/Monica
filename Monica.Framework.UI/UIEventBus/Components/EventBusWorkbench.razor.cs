@@ -311,11 +311,6 @@ public partial class EventBusWorkbench : IAsyncDisposable
         });
     }
 
-    internal Task CopyAsync(string text) => RunOwned(async () =>
-    {
-        await JS.InvokeAsync<bool>("MoClipboard.copyText", _token, [text]);
-    });
-
     internal void ListenerChanged() => StateHasChanged();
 
     private async Task ReadFeedAsync(EventBusMonitorChangeFeed feed)

@@ -123,8 +123,6 @@
       "Resolves": "Resolves as declared"
     },
     "Copy": "Copy",
-    "Copied": "Copied.",
-    "CopyFailed": "Couldn't copy the identity.",
     "FindingsTitle": "Convention findings",
     "FindingsDesc": "Covers conventional registration across the whole host, independently of the Service resolution filters, including implementations that produced no descriptor.",
     "FindingSearch": "Find a conventional implementation",
@@ -192,9 +190,6 @@
     },
     "MultiTipDivergent": "{0} registrations naming different implementations",
     "MultiTipSame": "{0} registrations of the same implementation",
-    "Page": "Page {0} of {1}",
-    "Prev": "Previous",
-    "Next": "Next step",
     "TapeTitle": "Registration order",
     "TapeNote": "The {0} descriptors of the finalized collection in registration order. Within one service identity, the later descriptor wins GetService.",
     "Legend": {

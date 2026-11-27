@@ -78,10 +78,8 @@
                 {
                     var (label, role) = MarkerLabel(marker);
                     var count = (Filter with { Markers = marker }).Apply(identities).Length;
-                    <button type="button" class="fchip @role @(count == 0 ? "is-zero" : null)" aria-pressed="@Bool(Filter.Markers.HasFlag(marker))"
-                            @onclick="() => ToggleMarkerAsync(marker)">
-                        <i class="swatch" aria-hidden="true"></i>@label<span class="n">@count</span>
-                    </button>
+                    <MoFilterChip Label="@label" Count="@count" Role="@role" Pill="true" ShowDot="true" Class="mo-vl-chip--instrument"
+                                  Selected="@Filter.Markers.HasFlag(marker)" SelectedChanged="() => ToggleMarkerAsync(marker)" />
                 }
             </div>
         </div>
@@ -177,18 +175,7 @@
                 </div>
             }
         </div>
-        @if (pages > 1)
-        {
-            <nav class="di-pager" aria-label="@L["Workbench:Page", page, pages]">
-                <button type="button" class="di-btn is-small" disabled="@(page == 1)" @onclick="() => SetPageAsync(page - 1)">
-                    <MoIcon Icon="@MoIcons.ChevronLeft" Size="14px" />@L["Workbench:Prev"]
-                </button>
-                <span class="mono">@L["Workbench:Page", page, pages]</span>
-                <button type="button" class="di-btn is-small" disabled="@(page == pages)" @onclick="() => SetPageAsync(page + 1)">
-                    @L["Workbench:Next"]<MoIcon Icon="@MoIcons.ChevronRight" Size="14px" />
-                </button>
-            </nav>
-        }
+        <MoCompactPager PageSize="@PageSize" Total="@scoped.Length" Page="@(page)" PageChanged="SetPageAsync" />
     }
 </section>
 
@@ -212,13 +199,13 @@
         }
     </text>;
 
-    private (string Label, string Role) MarkerLabel(ServiceMarkers marker) => marker switch
+    private (string Label, MoVisualRole Role) MarkerLabel(ServiceMarkers marker) => marker switch
     {
-        ServiceMarkers.Keyed => (L["Workbench:Markers:Keyed"], "role-info"),
-        ServiceMarkers.Multiple => (L["Workbench:Markers:Multiple"], "role-warning"),
-        ServiceMarkers.Warnings => (L["Workbench:Markers:Warnings"], "role-warning"),
-        ServiceMarkers.Errors => (L["Workbench:Markers:Errors"], "role-error"),
-        _ => (L["Workbench:Markers:Standard"], "role-neutral")
+        ServiceMarkers.Keyed => (L["Workbench:Markers:Keyed"], MoVisualRole.Info),
+        ServiceMarkers.Multiple => (L["Workbench:Markers:Multiple"], MoVisualRole.Warning),
+        ServiceMarkers.Warnings => (L["Workbench:Markers:Warnings"], MoVisualRole.Warning),
+        ServiceMarkers.Errors => (L["Workbench:Markers:Errors"], MoVisualRole.Error),
+        _ => (L["Workbench:Markers:Standard"], MoVisualRole.Neutral)
     };
 
     private static string Bool(bool value) => value ? "true" : "false";

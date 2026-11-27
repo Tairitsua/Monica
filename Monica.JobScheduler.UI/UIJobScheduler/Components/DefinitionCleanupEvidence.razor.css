@@ -19,7 +19,6 @@
 .cleanup-details dt { font-size:12.5px; color:var(--mud-palette-text-secondary); }
 .cleanup-details dd { display:flex; align-items:baseline; gap:8px; margin:0; min-width:0; font-size:13px; overflow-wrap:anywhere; }
 .cleanup-details code { font:12px/1.65 var(--mo-font-family-mono); overflow-wrap:anywhere; }
-.cleanup-details ::deep .scheduler-copy { flex:none; }
 .cleanup-note { margin:0; color:var(--mud-palette-text-secondary); font-size:12.5px; line-height:1.75; }
 .cleanup-sheet details { border-block:1px solid var(--mud-palette-divider); padding:12px 0; font-size:12.5px; }
 .cleanup-sheet summary { cursor:pointer; }

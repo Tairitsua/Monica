@@ -4,6 +4,17 @@
       "Title": "文本差异对比"
     }
   },
+  "Clipboard": {
+    "Copied": "已复制到剪贴板",
+    "Failed": "复制到剪贴板失败"
+  },
+  "Pager": {
+    "Navigation": "分页",
+    "Previous": "上一页",
+    "Next": "下一页",
+    "Range": "第 {0}–{1} 条，共 {2} 条",
+    "Position": "{0} / {1}"
+  },
   "Common": {
     "Close": "关闭",
     "Initializing": "初始化中",

@@ -4,6 +4,17 @@
       "Title": "Text Diff Comparison"
     }
   },
+  "Clipboard": {
+    "Copied": "Copied to clipboard",
+    "Failed": "Could not copy to clipboard"
+  },
+  "Pager": {
+    "Navigation": "Pagination",
+    "Previous": "Previous page",
+    "Next": "Next page",
+    "Range": "{0}–{1} of {2}",
+    "Position": "{0} / {1}"
+  },
   "Common": {
     "Close": "Close",
     "Initializing": "Initializing",

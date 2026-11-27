@@ -57,12 +57,14 @@
     <div class="eb-rt-strip" role="group" aria-label="@L["Precision:SubFilterRuntime"]">
         <span class="eb-strip-label">@L["Precision:SubFilterRuntime"]</span>
         <div class="fchips">
-            <EventBusFilterChip Count="@coverage.Length" Selected="@(runtime is null)" Select='() => Filter("runtime", null)'>@L["Precision:SubAllRuntime"]</EventBusFilterChip>
+            <MoFilterChip Label="@L["Precision:SubAllRuntime"]" Pill="true" Class="mo-vl-chip--instrument"
+                          Role="MoVisualRole.Primary" Count="@coverage.Length" Selected="@(runtime is null)" SelectedChanged='() => Filter("runtime", null)' />
             @foreach (var item in Enum.GetValues<EventBusCoverage>())
             {
-                <EventBusFilterChip Role="@EventBusVisuals.Role(item)" Count="@coverage.Count(row => MatchesRuntime(row, item))"
-                                    Selected="@(runtime == item)" Marked="true" Hatched="@(item == EventBusCoverage.Unreported)"
-                                    Select='() => Filter("runtime", runtime == item ? null : item.ToString())'>@L.CoverageText(item)</EventBusFilterChip>
+                <MoFilterChip Label="@L.CoverageText(item)" Pill="true"
+                              Role="@EventBusVisuals.Role(item)" Count="@coverage.Count(row => MatchesRuntime(row, item))"
+                              Selected="@(runtime == item)" ShowDot="true" Class="@(item == EventBusCoverage.Unreported ? "mo-vl-chip--instrument mo-vl-chip--hatched" : "mo-vl-chip--instrument")"
+                              SelectedChanged='() => Filter("runtime", runtime == item ? null : item.ToString())' />
             }
         </div>
     </div>
@@ -108,17 +110,20 @@
         </div>
         <div class="eb-reg-row2">
             <div class="fchips" role="group" aria-label="@L["Precision:SubColReg"]">
-                <EventBusFilterChip Count="@states.Length" Selected="@(registration is null)" Select='() => Filter("state", null)'>@L["Precision:SubFilterAll"]</EventBusFilterChip>
+                <MoFilterChip Label="@L["Precision:SubFilterAll"]" Pill="true" Class="mo-vl-chip--instrument"
+                              Role="MoVisualRole.Primary" Count="@states.Length" Selected="@(registration is null)" SelectedChanged='() => Filter("state", null)' />
                 @if (registration == "PendingInactive")
                 {
-                    <EventBusFilterChip Role="warning" Count="@states.Count(row => MatchesRegistration(row, registration))" Selected="true" Marked="true"
-                                        Select='() => Filter("state", null)'>@L["Precision:MxPendingInactive"]</EventBusFilterChip>
+                    <MoFilterChip Label="@L["Precision:MxPendingInactive"]" Pill="true" Class="mo-vl-chip--instrument"
+                                  Role="MoVisualRole.Warning" Count="@states.Count(row => MatchesRegistration(row, registration))" Selected="true" ShowDot="true"
+                                  SelectedChanged='() => Filter("state", null)' />
                 }
                 @foreach (var item in EventBusCaptureView.Registrations)
                 {
                     var id = item.ToString();
-                    <EventBusFilterChip Role="@EventBusVisuals.Role(item)" Count="@states.Count(row => row.State == item)" Selected="@(registration == id)"
-                                        Marked="true" Select='() => Filter("state", registration == id ? null : id)'>@L.GetSubscriptionStateText(item)</EventBusFilterChip>
+                    <MoFilterChip Label="@L.GetSubscriptionStateText(item)" Pill="true" Class="mo-vl-chip--instrument"
+                                  Role="@EventBusVisuals.Role(item)" Count="@states.Count(row => row.State == item)" Selected="@(registration == id)"
+                                  ShowDot="true" SelectedChanged='() => Filter("state", registration == id ? null : id)' />
                 }
             </div>
             <div class="eb-reg-toggles">
@@ -131,10 +136,9 @@
                 }
                 @if (listeners.Count > 0 || query.IsSet("listening"))
                 {
-                    <EventBusFilterChip Role="info" Count="@listeners.Count" Selected="@query.IsSet("listening")"
-                                        Select='() => Filter("listening", query.IsSet("listening") ? null : "1")'>
-                        <MoIcon Icon="@MoIcons.Radio" Size="13px" />@L["Precision:SubListeningOnly"]
-                    </EventBusFilterChip>
+                    <MoFilterChip Label="@L["Precision:SubListeningOnly"]" Pill="true" Icon="@MoIcons.Radio" Class="mo-vl-chip--instrument"
+                                  Role="MoVisualRole.Info" Count="@listeners.Count" Selected="@query.IsSet("listening")"
+                                  SelectedChanged='() => Filter("listening", query.IsSet("listening") ? null : "1")' />
                 }
                 @if (filtered)
                 {
@@ -183,7 +187,7 @@
                             <EventBusTransportBadge Distributed="@(row.Scope == EventSubscriptionScope.Distributed)" Kind="@kind" ServiceKey="@row.ServiceKey" />
                             @if (row.Scope == EventSubscriptionScope.Distributed) { <span class="eb-row-sub">@L.GetDistributedDeliveryText(row)</span> }
                         </div></td>
-                        <td data-label="@L["Precision:SubColReg"]"><span class="status is-pill mo-vl-role--@EventBusVisuals.Role(row.State)"><span class="status-dot"></span>@L.GetSubscriptionStateText(row.State)</span></td>
+                        <td data-label="@L["Precision:SubColReg"]"><span class="status is-pill @EventBusVisuals.Role(row.State).ToCssClass()"><span class="status-dot"></span>@L.GetSubscriptionStateText(row.State)</span></td>
                         <td data-label="@L["Precision:SubColRuntime"]"><div class="eb-cell-stack">
                             <EventBusRuntimeBadge Scope="@row.Scope" Status="@row.TopicStatus" />
                             @if (view.IsShared(row)) { <span class="eb-shared-pill" title="@L["Precision:MxSharedNote"]">@L["Precision:SubSharedTag"]</span> }
@@ -216,7 +220,7 @@
         </table>
         @if (matches.Length == 0) { <MoContentState Compact="true"><p>@L["Precision:SubNoMatch"]</p></MoContentState> }
     </div>
-    <EventBusPager Page="@(page)" PageSize="@PageSize" Total="@matches.Length" Changed='value => Workbench.EditQuery(("page", value == 1 ? null : value.ToString(System.Globalization.CultureInfo.InvariantCulture)))' />
+    <MoCompactPager ShowSinglePage="true" Page="@(page)" PageSize="@PageSize" Total="@matches.Length" PageChanged='value => Workbench.EditQuery(("page", value == 1 ? null : value.ToString(System.Globalization.CultureInfo.InvariantCulture)))' />
     <footer class="eb-surface-foot"><MoIcon Icon="@MoIcons.Info" Size="14px" />@L["Precision:SubFoot"]</footer>
 </section>
 

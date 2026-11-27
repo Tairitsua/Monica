@@ -12,15 +12,12 @@
         else { <span class="eb-dim">@L["Precision:InspNoTimestamp"]</span> }
         @if (Copy && (ClipboardValue ?? Value) is { } payload)
         {
-            <button class="icon-btn" type="button" aria-label="@L["Precision:CopyField", Label]" title="@L["Precision:CopyField", Label]"
-                    @onclick="() => Workbench.CopyAsync(payload)"><MoIcon Icon="@MoIcons.Copy" Size="14px" /></button>
+            <MoCopyButton Value="@payload" Label="@L["Precision:CopyField", Label]" />
         }
     </dd>
 </div>
 
 @code {
-    /// <summary>Gets the workbench owning the clipboard command.</summary>
-    [CascadingParameter] public EventBusWorkbench Workbench { get; set; } = null!;
     /// <summary>Gets or sets the field label.</summary>
     [Parameter, EditorRequired] public string Label { get; set; } = "";
     /// <summary>Gets or sets the display value, also used verbatim for copying.</summary>

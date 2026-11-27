@@ -176,10 +176,10 @@
             var key = stale ? "Overview:StaleRefresh" : active ? "Overview:ActiveRefresh" : "Overview:CompletedRefresh";
             <SeederStatusMark Text="@L[key]" Tone="@(stale ? "warning" : active ? "info" : "neutral")" Pill="true" />
         }
-        <SeederCopyButton Text="@session.HostName" Label="@L["Actions:CopyHost", session.HostName]">
+        <MoCopyButton Value="@session.HostName" Label="@L["Actions:CopyHost", session.HostName]">
             <MoIcon Icon="@MoIcons.Server" Size="13px" />
             <code>@session.HostName</code>
-        </SeederCopyButton>
+        </MoCopyButton>
         @if (run is not null)
         {
             var offset = UiTime.ToDisplayTime(run.CapturedAtUtc).ToString("zzz");

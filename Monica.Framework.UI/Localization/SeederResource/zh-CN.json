@@ -22,8 +22,6 @@
     "ClearFilters": "清除筛选",
     "CopyHost": "复制主机名 {0}",
     "CopyType": "复制完整类型名称",
-    "Copied": "已复制到剪贴板",
-    "CopyFailed": "复制到剪贴板失败",
     "Cancel": "取消",
     "BackToSeeder": "返回 {0}",
     "ClearSelection": "清除 Seeder 选择"

@@ -17,11 +17,10 @@
             <span class="mo-vl-status mo-vl-status--pill @StatusRole.ToCssClass()">
                 <i class="mo-vl-status-dot" aria-hidden="true"></i>@L[StatusKey]
             </span>
-            <button type="button" class="mo-vl-capsule mo-vl-capsule--outline mo-vl-role--neutral oi-host" title="@Environment.MachineName"
-                    aria-label="@L["Design:CopyHost", Environment.MachineName]" @onclick="CopyHostAsync">
+            <MoCopyButton Value="@Environment.MachineName" Label="@L["Design:CopyHost", Environment.MachineName]">
                 <MoIcon Icon="@MoIcons.Server" Size="13px" />
                 <span>@L["Design:ScopeChip", Shell.Value.GetAppName()]</span>
-            </button>
+            </MoCopyButton>
             <span class="mo-vl-capsule mo-vl-capsule--outline mo-vl-role--neutral" title="@Time.TimeZone.Id">
                 @L["Design:TzChip", Time.FormatZoneLabel(Workspace.Evidence?.ReadAt)]
             </span>

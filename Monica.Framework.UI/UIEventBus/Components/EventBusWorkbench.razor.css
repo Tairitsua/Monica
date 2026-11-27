@@ -9,14 +9,14 @@
     --eb-tertiary: color-mix(in srgb, var(--mud-palette-text-secondary) 91%, var(--mud-palette-surface));
     --eb-unreported: repeating-linear-gradient(135deg, color-mix(in srgb, var(--mud-palette-text-secondary) 46%, transparent) 0 1.5px, transparent 1.5px 5px), color-mix(in srgb, var(--mud-palette-text-secondary) 8%, transparent);
 }
-:is(.eb-page, .eb-overlay) ::deep .mo-vl-role--third { --mo-vl-role: var(--mo-color-role-third); }
+:is(.eb-page, .eb-overlay) ::deep :is(.mo-vl-role--third, .mo-vl-role--secondary) { --mo-vl-role: var(--mo-color-role-third); }
 :is(.eb-page, .eb-overlay) ::deep .mono { font-family: var(--mo-font-family-mono); font-variant-numeric: tabular-nums; }
-:is(.eb-page, .eb-overlay) ::deep :where(.btn, .icon-btn, .fchip, .eb-link-btn, .eb-mx-cell, .eb-mini-row, .eb-tape-tick, .eb-seg button, button.chip, .eb-inline-link) {
+:is(.eb-page, .eb-overlay) ::deep :where(.btn, .icon-btn, .eb-link-btn, .eb-mx-cell, .eb-mini-row, .eb-tape-tick, .eb-seg button, button.chip, .eb-inline-link) {
     border: 0;
     background-color: transparent;
     text-decoration: none;
 }
-:is(.eb-page, .eb-overlay) ::deep :is(.btn, .icon-btn, .fchip, .eb-link-btn, .eb-mx-cell, .eb-mini-row, .eb-tape-tick, .eb-seg button, button.chip, .eb-inline-link):focus-visible {
+:is(.eb-page, .eb-overlay) ::deep :is(.btn, .icon-btn, .eb-link-btn, .eb-mx-cell, .eb-mini-row, .eb-tape-tick, .eb-seg button, button.chip, .eb-inline-link):focus-visible {
     outline: 2px solid var(--mud-palette-primary);
     outline-offset: 1px;
 }
@@ -183,24 +183,6 @@
 :is(.eb-page, .eb-overlay) ::deep .meter > span { min-width: 2px; background: var(--mo-vl-role); }
 :is(.eb-page, .eb-overlay) ::deep .meter > span.is-light { background: color-mix(in srgb, var(--mo-vl-role) 45%, var(--mud-palette-surface)); }
 :is(.eb-page, .eb-overlay) ::deep .fchips { display: flex; flex-wrap: wrap; gap: 8px; }
-:is(.eb-page, .eb-overlay) ::deep .fchip {
-    display: inline-flex;
-    align-items: center;
-    gap: 7px;
-    height: 30px;
-    padding: 0 12px;
-    border-radius: 999px;
-    background: var(--mud-palette-surface);
-    box-shadow: inset 0 0 0 1px var(--mud-palette-lines-default);
-    color: var(--mud-palette-text-secondary);
-    font-size: 12.5px;
-    font-weight: 500;
-    transition: background-color 120ms ease, box-shadow 120ms ease, color 120ms ease;
-}
-:is(.eb-page, .eb-overlay) ::deep .fchip:hover { box-shadow: inset 0 0 0 1px var(--mud-palette-lines-inputs); color: var(--mud-palette-text-primary); }
-:is(.eb-page, .eb-overlay) ::deep .fchip[aria-pressed="true"] { background: color-mix(in srgb, var(--mo-vl-role) 11%, var(--mud-palette-surface)); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--mo-vl-role) 34%, transparent); color: color-mix(in srgb, var(--mo-vl-role) 74%, var(--mud-palette-text-primary)); }
-:is(.eb-page, .eb-overlay) ::deep .fchip .n { color: var(--eb-tertiary); font: 500 11px var(--mo-font-family-mono); }
-:is(.eb-page, .eb-overlay) ::deep .fchip[aria-pressed="true"] .n { color: inherit; }
 
 :is(.eb-page, .eb-overlay) ::deep .surface-head .count { white-space: nowrap; flex: none; }
 :is(.eb-page, .eb-overlay) ::deep .seal .i { width: 24px; height: 24px; }
@@ -700,8 +682,6 @@
 :is(.eb-page, .eb-overlay) ::deep .eb-check { display: inline-flex; align-items: center; gap: 7px; color: var(--mud-palette-text-secondary); font-size: 12.5px; cursor: pointer; }
 :is(.eb-page, .eb-overlay) ::deep .eb-check input { accent-color: var(--mud-palette-primary); width: 15px; height: 15px; }
 :is(.eb-page, .eb-overlay) ::deep .eb-route-pin { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 8px 12px; border-radius: 8px; background: color-mix(in srgb, var(--mud-palette-primary) 6%, var(--mud-palette-surface)); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--mud-palette-primary) 20%, transparent); }
-:is(.eb-page, .eb-overlay) ::deep .fchip.is-zero { color: var(--eb-tertiary); }
-:is(.eb-page, .eb-overlay) ::deep .fchip.is-zero .sw:not(.is-hatch) { background: transparent; box-shadow: inset 0 0 0 1.5px var(--mo-vl-role); }
 :is(.eb-page, .eb-overlay) ::deep .eb-ev-name { font-size: 13.5px; }
 :is(.eb-page, .eb-overlay) ::deep .eb-topic-code { color: var(--mud-palette-text-secondary); font-size: 12px; }
 :is(.eb-page, .eb-overlay) ::deep .eb-handler-name { color: var(--mud-palette-text-primary); font-size: 13px; font-weight: 500; overflow-wrap: anywhere; }
@@ -711,9 +691,6 @@
 :is(.eb-page, .eb-overlay) ::deep .eb-row-actions { display: inline-flex; align-items: center; gap: 2px; }
 :is(.eb-page, .eb-overlay) ::deep .eb-btn-listening { color: color-mix(in srgb, var(--mud-palette-success) 78%, var(--mud-palette-text-primary)); background: color-mix(in srgb, var(--mud-palette-success) 12%, var(--mud-palette-surface)); }
 :is(.eb-page, .eb-overlay) ::deep .eb-btn-danger:hover { color: color-mix(in srgb, var(--mud-palette-error) 80%, var(--mud-palette-text-primary)); background: color-mix(in srgb, var(--mud-palette-error) 10%, var(--mud-palette-surface)); }
-:is(.eb-page, .eb-overlay) ::deep .eb-pager { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px; padding: 12px 20px; box-shadow: inset 0 1px 0 var(--mud-palette-divider); }
-:is(.eb-page, .eb-overlay) ::deep .eb-pager-btns { display: flex; align-items: center; gap: 8px; }
-:is(.eb-page, .eb-overlay) ::deep .eb-page-num { font-size: 12px; color: var(--mud-palette-text-secondary); min-width: 48px; text-align: center; }
 :is(.eb-page, .eb-overlay) ::deep .eb-surface-foot { display: flex; align-items: flex-start; gap: 8px; padding: 12px 20px 14px; background: var(--mud-palette-background-gray); color: var(--mud-palette-text-secondary); font-size: 12px; line-height: 1.5; border-bottom-left-radius: 12px; border-bottom-right-radius: 12px; box-shadow: inset 0 1px 0 var(--mud-palette-divider); }
 :is(.eb-page, .eb-overlay) ::deep .eb-surface-foot .i { flex: none; margin-top: 2px; color: var(--eb-tertiary); }
 :is(.eb-page, .eb-overlay) ::deep .eb-ch-notices { display: flex; flex-direction: column; gap: 10px; padding: 0 26px 18px; }
@@ -909,7 +886,6 @@
     :is(.eb-page, .eb-overlay) ::deep .eb-loop-bar { padding-inline: 16px; }
     :is(.eb-page, .eb-overlay) ::deep .eb-toolbar,
     :is(.eb-page, .eb-overlay) ::deep .eb-reg-controls,
-    :is(.eb-page, .eb-overlay) ::deep .eb-pager,
     :is(.eb-page, .eb-overlay) ::deep .eb-surface-foot,
     :is(.eb-page, .eb-overlay) ::deep .eb-pv-row,
     :is(.eb-page, .eb-overlay) ::deep .eb-pv-group-head,

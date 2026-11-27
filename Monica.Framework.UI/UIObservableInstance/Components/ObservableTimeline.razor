@@ -10,10 +10,8 @@
             @foreach (var facet in Facets)
             {
                 var count = facet.Id == "timeline" ? Snapshot.History.Count : Snapshot.History.Count(entry => Matches(entry, facet.Id));
-                <button type="button" class="mo-vl-chip mo-vl-chip--pill @facet.Role.ToCssClass()" aria-pressed="@(Query.Timeline == facet.Id ? "true" : "false")"
-                        @onclick="() => ChangeView(facet.Id, Query.Sequence)">
-                    @L[$"Design:TimelineFilters:{facet.Key}"] <span class="mo-vl-chip-count">@count</span>
-                </button>
+                <MoFilterChip Label="@L[$"Design:TimelineFilters:{facet.Key}"]" Count="@count" Role="facet.Role" Pill="true"
+                              Class="mo-vl-chip--instrument" Selected="@(Query.Timeline == facet.Id)" SelectedChanged="() => ChangeView(facet.Id, Query.Sequence)" />
             }
         </div>
         <p class="oi-sheet-scope">@L["Design:TimelineScope", _matches.Length, Snapshot.History.Count, Snapshot.TotalRecords]</p>
@@ -118,7 +116,7 @@
                 </li>
             }
         </ol>
-        <ObservablePager Size="PageSize" Count="_matches.Length" Page="Page" PageChanged="page => _page = page" />
+        <MoCompactPager PageSize="@PageSize" Total="@_matches.Length" Page="@(Page + 1)" PageChanged="page => _page = page - 1" />
     }
 </div>
 

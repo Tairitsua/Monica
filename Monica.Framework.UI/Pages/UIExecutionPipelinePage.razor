@@ -1,3 +1,4 @@
+@using Monica.UI.Shared.Components.Visual
 @attribute [Route(PAGE_URL)]
 @implements IAsyncDisposable
 @using Monica.Framework.UI.UIExecutionPipeline.Components
@@ -14,41 +15,9 @@
 <PageTitle>@L["Pipeline:Title"]</PageTitle>
 
 <div class="ep-page" aria-busy="@Aria(_loading || PageState.View is null && PageState.FailedAt is null)">
-    <header class="mo-vl-masthead mo-vl-masthead--sealed ep-mh">
-        <div class="mo-vl-masthead__identity">
-            <span class="mo-vl-masthead__seal" aria-hidden="true"><MoIcon Icon="@MoIcons.Workflow" Size="24px" /></span>
-            <div class="mo-vl-masthead__copy">
-                <h1 class="mo-vl-title">@L["Pipeline:Title"]</h1>
-                @if (PageState.View is { } captured)
-                {
-                    <div class="mo-vl-meta">
-                        <span class="mo-vl-capsule mo-vl-capsule--outline mo-vl-mono">@L["Pipeline:Host", Environment.MachineName]</span>
-                        <span class="mo-vl-capsule mo-vl-capsule--outline">@L["Pipeline:Registered", captured.Registrations.Length]</span>
-                        @if (captured.FirstAt is { } first)
-                        {
-                            <time class="mo-vl-capsule mo-vl-capsule--outline" datetime="@first.ToString("O")" title="@L["Pipeline:SinceTip"]">@L["Pipeline:Since", UiTime.FormatTime(first)]</time>
-                        }
-                    </div>
-                }
-            </div>
-        </div>
-        @if (PageState.View is not null || PageState.FailedAt is not null)
-        {
-            <div class="ep-mh-actions">
-                @if (PageState.View is { } stamp)
-                {
-                    <div class="ep-stamp">
-                        <span>@(PageState.FailedAt is null ? L["Pipeline:Captured"] : L["Pipeline:CapturedStale"])</span>
-                        <time datetime="@stamp.Snapshot.CapturedAt.ToString("O")" title="@UiTime.Format(stamp.Snapshot.CapturedAt)">@UiTime.FormatTime(stamp.Snapshot.CapturedAt)</time>
-                    </div>
-                }
-                <button type="button" class="ep-action ep-action-primary" disabled="@_loading" @onclick="Refresh">
-                    <span class="@(_loading ? "ep-spin" : null)"><MoIcon Icon="@MoIcons.Refresh" Size="15px" /></span>
-                    @(PageState.View is null ? L["Pipeline:Retry"] : L["Pipeline:Refresh"])
-                </button>
-            </div>
-        }
-    </header>
+    <MoPageMasthead Icon="@MoIcons.Workflow" Title="@L["Pipeline:Title"]"
+                    Meta="@(PageState.View is { } captured ? Metadata(captured) : null)"
+                    Actions="@(PageState.View is not null || PageState.FailedAt is not null ? CaptureActions : null)" />
 
     @if (PageState.View is { } view)
     {
@@ -111,6 +80,29 @@
     private ExecutionPipelineQuery Query => new(Q, EmptyToNull(Point), EmptyToNull(Status), EmptyToNull(Tx),
         EmptyToNull(Business), EmptyToNull(Behavior), Applied, Sort, EmptyToNull(Open),
         EmptyToNull(Plan), EmptyToNull(Registration));
+
+    private RenderFragment Metadata(ExecutionPipelineView captured) => @<text>
+        <span class="mo-vl-capsule mo-vl-capsule--outline mo-vl-mono">@L["Pipeline:Host", Environment.MachineName]</span>
+        <span class="mo-vl-capsule mo-vl-capsule--outline">@L["Pipeline:Registered", captured.Registrations.Length]</span>
+        @if (captured.FirstAt is { } first)
+        {
+            <time class="mo-vl-capsule mo-vl-capsule--outline" datetime="@first.ToString("O")" title="@L["Pipeline:SinceTip"]">@L["Pipeline:Since", UiTime.FormatTime(first)]</time>
+        }
+    </text>;
+
+    private RenderFragment CaptureActions => @<text>
+        @if (PageState.View is { } stamp)
+        {
+            <div class="ep-stamp">
+                <span>@(PageState.FailedAt is null ? L["Pipeline:Captured"] : L["Pipeline:CapturedStale"])</span>
+                <time datetime="@stamp.Snapshot.CapturedAt.ToString("O")" title="@UiTime.Format(stamp.Snapshot.CapturedAt)">@UiTime.FormatTime(stamp.Snapshot.CapturedAt)</time>
+            </div>
+        }
+        <button type="button" class="ep-action ep-action-primary" disabled="@_loading" @onclick="Refresh">
+            <span class="@(_loading ? "ep-spin" : null)"><MoIcon Icon="@MoIcons.Refresh" Size="15px" /></span>
+            @(PageState.View is null ? L["Pipeline:Retry"] : L["Pipeline:Refresh"])
+        </button>
+    </text>;
 
     private Task? _load;
     private bool _retired, _loading;

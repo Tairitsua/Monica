@@ -22,8 +22,6 @@
     "ClearFilters": "Clear filters",
     "CopyHost": "Copy host {0}",
     "CopyType": "Copy full type name",
-    "Copied": "Copied to the clipboard",
-    "CopyFailed": "Copy to the clipboard failed",
     "Cancel": "Cancel",
     "BackToSeeder": "Back to {0}",
     "ClearSelection": "Clear seeder selection"

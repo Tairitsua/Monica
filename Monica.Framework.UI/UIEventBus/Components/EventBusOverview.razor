@@ -30,10 +30,10 @@
                       Population="@L[model.Attention == 0 ? "Precision:OvCalmUnit" : "Precision:OvUnit", model.Topics.Count]"
                       Role="@(model.Failed > 0 ? "error" : model.Attention > 0 ? "warning" : "success")">
         <Reasons>
-            <EventBusReason Role="error" Count="@model.Failed">@L["Precision:OvReasonFailed"]</EventBusReason>
-            <EventBusReason Role="warning" Count="@model.Topics.Count(topic => topic.Coverage == EventBusCoverage.Recovering && !topic.IsOrphan)">@L["Precision:OvReasonRecovering"]</EventBusReason>
+            <EventBusReason Role="MoVisualRole.Error" Count="@model.Failed">@L["Precision:OvReasonFailed"]</EventBusReason>
+            <EventBusReason Role="MoVisualRole.Warning" Count="@model.Topics.Count(topic => topic.Coverage == EventBusCoverage.Recovering && !topic.IsOrphan)">@L["Precision:OvReasonRecovering"]</EventBusReason>
             <EventBusReason Hatched="true" Count="@model.ActiveGaps">@L["Precision:OvReasonUnreported"]</EventBusReason>
-            <EventBusReason Role="warning" Diamond="true" Count="@model.Orphans">@L["Precision:OvReasonOrphan"]</EventBusReason>
+            <EventBusReason Role="MoVisualRole.Warning" Diamond="true" Count="@model.Orphans">@L["Precision:OvReasonOrphan"]</EventBusReason>
         </Reasons>
         <Finding>
             @if (model.Attention == 0)
@@ -88,10 +88,9 @@
         <div class="fchips" role="group" aria-label="@L["Precision:TopicLedgerTitle"]">
             @foreach (var (id, label, tone) in TopicFilters)
             {
-                <button type="button" class="fchip mo-vl-role--@tone" aria-pressed="@(filter == id ? "true" : "false")"
-                        @onclick='() => Workbench.EditQuery(("coverage", id == "all" ? null : id))'>
-                    @label <span class="n">@model.Topics.Count(topic => MatchesCoverage(topic, id))</span>
-                </button>
+                <MoFilterChip Label="@label" Role="@tone" Count="@model.Topics.Count(topic => MatchesCoverage(topic, id))"
+                              Pill="true" Class="mo-vl-chip--instrument" Selected="@(filter == id)"
+                              SelectedChanged='() => Workbench.EditQuery(("coverage", id == "all" ? null : id))' />
             }
         </div>
         <div class="eb-toolbar-end"><label class="eb-search"><MoIcon Class="i" Icon="@MoIcons.Search" Size="15px" />
@@ -209,13 +208,13 @@
     /// <summary>Gets the owning workbench and its current capture.</summary>
     [CascadingParameter] public EventBusWorkbench Workbench { get; set; } = null!;
 
-    private (string Id, string Label, string Role)[] TopicFilters =>
+    private (string Id, string Label, MoVisualRole Role)[] TopicFilters =>
     [
-        ("all", L["Precision:TopicFilterAll"], "primary"),
-        ("problems", L["Precision:TopicFilterProblems"], "error"),
-        ("errors", L["Precision:TopicFilterErrors"], "warning"),
-        ("unreported", L["Precision:TopicFilterUnreported"], "neutral"),
-        ("orphans", L["Precision:TopicFilterOrphans"], "warning")
+        ("all", L["Precision:TopicFilterAll"], MoVisualRole.Primary),
+        ("problems", L["Precision:TopicFilterProblems"], MoVisualRole.Error),
+        ("errors", L["Precision:TopicFilterErrors"], MoVisualRole.Warning),
+        ("unreported", L["Precision:TopicFilterUnreported"], MoVisualRole.Neutral),
+        ("orphans", L["Precision:TopicFilterOrphans"], MoVisualRole.Warning)
     ];
 
     private static bool MatchesCoverage(EventBusTopicRow row, string category) => category switch

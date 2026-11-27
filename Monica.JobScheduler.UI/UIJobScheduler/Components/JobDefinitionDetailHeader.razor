@@ -1,3 +1,4 @@
+@using Monica.UI.Shared.Components.Visual
 @using Monica.JobScheduler.Models
 @using Monica.JobScheduler.Models.Definitions
 @using Monica.JobScheduler.Models.Operations
@@ -10,7 +11,7 @@
         <section class="job-detail-header__identity">
             <p class="job-detail-header__eyebrow">@L[$"JobTypes:{Definition.Declaration.JobType}"] · @Definition.OwnerKey</p>
             <h2>@Definition.EffectiveConfiguration.JobName</h2>
-            <div class="job-detail-header__key"><code>@Definition.Declaration.JobKey</code><SchedulerCopyButton Value="@Definition.Declaration.JobKey" /></div>
+            <div class="job-detail-header__key"><code>@Definition.Declaration.JobKey</code><MoCopyButton Value="@Definition.Declaration.JobKey" Label="@L["Workspace:CopyJobKey"]" /></div>
             <div class="job-detail-header__chips">
                 <span class="job-detail-header__status" data-tone="@StandingTone"><i></i>@L[$"Workspace:Standings:{Standing}"]</span>
                 @if (IsManualSuppressed)

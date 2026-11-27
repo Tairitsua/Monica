@@ -126,7 +126,7 @@ public partial class ObservableRegistry
     {
         void Add(LocalizedString message, params RenderFragment[] values)
         {
-            builder.AddContent(0, ObservableMarkup.Format(message.Value, values));
+            builder.AddContent(0, MoRichFinding.Compose(message.Value, values));
             builder.AddContent(1, " ");
         }
         RenderFragment Link(TrackerEvidence item, MoVisualRole role) => ObservableMarkup.Mark(item.Name, role,

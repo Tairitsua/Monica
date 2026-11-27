@@ -4,10 +4,8 @@
 @using Monica.UI.Shared.Components.Dialogs
 @using Monica.UI.Shared.Components.Navigation
 @using Monica.UI.Shared.Components.States
-@using Monica.UI.Shared.Components.Visual
 @inject Monica.UI.Shared.Services.MoTimeFormatter UiTime
 @inject Microsoft.Extensions.Hosting.IHostEnvironment Host
-@inject IJSRuntime JS
 
 @{
     var capture = State.Snapshot;
@@ -24,9 +22,9 @@
                     @L[State.RefreshError is not null ? capture is null ? "Precision:FailedStatus" : "Precision:StaleStatus"
                         : capture is null ? "Precision:LoadingStatus" : IsEmpty ? "Precision:EmptyStatus" : State.AutoRefresh ? "Precision:Live" : "Precision:Paused"]
                 </span>
-                <button class="chip is-outline is-mono" type="button" title="@Host.ApplicationName" @onclick="() => CopyAsync(Host.ApplicationName)">
+                <MoCopyButton Value="@Host.ApplicationName" Label="@L["Precision:CopyField", Host.ApplicationName]">
                     <MoIcon Icon="@MoIcons.Server" Size="13px" /><span>@L["Precision:ScopeChip", Host.ApplicationName]</span>
-                </button>
+                </MoCopyButton>
                 <span class="chip is-outline" title="@UiTime.TimeZone.Id"><span>@L["Precision:TzChip", UiTime.FormatZoneLabel(capture?.CapturedAt ?? DateTimeOffset.UtcNow)]</span></span>
             </Meta>
             <Actions>

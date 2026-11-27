@@ -32,28 +32,28 @@
                 {
                     @if (View.Faulted.Length == 1)
                     {
-                        @PipelineDisplay.Sentence(L["Pipeline:FaultedOne"], PlanLink(fault, MoVisualRole.Error), Mark(PipelineDisplay.ExceptionName(fault.Plan), MoVisualRole.Error))
+                        @MoRichFinding.Compose(L["Pipeline:FaultedOne"].Value, PlanLink(fault, MoVisualRole.Error), Mark(PipelineDisplay.ExceptionName(fault.Plan), MoVisualRole.Error))
                     }
                     else
                     {
-                        @PipelineDisplay.Sentence(L["Pipeline:FaultedMany"], Mark(View.Faulted.Length, MoVisualRole.Error), PlanLink(fault, MoVisualRole.Error), Mark(PipelineDisplay.ExceptionName(fault.Plan), MoVisualRole.Error))
+                        @MoRichFinding.Compose(L["Pipeline:FaultedMany"].Value, Mark(View.Faulted.Length, MoVisualRole.Error), PlanLink(fault, MoVisualRole.Error), Mark(PipelineDisplay.ExceptionName(fault.Plan), MoVisualRole.Error))
                     }
                     @(" ")
                 }
                 @if (View.Stalled.FirstOrDefault() is { } stalled)
                 {
-                    @PipelineDisplay.Sentence(L["Pipeline:Stalled"], PlanLink(stalled, MoVisualRole.Warning), Mark(PipelineDisplay.Duration(L, stalled.Age), MoVisualRole.Warning))
+                    @MoRichFinding.Compose(L["Pipeline:Stalled"].Value, PlanLink(stalled, MoVisualRole.Warning), Mark(PipelineDisplay.Duration(L, stalled.Age), MoVisualRole.Warning))
                     @(" ")
                 }
                 @if (View.Ready.Length == View.Plans.Length)
                 {
-                    @PipelineDisplay.Sentence(L["Pipeline:Calm"], Mark(View.Ready.Length, MoVisualRole.Success),
+                    @MoRichFinding.Compose(L["Pipeline:Calm"].Value, Mark(View.Ready.Length, MoVisualRole.Success),
                         Text(View.Ready.Min(row => row.Plan.Behaviors.Length)), Text(View.Ready.Max(row => row.Plan.Behaviors.Length)))
                     @(" ")
                 }
                 @if (View.Building.FirstOrDefault() is { } building)
                 {
-                    @PipelineDisplay.Sentence(L["Pipeline:Building"], PlanLink(building, MoVisualRole.Warning))
+                    @MoRichFinding.Compose(L["Pipeline:Building"].Value, PlanLink(building, MoVisualRole.Warning))
                     @(" ")
                 }
                 @if (View.Registrations.Length == 0)
@@ -63,13 +63,13 @@
                 }
                 @if (View.Guard is { } guard && View.Ready.Length > 0)
                 {
-                    @PipelineDisplay.Sentence(L["Pipeline:Guard"], BehaviorLink(guard), Mark(guard.Applied, guard.Band.Role),
+                    @MoRichFinding.Compose(L["Pipeline:Guard"].Value, BehaviorLink(guard), Mark(guard.Applied, guard.Band.Role),
                         Text(View.Plans.Length), GuardScope(guard))
                     @(" ")
                 }
                 @if (View.Ready.Length > 0 && View.Registrations.FirstOrDefault(reg => reg.Applied == 0 && reg != View.Guard) is { } unused)
                 {
-                    @PipelineDisplay.Sentence(unused.Registration.IsOpenGeneric ? L["Pipeline:UnusedOpen"] : L["Pipeline:UnusedClosed"],
+                    @MoRichFinding.Compose(L[unused.Registration.IsOpenGeneric ? "Pipeline:UnusedOpen" : "Pipeline:UnusedClosed"].Value,
                         BehaviorLink(unused))
                     @(" ")
                 }
@@ -203,7 +203,7 @@
         @if (reached.Length == 1) { @L["Pipeline:GuardAllIn", reached[0].Point] }
         @if (http is not null && !http.Rows.Any(row => row.Applies(reg)))
         {
-            @PipelineDisplay.Sentence(L[reached.Length == 1 ? "Pipeline:GuardNoneHttpAnd" : "Pipeline:GuardNoneHttp"], HttpLink(reg, http.Rows.Length))
+            @MoRichFinding.Compose(L[reached.Length == 1 ? "Pipeline:GuardNoneHttpAnd" : "Pipeline:GuardNoneHttp"].Value, HttpLink(reg, http.Rows.Length))
         }
     </text>;
     private RenderFragment HttpLink(PipelineRegistration reg, int count) => @<button type="button" class="ep-vlink mo-vl-role--primary"

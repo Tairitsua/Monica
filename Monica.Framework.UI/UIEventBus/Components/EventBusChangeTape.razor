@@ -18,7 +18,7 @@
         <div class="eb-mx-legend">
             @foreach (var kind in Enum.GetValues<EventSubscriptionChangeType>())
             {
-                <span><span class="sw mo-vl-role--@EventBusVisuals.Role(kind)"></span>@L.GetSubscriptionChangeTypeText(kind)</span>
+                <span><span class="sw @EventBusVisuals.Role(kind).ToCssClass()"></span>@L.GetSubscriptionChangeTypeText(kind)</span>
             }
         </div>
     </div>
@@ -28,7 +28,7 @@
             {
                 var entry = tape[i];
                 var current = _hover is null ? i == focus : entry.ObservationId == _hover;
-                <button type="button" class="eb-tape-tick mo-vl-role--@EventBusVisuals.Role(entry.ChangeType) @(current ? "is-current" : null)"
+                <button type="button" class="eb-tape-tick @EventBusVisuals.Role(entry.ChangeType).ToCssClass() @(current ? "is-current" : null)"
                         data-row="0" data-column="@i" tabindex="@(i == focus ? 0 : -1)" @key="entry.ObservationId"
                         aria-label="@($"{L.GetSubscriptionChangeTypeText(entry.ChangeType)} · {entry.Subscription.EventTypeShortName} · {UiTime.Format(entry.Timestamp)}")"
                         @onfocus="() => Focus(entry.ObservationId)" @onmouseenter="() => _hover = entry.ObservationId" @onmouseleave="() => _hover = null"
@@ -39,7 +39,7 @@
             <span>@UiTime.FormatTime(tape[0].Timestamp)</span><span class="eb-tape-rule"></span><span>@UiTime.FormatTime(tape[^1].Timestamp) · @tape.Length / @TapeLimit</span>
         </div>
     </div>
-    <div class="eb-mx-readout is-active" aria-live="polite"><span class="eb-mx-dot mo-vl-role--@EventBusVisuals.Role(point.ChangeType)"></span>
+    <div class="eb-mx-readout is-active" aria-live="polite"><span class="eb-mx-dot @EventBusVisuals.Role(point.ChangeType).ToCssClass()"></span>
         <span><b class="mono">@UiTime.Format(point.Timestamp)</b> · @L.GetSubscriptionChangeTypeText(point.ChangeType) · @point.Subscription.EventTypeShortName (<code class="mono">@point.Subscription.TopicName</code>)</span>
     </div>
 </div>

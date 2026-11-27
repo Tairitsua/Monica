@@ -123,8 +123,6 @@
       "Resolves": "按声明解析"
     },
     "Copy": "复制",
-    "Copied": "已复制。",
-    "CopyFailed": "无法复制。",
     "FindingsTitle": "约定注册发现",
     "FindingsDesc": "覆盖整个主机的约定注册，与服务解析的筛选无关；也包含没有生成描述符的实现。",
     "FindingSearch": "查找约定实现",
@@ -192,9 +190,6 @@
     },
     "MultiTipDivergent": "{0} 个注册，指向不同实现",
     "MultiTipSame": "{0} 个注册，指向同一实现",
-    "Page": "第 {0} / {1} 页",
-    "Prev": "上一页",
-    "Next": "下一步",
     "TapeTitle": "注册顺序",
     "TapeNote": "最终集合的 {0} 个描述符，按注册顺序排列。同一服务标识下，后注册的描述符在 GetService 中胜出。",
     "Legend": {

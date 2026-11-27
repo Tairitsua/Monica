@@ -16,6 +16,10 @@
 }
 
 @code {
+    /// <summary>Composes the same localized finding in a programmatic render fragment.</summary>
+    public static RenderFragment Compose(string template, params RenderFragment[] values) =>
+        @<MoRichFinding Template="@template" Values="@values" />;
+
     private static readonly Regex SlotPattern = new(@"(?<!\{)(\{[0-9]+\})(?!\})", RegexOptions.CultureInvariant);
 
     /// <summary>

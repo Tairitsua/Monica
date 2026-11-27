@@ -155,20 +155,6 @@ public partial class ObservableWorkspace
         Navigation.NavigateTo(uri, new NavigationOptions { ReplaceHistoryEntry = replace });
     }
 
-    private async Task CopyHostAsync()
-    {
-        try
-        {
-            await JS.InvokeVoidAsync("navigator.clipboard.writeText", Environment.MachineName);
-            if (!_retired) Snackbar.Add(L["Design:Copied"], Severity.Success);
-        }
-        catch (JSDisconnectedException) { }
-        catch (JSException)
-        {
-            if (!_retired) Snackbar.Add(L["Design:CopyFailed"], Severity.Warning);
-        }
-    }
-
     private Task RefreshAsync() => StartOperation(ReadAsync);
 
     private Task StartOperation(Func<CancellationToken, Task> action)

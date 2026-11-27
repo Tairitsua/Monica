@@ -144,18 +144,14 @@
 
     <div class="oi-filters">
         <div class="mo-vl-chips" role="group" aria-label="@L["Design:EntryLevelLabel"]">
-            <button type="button" class="mo-vl-chip mo-vl-chip--pill mo-vl-role--primary" aria-pressed="@On(Query["level"] is null)" @onclick='() => Change("level", null)'>
-                @L["Design:AllLevels"] <span class="mo-vl-chip-count">@_levelBase.Length</span>
-            </button>
+            <MoFilterChip Label="@L["Design:AllLevels"]" Count="@_levelBase.Length" Role="MoVisualRole.Primary" Pill="true"
+                              Class="mo-vl-chip--instrument" Selected="@(Query["level"] is null)" SelectedChanged='() => Change("level", null)' />
             @foreach (var level in VisibleLevels())
             {
                 var total = _levelBase.Count(item => item.Level == level);
                 var role = Enum.TryParse<LogLevel>(level, out var value) ? TrackerEvidence.LevelRole(value) : MoVisualRole.Neutral;
-                <button type="button" class="mo-vl-chip mo-vl-chip--pill @role.ToCssClass()" aria-pressed="@On(Query["level"] == level)"
-                        @onclick='() => Toggle("level", level)'>
-                    <i class="mo-vl-swatch @role.ToCssClass()" aria-hidden="true"></i>
-                    @L[$"Design:Levels:{level}"] <span class="mo-vl-chip-count">@total</span>
-                </button>
+                <MoFilterChip Label="@L[$"Design:Levels:{level}"]" Count="@total" Role="role" Pill="true" ShowDot="true"
+                              Class="mo-vl-chip--instrument" Selected="@(Query["level"] == level)" SelectedChanged='() => Toggle("level", level)' />
             }
         </div>
         <div class="oi-tools">
@@ -231,6 +227,6 @@
                 </li>
             }
         </ol>
-        <ObservablePager Size="PageSize" Count="_matches.Length" Page="Page" PageChanged="page => _page = page" />
+        <MoCompactPager PageSize="@PageSize" Total="@_matches.Length" Page="@(Page + 1)" PageChanged="page => _page = page - 1" />
     }
 </section>
