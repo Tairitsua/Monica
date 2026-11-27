@@ -13,52 +13,41 @@
             row.ClientPort?.ToString(), row.DatabaseName, row.BackendId, row.Detail, Waiting(row))).ToArray();
     var result = filtered.Where(row => state is null || MatchesState(row, state)).OrderBy(row => SortValue(row, sort) is null);
     var ordered = (ascending ? result.ThenBy(row => SortValue(row, sort)) : result.ThenByDescending(row => SortValue(row, sort))).ToArray();
+    var sortOptions = SORT_KEYS.ToDictionary(key => key, key => L["Workbench:Activity:SortByField", Column(key)].Value);
+    var groupOptions = new Dictionary<string, string> { ["none"] = L["Persistence:NoGrouping"] };
+    foreach (var key in GROUP_KEYS) { groupOptions.Add(key, L["Workbench:Activity:GroupByField", Column(key)].Value); }
 }
 <section class="mo-vl-surface rp-act-ledger">
-    <header class="mo-vl-surface-heading rp-surface-heading">
+    <header class="mo-vl-surface-heading rp-ledger-heading">
         <span class="mo-vl-tile mo-vl-role--info"><MoIcon Icon="@MoIcons.Table" Size="16px" /></span>
-        <div class="rp-heading-copy"><h2>@L["Persistence:SessionLedger"]</h2><p>@L["Workbench:Activity:LedgerDescription"]</p></div>
-        <span class="rp-pill mo-vl-role--info mono">@ordered.Length / @Rows.Count</span>
+        <div class="rp-ledger-title"><h2>@L["Persistence:SessionLedger"]</h2><p>@L["Workbench:Activity:LedgerDescription"]</p></div>
+        <span class="rp-ledger-count mono">@ordered.Length / @Rows.Count</span>
     </header>
-    <div class="mo-vl-surface-body">
+    <div class="mo-vl-surface-body rp-ledger-body">
         <div class="rp-toolbar">
             <RepositorySearch Label="@L["Workbench:Activity:SearchPlaceholder"]" Value="@search"
                               Changed="@((string? value) => Workbench.Replace(("q", value)))" />
             <div class="rp-chips" role="group" aria-label="@L["Persistence:State"]">
                 @foreach (var option in FILTER_STATES)
                 {
-                    <MoFilterChip Label="@StateLabel(option.Key)" Role="option.Role" ShowDot="true" Pill="true"
+                    <MoFilterChip Label="@FilterLabel(option.Key)" Role="option.Role" ShowDot="true" Pill="true" Class="@(option.Key == "waiting" ? "rp-wait-filter" : null)"
                                   Count="@filtered.Count(row => MatchesState(row, option.Key))" Selected="@(state == option.Key)"
                                   SelectedChanged="@(_ => Workbench.Toggle("state", option.Key))" />
                 }
             </div>
             <div class="rp-sort-controls">
-                <div class="rp-select">
-                    <MudSelect T="string" Value="@sort" ValueChanged="@((string? value) => Workbench.Replace(("sort", value is "runtime" ? null : value)))"
-                               aria-label="@L["Persistence:Sort"]" Variant="Variant.Outlined" Margin="Margin.Dense" OpenIcon="@MoIcons.ChevronDown" CloseIcon="@MoIcons.ChevronUp">
-                        @foreach (var key in SORT_KEYS)
-                        {
-                            <MudSelectItem T="string" Value="@key">@L[$"Persistence:SessionColumns:{key}"]</MudSelectItem>
-                        }
-                    </MudSelect>
-                </div>
-                <MudButton StartIcon="@(ascending ? MoIcons.ArrowUp : MoIcons.ArrowDown)" Size="Size.Small" Variant="Variant.Outlined"
-                           OnClick="@(() => Workbench.Toggle("dir", "asc"))">@L[ascending ? "Persistence:Ascending" : "Persistence:Descending"]</MudButton>
-                <div class="rp-select">
-                    <MudSelect T="string" Value="@grouping" ValueChanged="@((string? value) => Workbench.Replace(("group", value is "none" ? null : value)))"
-                               aria-label="@L["Persistence:Group"]" Variant="Variant.Outlined" Margin="Margin.Dense" OpenIcon="@MoIcons.ChevronDown" CloseIcon="@MoIcons.ChevronUp">
-                        <MudSelectItem T="string" Value="@("none")">@L["Persistence:NoGrouping"]</MudSelectItem>
-                        @foreach (var key in GROUP_KEYS)
-                        {
-                            <MudSelectItem T="string" Value="@key">@L[$"Persistence:SessionColumns:{key}"]</MudSelectItem>
-                        }
-                    </MudSelect>
-                </div>
+                <RepositorySelect Value="@sort" Label="@L["Persistence:Sort"]" Options="sortOptions" Compact="true"
+                                  ValueChanged="@((string? value) => Workbench.Replace(("sort", value is "runtime" ? null : value)))" />
+                <RepositoryOutlineAction Icon="@(ascending ? MoIcons.ArrowUp : MoIcons.ArrowDown)"
+                                         Label="@L[ascending ? "Persistence:Ascending" : "Persistence:Descending"]"
+                                         OnClick="@(() => Workbench.Toggle("dir", "asc"))" />
+                <RepositorySelect Value="@grouping" Label="@L["Persistence:Group"]" Options="groupOptions" Compact="true"
+                                  ValueChanged="@((string? value) => Workbench.Replace(("group", value is "none" ? null : value)))" />
             </div>
         </div>
         <div class="rp-honesty-bar">
             <span>@L["Workbench:Activity:QueryAgeDescription"]</span>
-            @if (Postgres) { <span>@L["Workbench:Activity:PostgreSqlWaitNote"]</span> }
+            @if (Postgres) { <span aria-hidden="true">·</span><span>@L["Workbench:Activity:PostgreSqlWaitNote"]</span> }
         </div>
         @if (Rows.Count == 0)
         {
@@ -102,8 +91,16 @@
     private static readonly (string Key, MoVisualRole Role)[] FILTER_STATES =
         [("waiting", MoVisualRole.Error), ("idleTx", MoVisualRole.Warning), ("active", MoVisualRole.Info), ("idle", MoVisualRole.Neutral)];
 
+    private string Column(string key) => L[$"Persistence:SessionColumns:{key}"];
+    private string Available(string? value) => string.IsNullOrWhiteSpace(value) ? L["Persistence:Unavailable"].Value : value;
     private string StateLabel(string state) => state == "waiting" ? L[Postgres ? "Workbench:Activity:LockWait" : "Workbench:Activity:Waiting"]
         : L[$"Persistence:SessionStates:{state}"];
+    private string FilterLabel(string state) => state switch
+    {
+        "active" => L["Workbench:Activity:ActiveFilter"],
+        "idle" => L["Workbench:Activity:IdleFilter"],
+        _ => StateLabel(state)
+    };
     private static bool MatchesState(RepositoryActivityRow row, string state) => state == "waiting" ? row.Waiting == true : SessionState(row) == state;
     private static IComparable? SortValue(RepositoryActivityRow row, string sort) => sort switch
     {
@@ -127,38 +124,60 @@
     private RenderFragment Ledger(IEnumerable<RepositoryActivityRow> rows) => @<div class="rp-table-wrap">
         <table class="rp-table rp-session-table" aria-label="@L["Workbench:Activity:TableLabel"]">
             <thead><tr>
-                <th scope="col">@L["Workbench:Activity:Session"]</th><th scope="col">@L["Persistence:State"]</th>
-                <th scope="col">@L["Workbench:Activity:QueryAge"]</th><th scope="col">@L["Persistence:SessionOwner"]</th>
-                <th scope="col">@L["Persistence:SessionColumns:client"]</th><th scope="col">@L["Persistence:SessionColumns:query"]</th>
-                <th scope="col">@L["Persistence:Actions"]</th>
+                <th scope="col">@L["Workbench:Activity:Session"]</th>
+                <th scope="col">@L["Workbench:Activity:StateAndWait"]</th>
+                <th scope="col">@L["Workbench:Activity:SessionClient"]</th>
+                <th scope="col">@L["Workbench:Activity:SqlPreview"]</th>
+                <th scope="col" class="rp-query-age">@L["Workbench:Activity:QueryAge"]</th>
             </tr></thead>
             <tbody>
                 @foreach (var row in rows)
                 {
+                    var state = SessionState(row);
+                    var stateRole = state switch { "active" => MoVisualRole.Info, "idleTx" => MoVisualRole.Warning, _ => MoVisualRole.Neutral };
+                    var highlighted = row.Waiting == true || state == "idleTx" || IsLongActive(row);
                     <tr class="@(row.BackendId is not null && Workbench.Get("inspectSession") == row.BackendId ? "is-selected" : null)">
                         <td data-label="@L["Workbench:Activity:Session"]">
-                            @if (row.BackendId is { } id) { <a class="rp-row-link mono" href="@Inspect(id)">#@id</a> }
-                            else { <span>—</span> }
-                            <small class="mono">@row.DatabaseName</small>
-                            @if (!InDatabase(row, Database)) { <span class="rp-pill rp-pill-xs mo-vl-role--third">@L["Persistence:OtherDatabase"]</span> }
+                            <div class="rp-ledger-cell">
+                                @if (row.BackendId is { } id) { <a class="rp-row-link mono" href="@Inspect(id)">#@id</a> }
+                                else { <span>@Available(null)</span> }
+                                <span class="rp-session-db">
+                                    <span class="mono">@Available(row.DatabaseName)</span>
+                                    @if (!string.IsNullOrWhiteSpace(row.DatabaseName) && !InDatabase(row, Database))
+                                    {
+                                        <span class="rp-pill mo-vl-role--third">@L["Persistence:OtherDatabase"]</span>
+                                    }
+                                </span>
+                            </div>
                         </td>
-                        <td data-label="@L["Persistence:State"]">
-                            <span class="rp-pill rp-pill-xs @SessionRole(row).ToCssClass()"><i class="rp-swatch"></i>@StateLabel(SessionState(row))</span>
-                            @if (row.Waiting != false)
-                            {
-                                <span class="rp-pill rp-pill-xs @(row.Waiting == true ? "mo-vl-role--error" : "mo-vl-role--neutral")">@Waiting(row)</span>
-                            }
+                        <td data-label="@L["Workbench:Activity:StateAndWait"]">
+                            <div class="rp-ledger-cell">
+                                <span class="mo-vl-status mo-vl-status--pill @stateRole.ToCssClass()"><i class="mo-vl-status-dot" aria-hidden="true"></i>@Available(row.State)</span>
+                                <span class="rp-wait-line @(row.Waiting == true ? "is-waiting" : null)">
+                                    @if (row.Waiting == true) { <MoIcon Icon="@MoIcons.Hourglass" Size="13px" /> }
+                                    @Waiting(row)
+                                </span>
+                            </div>
                         </td>
-                        <td data-label="@L["Workbench:Activity:QueryAge"]"><strong class="mono rp-tinted @SessionRole(row).ToCssClass()">@Duration(row.Runtime, L)</strong></td>
-                        <td data-label="@L["Persistence:SessionOwner"]"><b>@(row.UserName ?? "—")</b><small>@row.ApplicationName</small></td>
-                        <td data-label="@L["Persistence:SessionColumns:client"]"><code>@(Client(row) ?? "—")</code><small>@row.Detail</small></td>
-                        <td data-label="@L["Persistence:SessionColumns:query"]"><code class="rp-query-preview">@(string.IsNullOrWhiteSpace(row.Query) ? "—" : row.Query)</code></td>
-                        <td data-label="@L["Persistence:Actions"]" class="rp-row-actions">
-                            @if (row.BackendId is { } key)
-                            {
-                                <MudIconButton Icon="@MoIcons.Search" Size="Size.Small" Href="@Inspect(key)" title="@L["Workbench:Activity:Inspect"]"
-                                               aria-label="@L["Workbench:Activity:InspectLabel", key, row.DatabaseName ?? "—"]" />
-                            }
+                        <td data-label="@L["Workbench:Activity:SessionClient"]">
+                            <div class="rp-ledger-cell">
+                                <b>@Available(row.ApplicationName)</b>
+                                <small class="mono">@Available(row.UserName) · @Available(Client(row))</small>
+                            </div>
+                        </td>
+                        <td data-label="@L["Workbench:Activity:SqlPreview"]" class="rp-sql-cell">
+                            <div class="rp-ledger-cell">
+                                <code class="rp-query-preview">@Available(row.Query)</code>
+                                @if (row.BackendId is { } key)
+                                {
+                                    <a class="rp-inspect-session" href="@Inspect(key)" aria-label="@L["Workbench:Activity:InspectLabel", key, Available(row.DatabaseName)]">
+                                        @L["Workbench:Activity:Inspect"]<MoIcon Icon="@MoIcons.ChevronRight" Size="15px" />
+                                    </a>
+                                }
+                            </div>
+                        </td>
+                        <td data-label="@L["Workbench:Activity:QueryAge"]" class="rp-query-age">
+                            <span class="mono @(highlighted ? "is-attention" : null)">@Duration(row.Runtime, L)</span>
                         </td>
                     </tr>
                 }

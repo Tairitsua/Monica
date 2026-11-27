@@ -13,9 +13,9 @@
 }
 <RepositoryContextPicker Workbench="Workbench" Context="Context" Label="@L["Persistence:ActivityProvenance"]"
                          Note="@($"{L["Persistence:ActivityProvenanceNote"]} {(peers.Length == 0 ? "" : L["Persistence:Peers", string.Join(" / ", peers.Select(peer => peer.Registration.DbContextName))].Value)}")">
-    <span class="rp-tag">@L[$"Persistence:Providers:{Provider(Context.ProviderName)}"]</span>
-    @if (guide.SourceObject is not null) { <code class="rp-tag">@guide.SourceObject</code> }
-    <MudButton Href="@Workbench.Url(("guide", "1"), ("inspectSession", null))" StartIcon="@MoIcons.FileText" Variant="Variant.Outlined" Size="Size.Small">@L["Persistence:GuideButton"]</MudButton>
+    <span class="mo-vl-capsule mo-vl-capsule--outline mo-vl-role--info">@L[$"Persistence:Providers:{Provider(Context.ProviderName)}"]</span>
+    @if (guide.SourceObject is not null) { <code class="mo-vl-capsule mo-vl-capsule--outline mo-vl-role--neutral">@guide.SourceObject</code> }
+    <RepositoryOutlineAction Href="@Workbench.Url(("guide", "1"), ("inspectSession", null))" Icon="@MoIcons.FileText" Label="@L["Persistence:GuideButton"]" />
 </RepositoryContextPicker>
 
 @if (state.RetainedActivityError is { } retainedError)

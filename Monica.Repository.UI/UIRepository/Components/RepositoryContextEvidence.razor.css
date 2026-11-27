@@ -1,0 +1,21 @@
+.rp-context-identity { display: flex; align-items: flex-start; gap: 12px; min-width: 0; }
+.rp-context-identity > div { flex: 1; min-width: 0; }
+.rp-context-identity p { margin: 0; color: var(--mud-palette-text-secondary); font-size: 12px; font-weight: 500; }
+.rp-context-identity h2 { margin: 2px 0 0; font-size: 18px; font-weight: 600; line-height: 1.3; overflow-wrap: anywhere; }
+.rp-context-flags,
+.rp-context-jumps,
+.rp-context-connection-actions { display: flex; flex-wrap: wrap; align-items: center; min-width: 0; }
+.rp-context-flags { gap: 6px; margin-block-start: 8px; padding-block-end: 12px; }
+.rp-context-jumps { gap: 8px; }
+.rp-context-connection-head { display: flex; flex-wrap: wrap; align-items: flex-start; gap: 8px 12px; }
+.rp-context-connection-head h3 { flex: 1 1 auto; }
+.rp-context-connection-actions { gap: 6px; }
+.rp-context-connection-actions ::deep .mo-copy-button.is-labelled {
+    min-height: 28px;
+    padding-inline: 10px;
+    border-color: var(--mud-palette-lines-inputs);
+    border-radius: var(--mo-input-border-radius, 6px);
+    font-size: 12.5px;
+    font-weight: 600;
+}
+.rp-context-probe ::deep .rp-key-values > div:first-child code { font-weight: 600; }

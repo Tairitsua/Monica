@@ -1,0 +1,58 @@
+.rp-ledger-title { min-width: 0; overflow-wrap: anywhere; }
+.rp-ledger-count {
+    flex: none;
+    padding: 1px 7px;
+    border-radius: 999px;
+    background: var(--mud-palette-background-gray);
+    color: var(--mud-palette-text-secondary);
+    font-size: 11px;
+    font-weight: 500;
+    line-height: 1.6;
+}
+.rp-ledger-body { display: grid; gap: 14px; }
+.rp-sort-controls { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; min-width: 0; max-width: 100%; margin-inline-start: auto; }
+.rp-act-ledger ::deep .rp-wait-filter .mo-vl-chip-dot { border-radius: 1px; transform: rotate(45deg); }
+
+.rp-act-ledger .rp-table.rp-session-table { table-layout: auto; font-size: 13px; line-height: 1.5; }
+.rp-act-ledger .rp-table.rp-session-table :is(th, td) { padding-block: 9px; }
+.rp-act-ledger .rp-table.rp-session-table th { background: var(--mud-palette-background-gray); font-weight: 500; }
+.rp-act-ledger .rp-session-table .rp-query-age { text-align: end; }
+.rp-query-age .is-attention { color: color-mix(in srgb, var(--mud-palette-warning) 76%, var(--mud-palette-text-primary)); font-weight: 600; }
+.rp-ledger-cell { display: flex; flex-direction: column; align-items: flex-start; gap: 3px; min-width: 0; }
+.rp-act-ledger .rp-ledger-cell small { font-size: 11.5px; }
+.rp-session-db { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 6px; font-size: 12px; color: var(--mud-palette-text-secondary); }
+.rp-wait-line { display: inline-flex; align-items: center; gap: 4px; color: var(--mud-palette-text-secondary); font-size: 11.5px; }
+.rp-wait-line ::deep .mo-icon { flex: none; }
+.rp-wait-line.is-waiting { color: color-mix(in srgb, var(--mud-palette-error) 76%, var(--mud-palette-text-primary)); font-weight: 600; }
+.rp-sql-cell { max-width: 440px; }
+.rp-query-preview {
+    display: -webkit-box;
+    overflow: hidden;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    font-size: 12px;
+    line-height: 1.45;
+    overflow-wrap: anywhere;
+}
+.rp-inspect-session {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    min-height: 28px;
+    margin-block-start: 4px;
+    margin-inline-start: -6px;
+    padding-inline: 6px;
+    border-radius: 6px;
+    color: var(--mud-palette-text-secondary);
+    font-size: 12.5px;
+    font-weight: 600;
+    text-decoration: none;
+}
+.rp-inspect-session:hover { background: var(--mud-palette-action-default-hover); color: var(--mud-palette-text-primary); }
+.rp-inspect-session:focus-visible { outline: 2px solid var(--mud-palette-primary); outline-offset: 2px; }
+
+@container repository-workbench (max-width: 740px) {
+    .rp-act-ledger .rp-table.rp-session-table td { max-width: none; padding-block: 4px; text-align: start; }
+    .rp-query-age > span { grid-column: 2; }
+    .rp-sort-controls { margin-inline-start: 0; }
+}

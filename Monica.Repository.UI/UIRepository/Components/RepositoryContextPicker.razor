@@ -3,18 +3,15 @@
 
 <div class="rp-ctx-strip mo-vl-surface">
     <div class="rp-ctx-strip-id">
-        <label class="rp-ctx-label">@Label</label>
+        <span id="@_labelId" class="rp-ctx-label">@Label</span>
         <div class="rp-ctx-select-row">
-            <div class="rp-select rp-context-picker">
-                <MudSelect T="string" Value="@Context.Registration.ContextId" ValueChanged="Workbench.Select" aria-label="@Label"
-                           Variant="Variant.Outlined" Margin="Margin.Dense" OpenIcon="@MoIcons.ChevronDown" CloseIcon="@MoIcons.ChevronUp">
-                    @foreach (var context in Workbench.State.Contexts)
-                    {
-                        <MudSelectItem T="string" Value="@context.Registration.ContextId">@Option(context)</MudSelectItem>
-                    }
-                </MudSelect>
-            </div>
-            <span class="rp-ctx-meta mono">@Context.Connection?.DataSource · @Context.Connection?.Database</span>
+            <RepositorySelect Value="@Context.Registration.ContextId" ValueChanged="Workbench.Select"
+                              Label="@Label" LabelId="@_labelId" Options="@Workbench.State.Contexts.ToDictionary(item => item.Registration.ContextId, Option)" />
+            <span class="rp-ctx-meta mono">
+                <span>@(Context.Connection?.DataSource ?? L["Persistence:Unavailable"].Value)</span>
+                <i aria-hidden="true"></i>
+                <span>@(Context.Connection?.Database ?? L["Persistence:Unavailable"].Value)</span>
+            </span>
         </div>
         @if (Note is not null) { <p class="rp-ctx-note">@Note</p> }
     </div>
@@ -27,6 +24,8 @@
     [Parameter, EditorRequired] public string Label { get; set; } = "";
     [Parameter] public string? Note { get; set; }
     [Parameter] public RenderFragment? ChildContent { get; set; }
+
+    private readonly string _labelId = $"rp-context-source-{Guid.NewGuid():N}";
 
     private string Option(RepositoryDbContextSnapshot context)
     {

@@ -1,12 +1,19 @@
 @inject IStringLocalizer<RepositoryUIResource> L
 
 <dl class="rp-key-values">
-    @foreach (var (label, value, copy) in Items)
+    @foreach (var (label, value, copy, role) in Items)
     {
         <div>
             <dt>@label</dt>
             <dd class="rp-key-value">
-                <code>@(string.IsNullOrWhiteSpace(value) ? L["Persistence:Unavailable"].Value : value)</code>
+                @if (role is { } visualRole)
+                {
+                    <span class="mo-vl-capsule @visualRole.ToCssClass()">@value</span>
+                }
+                else
+                {
+                    <code>@(string.IsNullOrWhiteSpace(value) ? L["Persistence:Unavailable"].Value : value)</code>
+                }
                 @if (copy && !string.IsNullOrWhiteSpace(value))
                 {
                     <MoCopyButton Value="@value" Label="@L["Persistence:CopyField", label]" />
@@ -17,5 +24,7 @@
 </dl>
 
 @code {
-    [Parameter, EditorRequired] public IReadOnlyList<(string Label, string? Value, bool Copy)> Items { get; set; } = [];
+    [Parameter, EditorRequired] public IReadOnlyList<Entry> Items { get; set; } = [];
+
+    public readonly record struct Entry(string Label, string? Value, bool Copy = false, MoVisualRole? Role = null);
 }

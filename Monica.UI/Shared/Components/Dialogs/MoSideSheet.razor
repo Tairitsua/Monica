@@ -4,7 +4,8 @@
 <MudDialog @ref="_dialog" VisibleChanged="OnVisibilityChangedAsync" Options="CurrentOptions"
            DefaultFocus="@(FocusCloseOnOpen && Dismissible ? DefaultFocus.None : DismissRequested.HasDelegate ? DefaultFocus.FirstChild : null)" OnBackdropClick="BackdropHandler"
            Gutters="false" TitleClass="pa-0" ContentClass="mo-side-sheet-content" ActionsClass="mo-side-sheet-footer"
-           Class="@(Compact ? "mo-side-sheet mo-side-sheet--compact" : "mo-side-sheet")" Style="@($"--mo-side-sheet-width: {Width}; --mo-side-sheet-expanded-width: {ExpandedWidth ?? Width};")"
+           Class="@($"mo-side-sheet {(Compact ? "mo-side-sheet--compact" : null)} {(InsetHeader ? "mo-side-sheet--inset-header" : null)}")"
+           Style="@($"--mo-side-sheet-width: {Width}; --mo-side-sheet-expanded-width: {ExpandedWidth ?? Width};")"
            AriaLabelledBy="@_headingId">
     <TitleContent>
         <div class="mo-side-sheet-heading">
@@ -26,7 +27,8 @@
         @if (TabPanels is not null)
         {
             <MudTabs Class="mo-side-sheet-tabs" ActivePanelIndex="ActiveTabIndex" ActivePanelIndexChanged="ActiveTabIndexChanged"
-                     Elevation="0" Rounded="false" MinimumTabWidth="0" PrevIcon="@MoIcons.ChevronLeft" NextIcon="@MoIcons.ChevronRight">
+                     Elevation="0" Rounded="false" MinimumTabWidth="0" HideSlider="InsetHeader"
+                     PrevIcon="@MoIcons.ChevronLeft" NextIcon="@MoIcons.ChevronRight">
                 @TabPanels
             </MudTabs>
         }

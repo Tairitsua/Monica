@@ -125,12 +125,12 @@
         }, EVIDENCE_FORMAT);
     }
 
-    private (string, string?, bool)[] Provenance =>
+    private RepositoryKeyValues.Entry[] Provenance =>
     [
-        (L["Workbench:Activity:Inspector:ContextType"], _context.Registration.FullName, false),
-        (L["Workbench:Activity:Inspector:ContextDatabase"], _context.Connection?.Database, false),
-        (L["Workbench:Activity:Inspector:Provider"], _context.ProviderName, false),
-        (L["Workbench:Activity:Inspector:CapturedAt"], UiTime.Format(_capturedAt), false)
+        new(L["Workbench:Activity:Inspector:ContextType"], _context.Registration.FullName),
+        new(L["Workbench:Activity:Inspector:ContextDatabase"], _context.Connection?.Database),
+        new(L["Workbench:Activity:Inspector:Provider"], _context.ProviderName),
+        new(L["Workbench:Activity:Inspector:CapturedAt"], UiTime.Format(_capturedAt))
     ];
 
     private (string, string?)[] Fields(RepositoryActivityRow row) =>

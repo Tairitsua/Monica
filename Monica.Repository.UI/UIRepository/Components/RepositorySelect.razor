@@ -1,0 +1,21 @@
+<div class="rp-fit-select @(Compact ? "is-compact" : null)">
+    <MudSelect T="string" Value="@Value" ValueChanged="ValueChanged" ToStringFunc="Display"
+               aria-label="@Label" aria-labelledby="@LabelId" Variant="Variant.Outlined" FitContent="true" Dense="true"
+               Margin="Margin.Dense" Typo="Typo.body2" OpenIcon="@MoIcons.ChevronDown" CloseIcon="@MoIcons.ChevronUp" IconSize="Size.Small">
+        @foreach (var (key, text) in Options)
+        {
+            <MudSelectItem T="string" @key="key" Value="@key">@text</MudSelectItem>
+        }
+    </MudSelect>
+</div>
+
+@code {
+    [Parameter, EditorRequired] public string Value { get; set; } = "";
+    [Parameter, EditorRequired] public EventCallback<string?> ValueChanged { get; set; }
+    [Parameter, EditorRequired] public string Label { get; set; } = "";
+    [Parameter, EditorRequired] public IReadOnlyDictionary<string, string> Options { get; set; } = null!;
+    [Parameter] public string? LabelId { get; set; }
+    [Parameter] public bool Compact { get; set; }
+
+    private string Display(string? key) => key is null ? "" : Options.GetValueOrDefault(key, key);
+}

@@ -127,13 +127,6 @@
 .rp-page ::deep .rp-scope-note .mo-icon { flex: none; margin-top: 1px; }
 .rp-page ::deep .rp-warn-note { color: color-mix(in srgb, var(--mud-palette-warning) 70%, var(--mud-palette-text-primary)); }
 
-.rp-page ::deep .rp-ctx-strip { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px 20px; padding: 12px 18px; }
-.rp-page ::deep .rp-ctx-strip-id { display: flex; flex-direction: column; gap: 5px; min-width: 0; flex: 1 1 440px; }
-.rp-page ::deep .rp-ctx-label { color: var(--mud-palette-text-secondary); font-size: 12px; font-weight: 600; }
-.rp-page ::deep :is(.rp-ctx-select-row, .rp-ctx-strip-end) { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; min-width: 0; }
-.rp-page ::deep :is(.rp-ctx-meta, .rp-ctx-note) { color: var(--mud-palette-text-secondary); font-size: 12px; line-height: 1.5; overflow-wrap: anywhere; }
-.rp-page ::deep .rp-ctx-note { max-width: 75ch; }
-.rp-page ::deep .rp-context-picker { flex: 0 1 480px; width: min(480px, 100%); }
 .rp-page ::deep .rp-select { min-width: 130px; max-width: 100%; }
 .rp-page ::deep .rp-select .mud-input { margin: 0; font-size: 13px; }
 .rp-page ::deep .rp-select .mud-input-slot { padding-block: 7px; min-height: 32px; }
@@ -203,10 +196,9 @@
 
 .rp-page ::deep .rp-surface-heading { flex-wrap: wrap; }
 .rp-page ::deep .rp-heading-copy { min-width: 0; flex: 1 1 260px; }
-.rp-page ::deep :is(.rp-inv, .rp-opts, .rp-act-ledger, .rp-mig-detail) .mo-vl-surface-body { display: grid; gap: 12px; }
-.rp-page ::deep :is(.rp-toolbar, .rp-chips, .rp-sort-controls, .rp-option-switch) { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; min-width: 0; }
+.rp-page ::deep :is(.rp-inv, .rp-opts, .rp-mig-detail) .mo-vl-surface-body { display: grid; gap: 12px; }
+.rp-page ::deep :is(.rp-toolbar, .rp-chips, .rp-option-switch) { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; min-width: 0; }
 .rp-page ::deep .rp-toolbar { gap: 10px 12px; }
-.rp-page ::deep .rp-sort-controls { margin-inline-start: auto; }
 .rp-page ::deep .rp-search { position: relative; flex: 1 1 220px; min-width: 0; max-width: 380px; }
 .rp-page ::deep .rp-search .mo-icon { position: absolute; inset-inline-start: 10px; top: 10px; color: var(--mud-palette-text-secondary); pointer-events: none; }
 .rp-page ::deep .rp-search input {
@@ -228,15 +220,12 @@
 .rp-page ::deep .rp-table small { display: block; color: var(--mud-palette-text-secondary); font-size: 11px; }
 .rp-page ::deep .rp-ctx-table th:is(:nth-child(1), :nth-child(2)) { width: 23%; }
 .rp-page ::deep .rp-ctx-table th:last-child { width: 135px; }
-.rp-page ::deep .rp-session-table th:nth-child(6) { width: 25%; }
-.rp-page ::deep .rp-session-table th:last-child { width: 76px; }
 .rp-page ::deep .rp-row-link { color: var(--mud-palette-text-primary); font-weight: 650; text-decoration: none; }
 .rp-page ::deep .rp-row-link:hover { color: var(--mud-palette-primary); text-decoration: underline; }
 .rp-page ::deep .rp-row-title { display: flex; align-items: center; flex-wrap: wrap; gap: 4px 6px; }
 .rp-page ::deep .rp-row-actions { white-space: nowrap; }
 .rp-page ::deep .rp-row-error { color: var(--mud-palette-error); }
-.rp-page ::deep :is(.rp-connection-preview, .rp-query-preview) { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--mud-palette-text-secondary); font-size: 11.5px; }
-.rp-page ::deep .rp-tinted { color: color-mix(in srgb, var(--mo-vl-role) 74%, var(--mud-palette-text-primary)); }
+.rp-page ::deep .rp-connection-preview { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--mud-palette-text-secondary); font-size: 11.5px; }
 .rp-page ::deep :is(.rp-honesty-bar, .rp-inline-info) {
     display: flex; align-items: center; flex-wrap: wrap; gap: 6px 10px; border-radius: 6px; padding: 8px 10px;
     background: var(--mud-palette-background); color: var(--mud-palette-text-secondary); font-size: 12px;

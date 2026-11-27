@@ -128,6 +128,8 @@ Indicators:
 - Border radii drift from the theme baseline without an intentional component contract, grow across nested surfaces, or global theme selectors override component-owned geometry
 - The implementation loses the prototype's typography, density, spacing rhythm, composition, surface roles, width utilization, or responsive reflow
 - Prototype acceptance checks only wide and phone layouts or lack matched owner widths; intermediate native breakpoints silently change the layout, or small repeated markers, icon tiles, badges and selected segments differ without rendered measurements
+- A compact control's wrapper appears aligned while its painted input, adornment, minimum height or native margin changes the toolbar geometry; inspect the computed inner control and the adjacent group together, including its dark-mode outline
+- A table cell merges independent state and severity into one paint role, or a portaled inspector's title badges, actions and tabs drift onto different gutters; compare the actual combined state and the stationary-to-scrolling boundary in the adopted design
 - Interface, hierarchy, and diagnostic text have no deliberate font-role separation, or monospace is used broadly as decoration
 - A font declared by the prototype/source is missing from local WOFF2 assets, lacks `@font-face`, fails offline, has no explicit fallback stack/CJK coverage, or is silently replaced by a fallback
 - Component CSS repainting global MudBlazor behavior that should be consistent across modules

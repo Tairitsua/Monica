@@ -56,6 +56,10 @@ public partial class MoSideSheet : IAsyncDisposable
     /// <summary>Uses the compact evidence padding in the identity and scrolling body. Defaults to false.</summary>
     [Parameter] public bool Compact { get; set; }
 
+    /// <summary>Aligns the stationary header and tab bar with the heading and body gutters. Defaults to false.</summary>
+    /// <remarks>Use with an unpadded <see cref="HeaderContent"/>. Each selected tab opens at the top of its own scrolling panel.</remarks>
+    [Parameter] public bool InsetHeader { get; set; }
+
     /// <summary>Gets or sets whether Close, Escape, and backdrop dismissal are enabled. Defaults to true.</summary>
     /// <remarks>Disabling dismissal does not prevent route retirement or disposal of owned business work.</remarks>
     [Parameter] public bool Dismissible { get; set; } = true;

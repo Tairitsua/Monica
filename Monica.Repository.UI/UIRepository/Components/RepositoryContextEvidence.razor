@@ -4,38 +4,40 @@
 @if (Workbench.Get("inspectContext") is { } id)
 {
     var context = Workbench.State.Contexts.FirstOrDefault(context => context.Registration.ContextId == id);
-    <MoSideSheet Open="true" DismissRequested="Workbench.CloseContextAsync" Width="560px" Compact="true" FocusCloseOnOpen="true"
+    var standing = context is null ? "error" : Standing(context);
+    <MoSideSheet Open="true" DismissRequested="Workbench.CloseContextAsync" Width="560px" Compact="true" InsetHeader="true" FocusCloseOnOpen="true"
                  ActiveTabIndex="ActiveTab" ActiveTabIndexChanged="TabChanged">
         <TitleContent>
-            <RepositoryEvidenceLayout>
-                <div class="rp-evidence-title">
-                    <span class="mo-vl-tile mo-vl-role--warning"><MoIcon Icon="@MoIcons.Database" Size="18px" /></span>
-                    <div><p>@L["Persistence:ContextDossier"]</p><h2>@(context?.Registration.DbContextName ?? L["Workbench:Messages:ContextMissing"].Value)</h2></div>
-                </div>
-            </RepositoryEvidenceLayout>
-        </TitleContent>
-        <HeaderContent>
-            <RepositoryEvidenceLayout>
-                <div class="rp-evidence-header">
+            <div class="rp-context-identity">
+                <span class="mo-vl-tile @StandingRole(standing).ToCssClass()"><MoIcon Icon="@MoIcons.Database" Size="16px" /></span>
+                <div>
+                    <p>@L["Persistence:ContextDossier"]</p>
+                    <h2>@(context?.Registration.DbContextName ?? L["Workbench:Messages:ContextMissing"].Value)</h2>
                     @if (context is not null)
                     {
-                        var standing = Standing(context);
-                        <div class="rp-evidence-marks">
-                            <span class="rp-evidence-pill @StandingRole(standing).ToCssClass()">@L[$"Persistence:Standing:{standing}"]</span>
-                            <span class="rp-evidence-pill mo-vl-role--info">@L[$"Persistence:Providers:{Provider(context.ProviderName)}"]</span>
+                        <div class="rp-context-flags">
+                            <span class="mo-vl-status mo-vl-status--pill @StandingRole(standing).ToCssClass()">
+                                <i class="mo-vl-status-dot" aria-hidden="true"></i>@L[$"Persistence:Standing:{standing}"]
+                            </span>
+                            <span class="mo-vl-capsule mo-vl-capsule--outline mo-vl-role--info">@L[$"Persistence:Providers:{Provider(context.ProviderName)}"]</span>
                             <MoCopyButton Value="@id" Label="@L["Persistence:CopyIdentity"]" />
-                        </div>
-                        <div class="rp-evidence-actions">
-                            <MudButton StartIcon="@MoIcons.ChartTrend" Variant="Variant.Outlined" Size="Size.Small" Href="@RepositoryRoute.Activity(id)">@L["Persistence:InspectActivity"]</MudButton>
-                            <MudButton StartIcon="@MoIcons.Workflow" Variant="Variant.Outlined" Size="Size.Small" Href="@RepositoryRoute.Migrations(id)">@L["Persistence:ReviewMigrations"]</MudButton>
                         </div>
                     }
                 </div>
-            </RepositoryEvidenceLayout>
+            </div>
+        </TitleContent>
+        <HeaderContent>
+            @if (context is not null)
+            {
+                <div class="rp-context-jumps">
+                    <RepositoryOutlineAction Icon="@MoIcons.ChartTrend" Href="@RepositoryRoute.Activity(id)" Label="@L["Persistence:InspectActivity"]" />
+                    <RepositoryOutlineAction Icon="@MoIcons.Workflow" Href="@RepositoryRoute.Migrations(id)" Label="@L["Persistence:ReviewMigrations"]" />
+                </div>
+            }
         </HeaderContent>
         <TabPanels>
             <MudTabPanel Text="@L["Persistence:ConnectionTab"]">
-                <RepositoryEvidenceLayout>
+                <RepositoryEvidenceLayout ContextDossier="true">
                     <div class="rp-evidence-content">
                         @if (context is null)
                         {
@@ -48,35 +50,52 @@
                             var shown = Workbench.State.RevealConnectionStrings
                                 ? connection?.RevealedConnectionString ?? connection?.MaskedConnectionString
                                 : connection?.MaskedConnectionString;
-                            @if (context.ErrorMessage is { } problem)
+                            @if (context.HasError || !context.CanConnect)
                             {
-                                <MoSemanticCallout Severity="MoVisualRole.Error" Title="@L["Persistence:Standing:error"]"><code class="rp-evidence-error">@problem</code></MoSemanticCallout>
+                                <MoSemanticCallout Severity="MoVisualRole.Error" Title="@L["Persistence:Standing:error"]">
+                                    @(context.ErrorMessage ?? L["Persistence:ProbeFailedDescription"].Value)
+                                </MoSemanticCallout>
                             }
-                            <section class="rp-evidence-section">
-                                <h3>@L["Persistence:ProbeResult"]</h3>
-                                <p>@L["Persistence:ProbeFact"]</p>
-                                <RepositoryKeyValues Items="@(
-                                    new (string, string?, bool)[] { (L["Persistence:Database"], connection?.Database, true),
-                                    (L["Persistence:DataSource"], connection?.DataSource, true) })" />
+                            <section class="rp-evidence-section rp-context-probe">
+                                <header>
+                                    <h3>@L["Persistence:ProbeResult"]</h3>
+                                    <p>@L["Persistence:ProbeFact"]</p>
+                                </header>
+                                <RepositoryKeyValues Items="@([new(L["Persistence:Database"], connection?.Database, Copy: true),
+                                                             new(L["Persistence:DataSource"], connection?.DataSource, Copy: true)])" />
                             </section>
                             <section class="rp-evidence-section">
-                                <div class="rp-evidence-heading">
+                                <header class="rp-context-connection-head">
                                     <h3>@L["Persistence:ConnectionString"]</h3>
-                                    <MudButton StartIcon="@(Workbench.State.RevealConnectionStrings ? MoIcons.EyeOff : MoIcons.Eye)" Size="Size.Small" Variant="Variant.Outlined"
-                                               aria-disabled="@(Workbench.Busy ? "true" : "false")" OnClick="Workbench.ToggleRevealAsync">@L[Workbench.State.RevealConnectionStrings ? "Persistence:Mask" : "Persistence:Reveal"]</MudButton>
-                                    <MoCopyButton Label="@L["Persistence:CopyConnection"]" Value="@shown">@L["Common:Actions:Copy"]</MoCopyButton>
-                                </div>
+                                    <div class="rp-context-connection-actions">
+                                        <RepositoryOutlineAction Icon="@(Workbench.State.RevealConnectionStrings ? MoIcons.EyeOff : MoIcons.Eye)" Busy="Workbench.Busy"
+                                                                 OnClick="Workbench.ToggleRevealAsync"
+                                                                 Label="@L[Workbench.State.RevealConnectionStrings ? "Persistence:DossierMask" : "Persistence:DossierReveal"]" />
+                                        @if (!string.IsNullOrEmpty(shown))
+                                        {
+                                            <MoCopyButton Label="@L["Persistence:CopyConnection"]" Value="@shown">@L["Common:Actions:Copy"]</MoCopyButton>
+                                        }
+                                    </div>
+                                </header>
                                 <pre class="rp-evidence-pre is-wrapped">@Available(shown)</pre>
-                                <p>@L["Persistence:RevealNote"]</p>
                             </section>
                             <section class="rp-evidence-section">
-                                <h3>@L["Persistence:Pool"]</h3>
-                                <p>@L["Persistence:PoolHonesty"]</p>
+                                <header>
+                                    <h3>@L["Persistence:Pool"]</h3>
+                                    <p>@L["Persistence:PoolHonesty"]</p>
+                                </header>
                                 <dl class="rp-key-values">
                                     <div><dt>@L["Persistence:Pooling"]</dt><dd>
-                                        <span class="rp-evidence-pill @(pool.Mode is "disabled" or "unknown" or "unspecified" ? "mo-vl-role--neutral" : "mo-vl-role--success")">
-                                            @L[connection?.Pool?.Pooling switch { true => "Persistence:Enabled", false => "Persistence:Disabled", _ => "Persistence:PoolUnspecified" }]
-                                        </span>
+                                        @if (connection?.Pool?.Pooling is { } enabled)
+                                        {
+                                            <span class="mo-vl-capsule @(enabled ? "mo-vl-role--success" : "mo-vl-role--neutral")">
+                                                @L[enabled ? "Persistence:Enabled" : "Persistence:Disabled"]
+                                            </span>
+                                        }
+                                        else
+                                        {
+                                            <code>@L["Persistence:PoolUnspecified"]</code>
+                                        }
                                     </dd></div>
                                     <div><dt>@L["Persistence:Maximum"]</dt><dd><code>@PoolBound(pool.Max, connection?.Pool?.MaxPoolSize)</code></dd></div>
                                     <div><dt>@L["Persistence:Minimum"]</dt><dd><code>@PoolBound(pool.Min, connection?.Pool?.MinPoolSize)</code></dd></div>
@@ -91,7 +110,7 @@
                 </RepositoryEvidenceLayout>
             </MudTabPanel>
             <MudTabPanel Text="@L["Persistence:OptionsTab"]" Disabled="@(context is null)">
-                <RepositoryEvidenceLayout>
+                <RepositoryEvidenceLayout ContextDossier="true">
                     @if (context is not null)
                     {
                         <div class="rp-evidence-content">
@@ -117,7 +136,7 @@
                 </RepositoryEvidenceLayout>
             </MudTabPanel>
             <MudTabPanel Text="@L["Persistence:SchemaTab"]" Disabled="@(context is null)">
-                <RepositoryEvidenceLayout>
+                <RepositoryEvidenceLayout ContextDossier="true">
                     @if (context is not null)
                     {
                         var status = context.MigrationStatus;
@@ -148,12 +167,17 @@
                                         <code class="rp-evidence-code">@migration</code>
                                     }
                                 </section>
-                                <section class="rp-evidence-section">
-                                    <h3>@L["Persistence:LatestApplied"]</h3>
-                                    <code class="rp-evidence-code">@Available(status.AppliedCurrentAssemblyMigrations.LastOrDefault())</code>
-                                </section>
+                                @if (status.AppliedCurrentAssemblyMigrations.LastOrDefault() is { } latest)
+                                {
+                                    <section class="rp-evidence-section">
+                                        <h3>@L["Persistence:LatestApplied"]</h3>
+                                        <code class="rp-evidence-pre is-wrapped">@latest</code>
+                                    </section>
+                                }
                             }
-                            <MudButton StartIcon="@MoIcons.Workflow" Variant="Variant.Filled" Color="Color.Primary" Size="Size.Small" Href="@RepositoryRoute.Migrations(id)">@L["Persistence:ReviewMigrations"]</MudButton>
+                            <div>
+                                <MudButton StartIcon="@MoIcons.Workflow" Variant="Variant.Filled" Color="Color.Primary" Size="Size.Small" Href="@RepositoryRoute.Migrations(id)">@L["Persistence:ReviewMigrations"]</MudButton>
+                            </div>
                         </div>
                     }
                 </RepositoryEvidenceLayout>
@@ -170,11 +194,12 @@
     private string Available(string? value) => string.IsNullOrWhiteSpace(value) ? L["Persistence:Unavailable"] : value;
     private string PoolBound(int? limit, int? explicitValue) => limit is null ? L["Persistence:Unavailable"]
         : explicitValue is null ? L["Persistence:DefaultPoolBound", limit.Value] : limit.Value.ToString();
-    private (string, string?, bool)[] ProviderFields(RepositoryDbContextSnapshot context) => [
-        (L["Persistence:Provider"], context.ProviderName, false),
-        (L["Persistence:OptionNames:Registration:ProviderType"], context.Registration.ProviderType.ToString(), false),
-        (L["Persistence:ContextType"], context.Registration.FullName, true),
-        (L["Persistence:OptionNames:Registration:AssemblyName"], context.Registration.AssemblyName, false),
-        (L["Persistence:AssemblyName"], context.MigrationAssembly, false)
+    private RepositoryKeyValues.Entry[] ProviderFields(RepositoryDbContextSnapshot context) => [
+        new(L["Persistence:Provider"], context.ProviderName),
+        new(L["Persistence:OptionNames:Registration:ProviderType"], context.Registration.ProviderType.ToString(),
+            Role: context.Registration.ProviderType == DbContextProviderType.UnitOfWork ? MoVisualRole.Primary : MoVisualRole.Info),
+        new(L["Persistence:ContextType"], context.Registration.FullName, Copy: true),
+        new(L["Persistence:OptionNames:Registration:AssemblyName"], context.Registration.AssemblyName),
+        new(L["Persistence:AssemblyName"], context.MigrationAssembly)
     ];
 }

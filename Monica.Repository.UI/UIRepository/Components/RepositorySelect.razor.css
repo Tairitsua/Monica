@@ -1,0 +1,37 @@
+.rp-fit-select {
+    --rp-select-height: 36px;
+    --rp-select-font-size: 13px;
+    min-width: 0;
+    max-width: 100%;
+}
+.rp-fit-select.is-compact { --rp-select-height: 32px; --rp-select-font-size: 12.5px; }
+.rp-fit-select ::deep .mud-select.mud-width-content { max-width: 100%; }
+.rp-fit-select ::deep .mud-input-control { margin: 0; }
+.rp-fit-select ::deep .mud-select-input.mud-input-outlined {
+    height: var(--rp-select-height);
+    min-width: 0;
+    margin: 0;
+    padding-inline: 10px;
+    border-radius: var(--mo-input-border-radius, 6px);
+    background: var(--mud-palette-surface);
+    font-size: var(--rp-select-font-size);
+    font-weight: 400;
+}
+.rp-fit-select ::deep .mud-select-input .mud-input-slot {
+    flex: 1 1 0;
+    width: 0;
+    min-width: 0;
+    padding: 0;
+    font: inherit;
+}
+.rp-fit-select ::deep .mud-select-input .mud-input-adornment-end { flex: none; margin-inline-start: 4px; }
+.rp-fit-select ::deep :is(.mud-input-adornment, .mud-select-filler) .mud-icon-root { width: 16px; height: 16px; }
+.rp-fit-select ::deep .mud-select-input .mud-input-outlined-border { border-color: var(--mud-palette-lines-inputs); }
+.rp-fit-select ::deep .mud-select-input:hover .mud-input-outlined-border { border-color: var(--mud-palette-text-secondary); }
+.rp-fit-select ::deep .mud-select-input:focus-within .mud-input-outlined-border { border-color: var(--mud-palette-primary); }
+.rp-fit-select ::deep .mud-select-filler {
+    max-width: calc(100% - 20px);
+    margin-inline: 10px !important;
+    overflow: hidden;
+}
+.rp-fit-select ::deep .mud-select-filler .mud-typography { font-size: var(--rp-select-font-size); font-weight: 400; }

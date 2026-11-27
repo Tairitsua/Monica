@@ -1,5 +1,6 @@
-<div class="rp-evidence-root">@ChildContent</div>
+<div class="rp-evidence-root @(ContextDossier ? "rp-evidence-root--context" : null)">@ChildContent</div>
 
 @code {
     [Parameter, EditorRequired] public RenderFragment? ChildContent { get; set; }
+    [Parameter] public bool ContextDossier { get; set; }
 }
