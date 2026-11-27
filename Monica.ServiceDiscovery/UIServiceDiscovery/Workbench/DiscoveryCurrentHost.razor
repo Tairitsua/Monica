@@ -1,0 +1,197 @@
+@inherits DiscoveryComponent
+
+<DiscoverySignature Label="@T("hostDecisionLabel")" Value="@Num(Instance.Age)" Unit="@($"{T("hostDecisionUnit")} · {T("hbHealth:" + Instance.Health)}")"
+                    Role="@HeartbeatRole(Instance.Health)" Facts="@Facts">
+    <Reasons>
+        <span><span class="sw role-info"></span><b>@Host.AppName</b></span>
+        <span><span class="sw role-@(Snapshot.IsLeader ? "primary" : "neutral") @(Snapshot.IsLeader ? "is-diamond" : null)"></span><b>@LocalLeaderLabel</b></span>
+        <span><span class="sw role-third"></span><b>@Version</b></span>
+    </Reasons>
+    <Finding>
+        <MoRichFinding Template="@T("hostFinding")" Values="@FindingSlots" />
+        <text> </text>@Reconciliation
+    </Finding>
+    <ChildContent>
+        <div class="sv-host-runway">
+            <div class="sv-host-runway-head">
+                <div><h2>@T("hostRunwayTitle")</h2><p>@T("hostRunwayDesc")</p></div>
+                <a class="btn btn-outline btn-sm" href="@Workbench.Here(("inspect", Host.AppId), ("tab", null))"><MoIcon Icon="@MoIcons.ArrowUpRight" Size="15px" />@T("hostOpenParentSheet")</a>
+            </div>
+            <div class="sv-runway-bar" role="img" aria-label="@($"{T("hostFields:hbAge")}: {T("secUnit", Num(Instance.Age))} / {T("hzRegFlag", Num(Instance.Ttl))}")">
+                <div class="sv-runway-track">
+                    <span class="sv-hz-zone-warn" style="left:@Pct(Instance.Warn, Scale);right:0"></span>
+                    <span class="sv-runway-fill role-@HeartbeatRole(Instance.Health)" style="width:@Pct(Instance.Age ?? 0, Scale)"></span>
+                    <span class="sv-hz-rule is-period" style="left:@Pct(Instance.Period, Scale)"></span>
+                    <span class="sv-hz-rule is-warn" style="left:@Pct(Instance.Warn, Scale)"></span>
+                    <span class="sv-hz-rule is-leader" style="left:@Pct(Policy.LeaderTTL.TotalSeconds, Scale)"></span>
+                    @if (Instance.Age is { } age)
+                    {
+                        <span class="sv-runway-pin role-@HeartbeatRole(Instance.Health)" style="left:@Pct(age, Scale)"><b class="mono">@T("ageSeconds", Num(age))</b></span>
+                    }
+                </div>
+                <div class="sv-runway-axis mono">
+                    <span style="left:0%">0s</span>
+                    <span style="left:@Pct(Instance.Period, Scale)">@T("hzPeriodFlag", Num(Instance.Period))</span>
+                    <span class="is-warn" style="left:@Pct(Instance.Warn, Scale)">@T("hzWarnFlag", Num(Instance.Warn))</span>
+                    <span style="left:@Pct(Policy.LeaderTTL.TotalSeconds, Scale)">@T("hzLeaderFlag", Num(Policy.LeaderTTL.TotalSeconds))</span>
+                    <span class="is-end" style="left:@Pct(Instance.Ttl, Scale)">@T("hzRegFlag", Num(Instance.Ttl))</span>
+                </div>
+            </div>
+        </div>
+    </ChildContent>
+</DiscoverySignature>
+
+<DiscoverySurface Title="@T("hostPlaneTitle")" Detail="@T("hostPlaneDesc")" Icon="@MoIcons.ShieldCheck"
+                  Role="@(Model.Agreement == "split" ? "error" : "info")">
+    <Aside>
+        @if (Snapshot.IsLeader && Workbench.Autonomous)
+        {
+            <DiscoveryLeaderAction AppId="@Host.AppId" InstanceId="@Host.InstanceId" Release OnSuccess="Workbench.RefreshAsync" />
+        }
+    </Aside>
+    <ChildContent>
+        <div class="mo-vl-surface-body sv-planes-body">
+            <MoSemanticCallout Severity="@PlaneRole" Title="@T("hostAgreementLabel:" + Model.Agreement)">@Reconciliation</MoSemanticCallout>
+            <div class="sv-planes-grid">
+                <section class="sv-plane-card">
+                    <header class="sv-plane-head"><h3>@T("hostLocalPlane")</h3><DiscoveryBadge Role="@(Snapshot.IsLeader ? "primary" : "neutral")" Diamond="@Snapshot.IsLeader">@LocalLeaderLabel</DiscoveryBadge></header>
+                    @if (!Snapshot.IsLeaderElectionEnabled || !Workbench.Autonomous)
+                    {
+                        <p class="sv-dim">@T("hostElectionDisabled")</p>
+                    }
+                    else
+                    {
+                        <dl class="kv is-single">
+                            <div><dt>@T("hostFields:localStatus")</dt><dd><DiscoveryBadge Role="@(Snapshot.IsLeader ? "primary" : "neutral")" Diamond="@Snapshot.IsLeader">@LocalLeaderLabel</DiscoveryBadge></dd></div>
+                            @Fact("hostFields:becameLeaderAt", UiTime.Format(Snapshot.LeaderBecomeTime))
+                            @Fact("hostFields:termId", Snapshot.CurrentTermId, true)
+                        </dl>
+                    }
+                </section>
+                <section class="sv-plane-card">
+                    <header class="sv-plane-head"><h3>@T("hostLeasePlane")</h3><code class="sv-dim">@Workbench.Settings!.LeaderLeaseStore?.Scope</code></header>
+                    @if (Snapshot.ClusterLeaderState is not { } lease) { <p class="sv-dim">@T("hostNoLease")</p> }
+                    else
+                    {
+                        <dl class="kv is-single">
+                            @Fact("hostFields:leaseApp", lease.AppId, true)
+                            <div><dt>@T("hostFields:leaseHolder")</dt><dd><code>@lease.InstanceId</code><MoCopyButton Value="@lease.InstanceId" Label="@T("copyId")" />
+                                @if (lease.InstanceId == Host.InstanceId) { <span class="chip role-info">@T("thisHostTag")</span> }
+                            </dd></div>
+                            @Fact("hostFields:leaseAcquired", UiTime.Format(lease.BecomeLeaderTime))
+                            @Fact("leaseExpires", UiTime.Format(lease.ExpiresAt))
+                        </dl>
+                    }
+                </section>
+            </div>
+        </div>
+    </ChildContent>
+</DiscoverySurface>
+
+<div class="sv-host-two-col">
+    <DiscoverySurface Title="@T("hostConfigTitle")" Detail="@T("hostConfigDesc")" Icon="@MoIcons.Sliders" Role="third">
+        <div class="mo-vl-surface-body">
+            <DiscoveryElectionPolicy Policy="@Policy" Settings="@(Workbench.Settings!)" />
+            <p class="sv-config-note">@T("hostStateTransitionNote")</p>
+        </div>
+    </DiscoverySurface>
+    <DiscoverySurface Title="@T("hostBuildTitle")" Icon="@MoIcons.Fingerprint" Role="info">
+        <div class="mo-vl-surface-body">
+            <dl class="kv is-single">
+                @Fact("hostFields:appName", Host.AppName)
+                @Fact("hostFields:appId", Host.AppId, true)
+                @Fact("hostFields:instanceId", Host.InstanceId, true)
+                @Fact("hostFields:project", Host.ProjectName)
+                @Fact("hostFields:releaseVer", Host.ReleaseVersion)
+                <div><dt>@T("hostFields:domains")</dt><dd>
+                    @foreach (var domain in Host.GetDomainNames()) { <a class="chip is-outline" href="@Workbench.Link(DiscoveryWorkbench.DOMAINS, ("domain", domain))">@domain</a> }
+                </dd></div>
+                <div><dt>@T("hostFields:roles")</dt><dd>
+                    @foreach (var role in Host.RoleIds)
+                    {
+                        <a class="sv-role-pill sv-role-pill-link role-@HealthRole(Model.RoleById.GetValueOrDefault(role)?.Status)" href="@Workbench.Link("health-checks/roles", ("role", role))"><span class="sw"></span><code>@role</code></a>
+                    }
+                </dd></div>
+            </dl>
+        </div>
+    </DiscoverySurface>
+</div>
+
+@if (Model.ServiceById.GetValueOrDefault(Host.AppId) is { Instances.Count: > 0 } app)
+{
+    <DiscoverySurface Title="@T("hostSiblingsTitle")" Detail="@T("hostSiblingsDesc", Host.AppId)" Icon="@MoIcons.Server">
+        <div class="sv-table-wrap">
+            <table class="table sv-table">
+                <thead><tr>@foreach (var label in SiblingColumns) { <th scope="col">@T(label)</th> }</tr></thead>
+                <tbody>
+                    @foreach (var row in app.Instances)
+                    {
+                        var self = row.State.InstanceId == Host.InstanceId;
+                        <tr @key="row.State.InstanceId" class="@(self ? "is-selected" : null)">
+                            <td data-label="@T("hostFields:instanceId")"><div class="sv-sib-id mono"><span>@row.State.InstanceId</span>@if (self) { <span class="chip role-info">@T("thisHostTag")</span> }</div></td>
+                            <td data-label="@T("hostFields:status")"><DiscoveryBadge Role="@StatusRole(row.State.Status)">@T("statuses:" + row.State.Status)</DiscoveryBadge></td>
+                            <td data-label="@T("colInstances")"><DiscoveryBadge Role="@(row.State.IsLeader ? "primary" : "neutral")" Diamond="@row.State.IsLeader">@T(row.State.IsLeader ? "leaderStatuses:Leader" : "leaderStatuses:Follower")</DiscoveryBadge></td>
+                            <td data-label="@T("colFreshness")"><DiscoveryBadge Role="@HeartbeatRole(row.Health)">@T("hbHealth:" + row.Health) · @T("ageSeconds", Num(row.Age))</DiscoveryBadge></td>
+                            <td data-label="@T("colBuild")"><code class="@(row.Version != Instance.Version ? "sv-skew-tag role-warning" : null)">@(row.Version ?? "—")</code></td>
+                            <td data-label="@T("colEndpoints")"><code>@(row.State.Metadata.GetValueOrDefault("K8S_LISTENING_ADDRESSES") ?? row.State.Metadata.GetValueOrDefault("LISTENING_ADDRESS") ?? "—")</code></td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    </DiscoverySurface>
+}
+
+<DiscoverySurface Title="@T("hostMetadataTitle")" Detail="@T("hostMetadataDesc")" Icon="@MoIcons.Braces" Role="neutral">
+    <div class="mo-vl-surface-body"><DiscoveryMetadata Metadata="@Host.Metadata" /></div>
+</DiscoverySurface>
+
+@code {
+    private static readonly string[] SiblingColumns = ["hostFields:instanceId", "hostFields:status", "colInstances", "colFreshness", "colBuild", "colEndpoints"];
+    private DiscoveryEvidence Model => Workbench.Evidence!;
+    private CurrentInstanceSnapshot Snapshot => Model.Host;
+    private InstanceRow Instance => Model.LocalInstance;
+    private InstanceState Host => Instance.State;
+    private ElectionConfig Policy => Model.Election;
+    private double Scale => Math.Max(Instance.Ttl, Instance.Age ?? 0);
+    private string Version => Instance.Version is { } version ? $"v{version}" : "—";
+    private string LocalLeaderLabel => Snapshot.IsLeaderElectionEnabled && Workbench.Autonomous
+        ? T("leaderStatuses:" + Snapshot.CurrentLeaderStatus) : T("hostRoles:" + Workbench.Settings!.Role);
+
+    private MoVisualRole PlaneRole => Model.Agreement switch
+    {
+        "split" => MoVisualRole.Error, "match" => MoVisualRole.Success, _ => MoVisualRole.Info
+    };
+
+    private string Reconciliation => Model.Agreement switch
+    {
+        "split" when Snapshot.ClusterLeaderState is { } lease => T("hostAgreementSplit", lease.InstanceId),
+        "split" => T("hostSplitMissing"),
+        "match" => T("hostAgreementMatch"),
+        "sibling" => T("hostAgreementSibling", Snapshot.ClusterLeaderState!.InstanceId),
+        _ => T("hostAgreementNone")
+    };
+
+    private IReadOnlyList<DiscoverySignature.Fact> Facts =>
+    [
+        new("success", T("hostFields:status"), T("statuses:" + (Model.LocalRegistration?.State.Status ?? ServiceStatus.Offline)), Host.AppId),
+        new("info", T("hostFields:lastHb"), UiTime.FormatTime(KnownTime(Host.LastHeartbeatTime)), UiTime.Format(KnownTime(Host.LastHeartbeatTime))),
+        new("neutral", T("hostFields:regTime"), UiTime.FormatTime(KnownTime(Host.RegistrationTime)), UiTime.Format(KnownTime(Host.RegistrationTime))),
+        new("third", T("hostFields:assemblyVer"), Version, $"{T("hostFields:buildTime")}: {UiTime.Format(KnownTime(Host.BuildTime))}")
+    ];
+
+    private RenderFragment[] FindingSlots =>
+    [
+        @<MoValueMark Role="MoVisualRole.Info">@Host.AppName</MoValueMark>,
+        @<code>@Host.InstanceId</code>,
+        @<MoValueMark Role="@(Instance.Health switch { "Unhealthy" => MoVisualRole.Warning, "Offline" => MoVisualRole.Error, "Healthy" => MoVisualRole.Success, _ => MoVisualRole.Neutral })">@T("secUnit", Num(Instance.Age))</MoValueMark>,
+        @<span>@Num(Instance.Period)</span>,
+        @<span>@Num(Instance.Ttl)</span>
+    ];
+
+    private RenderFragment Fact(string label, string? value, bool copy = false) => @<div>
+        <dt>@T(label)</dt><dd><span class="mono">@(value ?? "—")</span>
+            @if (copy && !string.IsNullOrEmpty(value)) { <MoCopyButton Value="@value" Label="@T("copyId")" /> }
+        </dd>
+    </div>;
+}

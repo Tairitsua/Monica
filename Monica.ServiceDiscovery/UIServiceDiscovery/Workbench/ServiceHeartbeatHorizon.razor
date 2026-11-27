@@ -1,0 +1,119 @@
+@inherits DiscoveryComponent
+
+<div class="sv-hz" @onmouseleave="Clear">
+    <div class="sv-hz-head">
+        <div class="sv-hz-title">
+            <h2>@T("hzTitle")</h2>
+            <p>@T("hzDesc", Num(Period), Num(Warn), Num(LeaderTtl), Num(RegistrationTtl))</p>
+        </div>
+        <div class="sv-hz-legend" aria-label="@T("hzTitle")">
+            <span><span class="sw role-success"></span>@T("hzLegendFresh")</span>
+            <span><span class="sw role-warning"></span>@T("hzLegendOverdue")</span>
+            <span><span class="sw role-info"></span>@T("hzLegendUpdating")</span>
+            <span><span class="sw is-diamond role-primary"></span>@T("hzLegendLeader")</span>
+            <span><span class="sv-ev-ring"></span>@T("hzLegendDisappeared")</span>
+            <span><span class="sw is-hatch"></span>@T("hzLegendPredefined")</span>
+        </div>
+    </div>
+    <div class="sv-hz-axis-row" aria-hidden="true">
+        <div class="sv-hz-axis-label">@T("colService")</div>
+        <div class="sv-hz-axis-track">
+            <span class="sv-hz-tick" style="left:0%"><b>0s</b></span>
+            <span class="sv-hz-tick is-period" style="left:@Pct(Period, _scale)"><b>@T("hzPeriodFlag", Num(Period))</b></span>
+            <span class="sv-hz-tick is-warn" style="left:@Pct(Warn, _scale)"><b>@T("hzWarnFlag", Num(Warn))</b></span>
+            <span class="sv-hz-tick is-leader" style="left:@Pct(LeaderTtl, _scale)"><b>@T("hzLeaderFlag", Num(LeaderTtl))</b></span>
+            <span class="sv-hz-tick is-end" style="left:@Pct(RegistrationTtl, _scale)"><b>@T("hzRegFlag", Num(RegistrationTtl))</b></span>
+        </div>
+        <div class="sv-hz-axis-meta">@T("colInstances")</div>
+    </div>
+    <div class="sv-hz-lanes" data-sv-keygrid role="group" aria-label="@T("hzTitle")">
+        @foreach (var row in Model.Services)
+        {
+            <div @key="row.Id" class="sv-hz-lane @(row.Offline ? "is-offline" : null) @(Workbench.Param("inspect") == row.Id ? "is-selected" : null)" data-sv-keyrow>
+                <a class="sv-hz-label" href="@Workbench.Here(("inspect", row.Id), ("tab", null))" @onmouseenter="() => Read(row, row.Instances.FirstOrDefault())">
+                    <span class="sv-hz-svc-top"><b title="@row.Name">@row.Name</b></span>
+                    <span class="sv-hz-svc-sub">
+                        <small class="mono">@row.Id</small>
+                        @if (row.Skew) { <span class="sv-hz-pill role-warning">@T("hzSkewBadge", row.Versions.Count)</span> }
+                        @if (row.State.EvictedInstances.Count > 0) { <span class="sv-hz-pill role-warning">@T("hzDisappearedTag", row.State.EvictedInstances.Count)</span> }
+                    </span>
+                </a>
+                <div class="sv-hz-track">
+                    <span class="sv-hz-zone-warn" style="left:@Pct(Warn, _scale);right:0" aria-hidden="true"></span>
+                    <span class="sv-hz-rule is-period" style="left:@Pct(Period, _scale)" aria-hidden="true"></span>
+                    <span class="sv-hz-rule is-warn" style="left:@Pct(Warn, _scale)" aria-hidden="true"></span>
+                    <span class="sv-hz-rule is-leader" style="left:@Pct(LeaderTtl, _scale)" aria-hidden="true"></span>
+                    @if (row.Offline)
+                    {
+                        <button type="button" class="sv-hz-offline-bar hatch" data-sv-keymark aria-label="@Readout(row, null)"
+                                @onmouseenter="() => Read(row, null)" @onfocus="() => Read(row, null)" @onkeydown="ClearOnEscape"
+                                @onclick="() => Workbench.OpenService(row.Id)">@T("hzNoInstances")</button>
+                    }
+                    else
+                    {
+                        <span class="sv-hz-baseline" aria-hidden="true"></span>
+                        @foreach (var instance in row.Instances.Where(instance => instance.Age is not null))
+                        {
+                            var overlap = row.Instances.TakeWhile(item => item != instance).Count(item => Math.Abs((item.Age ?? -99) - instance.Age!.Value) < 2);
+                            var offset = overlap == 0 ? 0 : overlap % 2 == 1 ? -9 : 9;
+                            <button @key="instance.State.InstanceId" type="button" data-sv-keymark
+                                    class="sv-hz-mark role-@MarkRole(instance) @(instance.State.IsLeader ? "is-leader" : null) @(instance.State.InstanceId == Model.Host.CurrentInstance.InstanceId && row.Id == Model.Host.CurrentInstance.AppId ? "is-self" : null)"
+                                    style="left:@Pct(instance.Age!.Value, _scale);--dy:@(offset)px" aria-label="@Readout(row, instance)"
+                                    @onmouseenter="() => Read(row, instance)" @onfocus="() => Read(row, instance)" @onkeydown="ClearOnEscape"
+                                    @onclick="() => Workbench.OpenService(row.Id)"><span class="sv-hz-dot" aria-hidden="true"></span></button>
+                        }
+                        @if (row.State.EvictedInstances.Count > 0)
+                        {
+                            <span class="sv-hz-evicted-pin" title="@T("hzDisappearedTag", row.State.EvictedInstances.Count)" aria-hidden="true"></span>
+                        }
+                    }
+                </div>
+                <div class="sv-hz-meta mono">
+                    @if (row.Offline) { <b class="role-error sv-hz-meta-num">0</b><small>@T("expectedOnly")</small> }
+                    else { <b>@row.State.RunningInstanceCount/@row.Instances.Count</b><small class="@(row.Overdue ? "is-warn" : null)">@(row.Oldest is { } oldest ? Num(oldest.Age) + "s" : "—")</small> }
+                </div>
+            </div>
+        }
+    </div>
+    <div class="sv-hz-readout @(_activeService is null ? null : "is-active")" role="status" aria-live="polite">
+        <span class="sv-hz-readout-dot role-@(_activeInstance is not null ? MarkRole(_activeInstance) : _activeService is not null ? "error" : "info")"></span>
+        <span class="mono">@(_activeService is not null ? Readout(_activeService, _activeInstance) : T("hzReadoutIdle"))</span>
+    </div>
+</div>
+
+@code {
+    private DiscoveryEvidence Model => Workbench.Evidence!;
+    private double Period => Model.Election.HeartbeatPeriod.TotalSeconds;
+    private double Warn => Period * 1.5;
+    private double LeaderTtl => Model.Election.LeaderTTL.TotalSeconds;
+    private double RegistrationTtl => Model.Election.RegistrationTTL.TotalSeconds;
+    private double _scale;
+    private ServiceRow? _activeService;
+    private InstanceRow? _activeInstance;
+
+    protected override void OnParametersSet()
+    {
+        _scale = Model.Services.SelectMany(service => service.Instances).Select(instance => instance.Age ?? 0)
+            .Append(RegistrationTtl).Max();
+        if (_activeService is { } active && Model.ServiceById.TryGetValue(active.Id, out var updated))
+        {
+            Read(updated, updated.Instances.FirstOrDefault(instance => instance.State.InstanceId == _activeInstance?.State.InstanceId));
+        }
+        else Clear();
+    }
+
+    private void Read(ServiceRow row, InstanceRow? instance) => (_activeService, _activeInstance) = (row, instance);
+    private void Clear() => (_activeService, _activeInstance) = (null, null);
+    private void ClearOnEscape(KeyboardEventArgs key) { if (key.Key == "Escape") Clear(); }
+
+    private string Readout(ServiceRow row, InstanceRow? instance) => instance is null
+        ? T("hzReadoutPredefined", row.Name, row.Id)
+        : T("hzReadoutInst", row.Name, instance.State.InstanceId, Num(instance.Age),
+            T("hbHealth:" + instance.Health), T(instance.State.IsLeader ? "leaderStatuses:Leader" : "leaderStatuses:Follower"), instance.Version ?? "—");
+
+    private static string MarkRole(InstanceRow instance) => instance.State.Status switch
+    {
+        ServiceStatus.Error => "error", ServiceStatus.Updating when instance.Health == "Healthy" => "info",
+        _ => HeartbeatRole(instance.Health)
+    };
+}

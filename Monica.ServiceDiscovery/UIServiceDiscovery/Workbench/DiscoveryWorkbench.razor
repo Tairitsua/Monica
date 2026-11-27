@@ -1,0 +1,91 @@
+@inherits DiscoveryComponent
+
+<PageTitle>@Title</PageTitle>
+<div class="mo-workbench-container sv-frame" @ref="_root">
+    <div class="mo-page-shell mo-page-shell--workbench mo-page-shell--full-width sv-page" data-view="@View">
+        <MoPageMasthead Title="@Title" Crumb="@T("eyebrow")" Icon="@Current.Icon">
+            <Meta>
+                <DiscoveryBadge Role="@Posture.Role" Live="@(Posture.Key == "live")">@T(Posture.Key)</DiscoveryBadge>
+                @if (IsEndpoint)
+                {
+                    <span class="chip is-outline is-mono"><MoIcon Icon="@MoIcons.Monitor" Size="13px" /><MoCopyButton Value="@(Endpoints?.Host ?? Environment.MachineName)" Label="@T("copyId")">@T("epHostChip", Endpoints?.Host ?? Environment.MachineName, Endpoints?.ProcessId ?? Environment.ProcessId)</MoCopyButton></span>
+                }
+                else
+                {
+                    <span class="chip is-outline is-mono"><MoIcon Icon="@MoIcons.Database" Size="13px" /><MoCopyButton Value="@StorageKey" Label="@T("copyId")">@T("scopeChip", StorageKey)</MoCopyButton></span>
+                }
+                <span class="chip is-outline" title="@UiTime.TimeZone.Id">@T("tzChip", UiTime.FormatZoneLabel(CapturedAt))</span>
+            </Meta>
+            <Actions>
+                <div class="mh-stamp">
+                    <span>@T("captured")</span>
+                    <b title="@UiTime.Format(CapturedAt)">@(CapturedAt is null ? T("notCaptured") : UiTime.FormatTime(CapturedAt))</b>
+                </div>
+                @if (CanPoll)
+                {
+                    <button type="button" class="btn btn-outline sv-auto" role="switch" aria-checked="@Bool(Auto)" @onclick="ToggleAuto">
+                        <span class="status-dot role-@(Error is not null ? "warning" : Auto ? "info" : "neutral")" aria-hidden="true"></span>
+                        @(Error is not null ? T("autoFailing") : Auto ? T("autoOn", ServiceDiscoveryPageState.RefreshInterval.TotalSeconds) : T("autoOff"))
+                    </button>
+                }
+                <button type="button" class="btn btn-primary" disabled="@_busy" @onclick="RefreshAsync">
+                    <MoIcon Icon="@MoIcons.Refresh" Size="16px" />@T(IsEndpoint ? "epRefreshAction" : "refresh")
+                </button>
+            </Actions>
+        </MoPageMasthead>
+        <MoWorkbenchNavigation Compact Label="@T("navLabel")" Class="sv-wbn">
+            @foreach (var route in Routes.Where(route => Membership is not null || route.View == "Endpoints"))
+            {
+                var pill = RailMark(route.View);
+                <a class="sv-wbn-link" href="@Link(route.Path)" aria-current="@(route.View == View ? "page" : null)">
+                    <MoIcon Icon="@route.Icon" Size="15px" /><span>@T(route.View + ":Nav")</span>
+                    @if (pill is { } mark) { <span class="sv-wbn-count role-@mark.Role">@mark.Label</span> }
+                </a>
+            }
+        </MoWorkbenchNavigation>
+        @if (Error is not null && CapturedAt is not null || !Autonomous && !IsEndpoint)
+        {
+            <div class="sv-notices">
+                @if (Error is not null && CapturedAt is not null)
+                {
+                    <MoSemanticCallout Severity="MoVisualRole.Warning" Title="@T("staleTitle")">@T(IsEndpoint ? "endpointStaleBody" : "staleBody", UiTime.Format(CapturedAt)) <code>@Error</code></MoSemanticCallout>
+                }
+                @if (!Autonomous && !IsEndpoint)
+                {
+                    <MoSemanticCallout Severity="MoVisualRole.Neutral" Icon="@MoIcons.Lock" Title="@T("manualTitle")">@T("manualBody")</MoSemanticCallout>
+                }
+            </div>
+        }
+        @if (CapturedAt is null)
+        {
+            <section class="mo-vl-surface sv-state-panel">
+                <MoContentState Loading="@(Error is null)">
+                    <span class="tile role-@(Error is null ? "info" : "error")"><MoIcon Icon="@(Error is null ? MoIcons.Refresh : MoIcons.Error)" Size="18px" /></span>
+                    <h2>@T(Error is null ? IsEndpoint ? "epLoadingTitle" : "loadingTitle" : "loadFailedTitle")</h2>
+                    <p>@T(Error is null ? IsEndpoint ? "epLoadingBody" : "loadingBody" : "loadFailedBody")</p>
+                    @if (Error is not null)
+                    {
+                        <p class="mono sv-state-err" role="alert">@Error</p>
+                        <button type="button" class="btn btn-primary" @onclick="RefreshAsync">@T("retry")</button>
+                    }
+                </MoContentState>
+            </section>
+        }
+        else
+        {
+            <CascadingValue Value="@(new DiscoveryContext(this))">
+                @switch (View)
+                {
+                    case "Registry": <ServiceRegistry /> break;
+                    case "Dependencies": <DependencyWorkbench /> break;
+                    case "Domains": <SubdomainDirectory /> break;
+                    case "Host": <DiscoveryCurrentHost /> break;
+                }
+                @if (Membership is not null)
+                {
+                    <DiscoveryInspectorHost />
+                }
+            </CascadingValue>
+        }
+    </div>
+</div>

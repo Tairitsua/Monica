@@ -1,12 +1,9 @@
 @namespace Monica.ServiceDiscovery.Pages
 @attribute [Route(PAGE_URL)]
-@using Monica.ServiceDiscovery.UIServiceDiscovery.Components
-@using Monica.ServiceDiscovery.Localization
-@inject IStringLocalizer<ServiceDiscoveryResource> L
-@inject NavigationManager Navigation
-<PageTitle>@L["Workbench:Views:Dependencies:Title"]</PageTitle>
-<DiscoveryWorkbench View="Dependencies"><DomainDependencyVisualization OnDomainClick="OpenDomain" /></DiscoveryWorkbench>
+@using Monica.ServiceDiscovery.UIServiceDiscovery.Workbench
+
+<DiscoveryWorkbench View="Dependencies" />
+
 @code {
     public const string PAGE_URL = "/service-discovery-manage/dependencies";
-    private void OpenDomain(string domain) => Navigation.NavigateTo(UIServiceDiscoveryDomainsPage.PAGE_URL + "?domain=" + Uri.EscapeDataString(domain));
 }

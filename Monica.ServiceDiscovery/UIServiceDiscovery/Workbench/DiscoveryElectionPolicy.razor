@@ -1,0 +1,24 @@
+@inherits DiscoveryComponent
+@using Monica.Modules
+
+<dl class="kv @(Compact ? "is-single" : null)">
+    <div><dt>@T("hostFields:hbPeriod")</dt><dd class="mono">@T("secUnit", Policy.HeartbeatPeriodSeconds) (±@T("msUnit", Policy.HeartbeatJitterMilliseconds))</dd></div>
+    <div><dt>@T("hostFields:leaderTtl")</dt><dd class="mono">@Formula(Policy.LeaderOfflineTTLMultiplier, Policy.LeaderOfflineTTLAdditionalSeconds, Policy.LeaderTTL)</dd></div>
+    <div><dt>@T("hostFields:instTtl")</dt><dd class="mono">@Formula(Policy.RegistrationOfflineTTLMultiplier, Policy.RegistrationOfflineTTLAdditionalSeconds, Policy.RegistrationTTL)</dd></div>
+    <div><dt>@T("hostFields:hostRole")</dt><dd>@T("hostRoles:" + Settings.Role)</dd></div>
+    <div><dt>@T("hostFields:storageMode")</dt><dd>@T("storageModes:" + Settings.StorageMode)</dd></div>
+    @if (!Compact)
+    {
+        <div><dt>@T("leaseStandbyInterval")</dt><dd class="mono">@T("secUnit", Num(Policy.LeaseStandbyInterval.TotalSeconds))</dd></div>
+        <div><dt>@T("leaseOperationTimeout")</dt><dd class="mono">@T("secUnit", Num(Policy.LeaseOperationTimeout.TotalSeconds))</dd></div>
+        <div><dt>@T("hostAuthority")</dt><dd class="mono">@(Settings.LeaderLeaseStore?.ServiceKey ?? nameof(Monica.Modules.ModuleServiceDiscovery))</dd></div>
+    }
+</dl>
+
+@code {
+    [Parameter] public bool Compact { get; set; }
+    [Parameter, EditorRequired] public ModuleServiceDiscoveryOption Settings { get; set; } = default!;
+    [Parameter, EditorRequired] public ElectionConfig Policy { get; set; } = default!;
+    private string Formula(double multiplier, int extra, TimeSpan ttl) =>
+        T("ttlFormula", Policy.HeartbeatPeriodSeconds, Num(multiplier), extra, Num(ttl.TotalSeconds));
+}

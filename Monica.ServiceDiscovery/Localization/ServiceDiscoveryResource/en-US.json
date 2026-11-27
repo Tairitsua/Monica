@@ -4,371 +4,10 @@
       "Title": "Service Discovery"
     }
   },
-  "Shared": {
-    "Actions": {
-      "Cancel": "Cancel",
-      "Clear": "Clear",
-      "Close": "Close",
-      "Refresh": "Refresh",
-      "SelectAll": "Select all",
-      "ViewDetails": "View details"
-    },
-    "Formats": {
-      "SecondsValue": "{0} s",
-      "StatusCount": "{0} ({1})"
-    },
-    "HeartbeatHealth": {
-      "Healthy": "Healthy",
-      "Offline": "Offline",
-      "Unhealthy": "Unhealthy"
-    },
-    "Labels": {
-      "AutoRefresh": "Auto refresh",
-      "RefreshIntervalSeconds": "Refresh interval (sec)"
-    },
-    "LeaderStatuses": {
-      "Follower": "Follower",
-      "Leader": "Leader",
-      "Looking": "Looking",
-      "Unknown": "Unknown"
-    },
-    "ServiceStatuses": {
-      "Error": "Error",
-      "Offline": "Offline",
-      "Running": "Running",
-      "Unhealthy": "Unhealthy",
-      "Unknown": "Unknown",
-      "Updating": "Updating"
-    },
-    "Values": {
-      "Roles": "Observed roles",
-      "NotAvailable": "Not available",
-      "NotSet": "Not set",
-      "NotSpecified": "Not specified",
-      "Unknown": "Unknown"
-    }
-  },
-  "Page": {},
   "CurrentInstance": {
     "Errors": {
       "ClientInfoNotConfigured": "Service Discovery client info is not configured for the current service.",
       "LoadFailed": "Failed to load current instance information: {0}"
-    },
-    "Fields": {
-      "AppName": "App name",
-      "AssemblyVersion": "Assembly version",
-      "BuildTime": "Build time",
-      "CurrentTermId": "Current term",
-      "CurrentStatus": "Current status",
-      "InstanceId": "Instance ID",
-      "LastHeartbeat": "Last heartbeat",
-      "LeaderBecomeTime": "Became leader at",
-      "LeaderInstanceId": "Leader instance ID",
-      "Metadata": "Metadata",
-      "RegistrationTime": "Registration time",
-      "ReleaseVersion": "Release version",
-      "AppId": "App ID"
-    },
-    "HeaderTitle": "Current instance",
-    "Sections": {
-      "ClusterLeaderInfo": "Cluster leader information",
-      "LeaderStatus": "Leader status"
-    },
-    "States": {
-      "LeaderElectionDisabled": "Leader election service is not enabled."
-    }
-  },
-  "DomainFilter": {
-    "Labels": {
-      "DomainFilter": "Domain filter",
-      "Search": "Search domains",
-      "SearchHelp": "Search by domain name, display name, or description",
-      "ShowOnlyWithDependencies": "Show only domains with dependencies",
-      "ShowOnlyWithServices": "Show only domains with services"
-    }
-  },
-  "DomainLayout": {
-    "Labels": {
-      "LayoutType": "Layout type",
-      "NodeSpacing": "Node spacing: {0}",
-      "RepulsionStrength": "Repulsion strength: {0}"
-    },
-    "Types": {
-      "Circular": "Circular",
-      "Force": "Force-directed",
-      "Hierarchy": "Hierarchy",
-      "RadialTree": "Radial tree"
-    }
-  },
-  "DomainList": {
-    "Counts": {
-      "OwnedServices": "{0} services",
-      "RelatedDependencies": "+{0} dependencies"
-    },
-    "Messages": {
-      "LoadFailed": "Failed to load domain list: {0}",
-      "RefreshFailed": "Failed to refresh domain list: {0}"
-    },
-    "States": {
-      "Empty": "No domains available.",
-      "Loading": "Loading domains..."
-    },
-    "Summary": {
-      "DependentBy": "Depended on by: {0}",
-      "DomainName": "Domain: {0}",
-      "OwnedServices": "Owned services: {0}"
-    },
-    "Title": "Domain list"
-  },
-  "DomainDetail": {
-    "Actions": {
-      "BackToList": "Back to domain list"
-    },
-    "Counts": {
-      "Services": "{0} services"
-    },
-    "Fields": {
-      "DependentServices": "Services depending on this domain",
-      "DisplayName": "Display name",
-      "Name": "Domain name",
-      "OwnedServices": "Owned services",
-      "RunningServices": "Running services"
-    },
-    "Messages": {
-      "LoadFailed": "Failed to load domain details: {0}",
-      "Refreshed": "Domain details refreshed."
-    },
-    "Sections": {
-      "BasicInfo": "Domain information"
-    },
-    "ServiceCard": {
-      "Domain": "Domain: {0}",
-      "ExternalDependency": "External dependency",
-      "Id": "ID: {0}",
-      "InstancesRunning": "{0}/{1} instances running",
-      "Project": "Project: {0}"
-    },
-    "States": {
-      "LoadFailed": "Failed to load domain details.",
-      "LoadingDetail": "Loading domain details...",
-      "LoadingServices": "Loading services...",
-      "NoDependentServices": "No observed external service owns a collected caller to this domain.",
-      "NoOwnedServices": "No services belong to this domain."
-    },
-    "Tabs": {
-      "DependentServices": "Dependent services ({0})",
-      "OwnedServices": "Owned services ({0})"
-    }
-  },
-  "DomainGraph": {
-    "ContextMenu": {
-      "ClearFilters": "Clear all filters",
-      "CopyDomainName": "Copy domain name",
-      "FilterDomainServices": "Filter services in this domain",
-      "FocusDomain": "Focus this domain",
-      "ShowDependencies": "Show dependencies",
-      "ViewDomainDetails": "View domain details"
-    },
-    "Graph": {
-      "Labels": {
-        "AndMore": "and {0} more",
-        "ClickToViewDetails": "Click to view details",
-        "DependencyServiceCount": "API usage records",
-        "NoRelatedServices": "No related services",
-        "RelatedServices": "Related services ({0})",
-        "ServiceCount": "Service count",
-        "StatusCount": "{0}: {1}"
-      }
-    },
-    "Messages": {
-      "ClearedFilters": "Cleared all filters.",
-      "CopiedDomainName": "Domain name copied to clipboard.",
-      "FilteredDomain": "Filtered domain: {0}",
-      "LoadFailed": "Failed to load domain graph data: {0}",
-      "ShowingDependencies": "Showing dependencies related to {0}"
-    },
-    "Title": "Domain dependency graph"
-  },
-  "ServiceFilter": {
-    "Labels": {
-      "DomainFilter": "Domain filter",
-      "Search": "Search services",
-      "SearchHelp": "Search by service name, AppId, project, or domain",
-      "ShowOnlyWithInstances": "Show only services with instances",
-      "StatusFilter": "Status filter"
-    }
-  },
-  "ServiceLayout": {
-    "Labels": {
-      "LayoutType": "Layout type",
-      "NodeSpacing": "Node spacing: {0}",
-      "RepulsionStrength": "Repulsion strength: {0}"
-    },
-    "Types": {
-      "Circular": "Circular",
-      "Force": "Force-directed",
-      "Grid": "Grid",
-      "Hierarchy": "Hierarchy"
-    }
-  },
-  "ServiceList": {
-    "Columns": {
-      "AppId": "App ID",
-      "AssemblyVersion": "Assembly version",
-      "BuildTime": "Build time",
-      "Domain": "Domain",
-      "InstanceCount": "Instances",
-      "LastHeartbeat": "Last heartbeat",
-      "OverallStatus": "Overall status",
-      "ProjectName": "Project",
-      "ServiceName": "Service name"
-    },
-    "Dialogs": {
-      "ServiceDetailTitle": "Service details"
-    }
-  },
-  "ServiceDetailDialog": {
-    "Title": "Service details - {0}"
-  },
-  "ServiceGraph": {
-    "ContextMenu": {
-      "ClearFilters": "Clear all filters",
-      "CopyServiceId": "Copy service ID",
-      "CopyServiceName": "Copy service name",
-      "FilterSameDomain": "Filter same domain",
-      "FilterSameProject": "Filter same project",
-      "FilterSameStatus": "Filter same status",
-      "FocusService": "Focus this service",
-      "ViewServiceDetails": "View service details"
-    },
-    "Graph": {
-      "Labels": {
-        "AppId": "AppId",
-        "Domain": "Domain",
-        "Instances": "Instances",
-        "Project": "Project",
-        "Status": "Status",
-        "Version": "Version"
-      }
-    },
-    "Messages": {
-      "ClearedFilters": "Cleared all filters.",
-      "CopiedServiceId": "Service ID copied to clipboard.",
-      "CopiedServiceName": "Service name copied to clipboard.",
-      "FilteredDomain": "Filtered domain: {0}",
-      "FilteredProject": "Filtered project: {0}",
-      "FilteredStatus": "Filtered status: {0}",
-      "LoadException": "An exception occurred while loading service data: {0}"
-    },
-    "Summary": {
-      "ShowingServices": "Showing {0} / {1} services"
-    },
-    "Title": "Service topology"
-  },
-  "ServiceDetail": {
-    "Configuration": {
-      "Fields": {
-        "AdditionalSeconds": "Additional seconds",
-        "CalculatedValue": "Calculated value",
-        "HeartbeatJitterHelper": "Random jitter range for heartbeat transmission.",
-        "HeartbeatJitterMilliseconds": "Heartbeat jitter (ms)",
-        "HeartbeatPeriodHelper": "Interval between instance heartbeats.",
-        "HeartbeatPeriodSeconds": "Heartbeat period (sec)",
-        "InstanceTtl": "Instance TTL",
-        "LeaderTtl": "Leader TTL",
-        "Multiplier": "Multiplier",
-        "HostRole": "Host role",
-        "StateStoreMode": "State store mode"
-      },
-      "Messages": {
-        "StateTransition": "Membership heartbeats and lease renewal run independently. Exhausted heartbeat retries stop renewal and cancel leader work; the host stays running."
-      },
-      "Sections": {
-        "ElectionConfig": "Election configuration",
-        "RuntimeMode": "Runtime mode",
-        "TtlConfig": "TTL configuration"
-      },
-      "Values": {
-        "DistributedStorage": "Distributed state store",
-        "ExternalKeyedStorage": "External keyed state store",
-        "MemoryStorage": "Process-local memory state store",
-        "RegistryRole": "Registry control plane",
-        "StandaloneRole": "Standalone control plane and worker",
-        "WorkerRole": "Worker"
-      }
-    },
-    "Dialogs": {
-      "ConfirmActionTitle": "Confirm action",
-      "ConfirmDelete": "Delete"
-    },
-    "ElectionStatus": {
-      "Actions": {
-        "ForceDeleteLeader": "Force delete leader"
-      },
-      "Descriptions": {
-        "Follower": "The current instance is a follower waiting to become the leader.",
-        "Leader": "The current instance is the cluster leader and coordinates work.",
-        "Looking": "Leader election is in progress."
-      },
-      "Fields": {
-        "BecameLeaderAt": "Became leader at:",
-        "CurrentTermId": "Current term:"
-      },
-      "Sections": {
-        "CurrentStatus": "Current election status",
-        "Description": "Election state description",
-        "Management": "Leader management"
-      },
-      "Tooltips": {
-        "CurrentTermId": "Unique acquisition identifier; renewal retains it."
-      },
-      "Warnings": {
-        "ForceDeleteLeader": "Force deleting the leader will remove the current leader status from the leader instance and trigger a new election. This action is mainly intended for development and testing scenarios."
-      }
-    },
-    "Instances": {
-      "Columns": {
-        "AssemblyVersion": "Assembly version",
-        "BuildTime": "Build time",
-        "HeartbeatHealth": "Heartbeat health",
-        "InstanceId": "Instance ID",
-        "LastHeartbeat": "Last heartbeat",
-        "RegistrationTime": "Registration time",
-        "ReleaseVersion": "Release version",
-        "Role": "Role",
-        "Status": "Status"
-      }
-    },
-    "Messages": {
-      "DeleteLeaderFailed": "Failed to delete leader: {0}",
-      "DeleteLeaderSucceeded": "Leader deleted. A new election will start shortly."
-    },
-    "Metadata": {
-      "InstanceTitle": "Instance {0} metadata",
-      "States": {
-        "NoInstances": "No instance information available.",
-        "NoMetadata": "This instance has no metadata."
-      }
-    },
-    "Overview": {
-      "Fields": {
-        "AppId": "App ID",
-        "DomainName": "Domain name",
-        "ProjectName": "Project name",
-        "ServiceName": "Service name"
-      }
-    },
-    "Status": {
-      "RunningInstances": "Running instances: {0}",
-      "Title": "Service status",
-      "TotalInstances": "Total instances: {0}"
-    },
-    "Tabs": {
-      "Configuration": "Configuration",
-      "ElectionStatus": "Election status",
-      "Instances": "Instances ({0})",
-      "Metadata": "Metadata",
-      "Overview": "Overview"
     }
   },
   "Service": {
@@ -387,184 +26,623 @@
   },
   "Workbench": {
     "ReadFailed": "The selected provider could not supply a discovery capture. Check the host logs for the failed read.",
-    "Eyebrow": "Monica / Discovery atlas",
-    "Navigation": "Service Discovery workspaces",
     "Views": {
       "Registry": {
-        "Title": "Service registry",
-        "Label": "Registry",
         "Description": "Read the current membership, compare reported instance evidence, and inspect expected services that have no registrations."
       },
       "Atlas": {
         "Title": "Service atlas",
-        "Label": "Service atlas",
         "Description": "Explore the service inventory spatially, with a complete native roster alongside the map."
       },
       "Dependencies": {
         "Title": "Subdomain dependencies",
-        "Label": "Dependencies",
         "Description": "Inspect compiled cross-domain API usages and their calling types. This map does not measure live traffic."
       },
       "Domains": {
         "Title": "Subdomain directory",
-        "Label": "Subdomains",
         "Description": "Explore shared domain metadata, observed owning services, and services that own API callers."
       },
       "Host": {
         "Title": "Current host",
-        "Label": "Current host",
         "Description": "Inspect this instance’s registration and election evidence in the context of its application and selected store."
       },
       "Endpoints": {
         "Title": "Endpoint discovery",
-        "Label": "Endpoints",
         "Description": "Resolve logical destinations and inspect actual HTTP evidence."
       }
-    },
-    "RegistryScope": "Selected store / current snapshot",
-    "Membership": "Registration membership",
-    "RegistryComposition": "{0} registered services · {1} instances",
-    "MembershipHelp": "An unexpired registration confirms membership in this store. It is separate from host readiness and health probes.",
-    "RegistryReadFailed": "Registry capture failed",
-    "RegistryTitle": "Services & instance evidence",
-    "ExpectedCount": "{0} predefined services have no current registrations",
-    "LoadingRegistry": "Reading registrations",
-    "EmptyRegistry": "No services in this capture",
-    "EmptyRegistryHelp": "The provider read succeeded and returned no registrations or predefined services.",
-    "FilterMiss": "No matching evidence",
-    "FilterMissHelp": "Adjust the search or selections to show services in the captured registry.",
-    "ResetFilters": "Reset filters",
-    "ShownCount": "{0} / {1} services shown",
-    "ObservedInstanceHelp": "Build and heartbeat cells show one observed instance; inspect a service for every instance.",
-    "Registered": "registered",
-    "ExpectedOnly": "predefined only",
-    "HeartbeatReportedLeader": "heartbeat-reported leader",
-    "ObservedBuild": "Observed build",
-    "Actions": "Actions",
-    "CopyId": "Copy application ID {0}",
-    "InspectService": "Inspect service {0}",
-    "CatalogScope": "Catalog / read-only",
-    "DomainCatalog": "Subdomain catalog",
-    "CatalogHelp": "Domain metadata comes from the shared domain catalog; service membership comes from registration snapshots.",
-    "CatalogReadFailed": "Catalog capture failed",
-    "FindDomain": "Find a subdomain",
-    "CatalogEntries": "Catalog entries",
-    "CatalogEmpty": "The catalog returned no subdomains.",
-    "SelectedDomain": "Selected subdomain",
-    "NoCatalogDescription": "No description was supplied by the catalog.",
-    "DomainServicesFailed": "Related service evidence could not be read",
-    "DomainServicesUnavailable": "The catalog identity remains available. Ownership and dependency evidence are unavailable for this failed refresh.",
-    "Ownership": "Ownership",
-    "OwnedServices": "Owning services",
-    "OwnedServicesHelp": "Registrations that report this subdomain as their owner.",
-    "InstancesCount": "{0} registered instances",
-    "NoOwnedServices": "No captured service reports this subdomain as its owner.",
-    "Declarations": "Compiled API usages",
-    "DependentServices": "External caller services",
-    "DependentServicesHelp": "Observed services whose roles or domains own collected API calls to this domain. This does not prove execution.",
-    "NoDependentServices": "No observed external service owns a collected caller to this domain.",
-    "ChooseDomain": "Choose a subdomain",
-    "ChooseDomainHelp": "Select a catalog entry to inspect its identity and service relationships.",
-    "DomainUnlisted": "This endpoint is outside the catalog",
-    "DomainUnlistedHelp": "{0} has no matching catalog definition. A dependency declaration alone does not establish a registered subdomain.",
-    "QueryingHost": "Querying host",
-    "CurrentHostScope": "Inspect this host’s identity, registration evidence and local election state alongside the application’s provider lease.",
-    "CurrentHostReadFailed": "Current host capture failed",
-    "LastSuccessfulCapture": "The last successful capture remains visible below.",
-    "CapturedUTC": "Captured at",
-    "FrozenUTC": "Frozen at",
-    "RegistrationEvidence": "Registration evidence",
-    "LocalTimes": "Event timestamps are shown in local time.",
-    "HeartbeatAgeAtCapture": "Heartbeat age at capture",
-    "HeartbeatAgeSeconds": "{0:N0} seconds",
-    "BuildIdentity": "Build identity",
-    "LocalElectionScope": "Local election state belongs to the querying host. It is independent of the provider’s current application leader lease.",
-    "LeaseScope": "Provider lease for this application at capture time. Acquisition time remains unchanged during renewal.",
-    "NoLeaderLease": "No leader lease was present in the successful provider read.",
-    "MetadataScope": "Metadata exposed by this host at capture time.",
-    "NoCurrentHostCapture": "No current host capture yet",
-    "NoCurrentHostCaptureHelp": "Refresh to read this host and its application’s provider lease.",
-    "FrozenServiceCapture": "Frozen service capture",
-    "FrozenServiceHelp": "This inspector retains the selected service read. Directory polling does not replace its registration or metadata evidence.",
-    "InstanceEvidenceScope": "Leadership badges reflect the captured registration heartbeat. Disappearances are observations made by this UI, rather than provider eviction records.",
-    "HeartbeatInferenceScope": "Heartbeat health is evaluated at capture time using the querying host’s heartbeat period and registration TTL. Event timestamps use local time.",
-    "HeartbeatInferenceFrozenScope": "Heartbeat health is evaluated when this inspector freezes the selected read, using the querying host’s heartbeat period and registration TTL. The original read time is unavailable. Event timestamps use local time.",
-    "ObservedDisappearance": "Observed disappearance",
-    "DisappearanceObservedAt": "Disappearance observed at",
-    "ConfigurationScope": "These settings belong to the querying host and were captured when the inspector opened. They do not describe the selected remote service’s configuration.",
-    "ForceDeleteScope": "Revoke the current leader lease for application {0}. Membership remains registered, and a host may acquire a new term on its next election attempt.",
-    "LeaderDeleteCaptureUnchanged": "The delete completed. This frozen capture remains unchanged; refresh the directory for new provider evidence.",
-    "ForceDeleteConfirmation": "Delete the current leader key for application {0}? This targets the application key even if leadership changed since capture. It does not remove registrations or stop a host, and the lease may be acquired again.",
-    "CatalogUnavailable": "Catalog evidence is unavailable. Refresh to retry; a failed read does not establish that this endpoint is absent.",
-    "SortBy": "Order by",
-    "ReverseSort": "Reverse sort direction"
-  },
-  "Atlas": {
-    "Shared": {
-      "Layout": "Layout",
-      "Filters": "Filters",
-      "FitView": "Fit view",
-      "Loading": "Capturing the registry…",
-      "Refreshing": "Refreshing snapshot…",
-      "RetainedSnapshot": "Refresh failed · previous snapshot retained",
-      "CaptureFailed": "Registry snapshot unavailable",
-      "RetryHint": "Refresh to try reading the provider again.",
-      "GraphUnavailable": "The visual atlas could not be loaded",
-      "NativeAlternative": "Use the evidence list beside the map to inspect the same captured records.",
-      "FilterMiss": "No records match these filters",
-      "FilterMissHint": "Clear or adjust the filters to bring records back into view.",
-      "NativeEvidence": "Readable evidence",
-      "RecordActions": "Actions for {0}",
-      "Captured": "Snapshot captured",
-      "GestureHint": "Drag to pan · scroll to zoom · select a node to inspect",
-      "StatusLegend": "Registry status legend",
-      "ClipboardFailed": "The browser could not copy this value. Try copying it directly from the readable evidence."
-    },
-    "Services": {
-      "Eyebrow": "Membership atlas",
-      "Description": "Explore the services visible in this registry, then inspect their registered instances and identity.",
-      "MapLabel": "Service map",
-      "Roster": "Service roster",
-      "RosterHint": "The same filtered services, readable and accessible without using the graph.",
-      "InstanceCount": "{0} registered instances",
-      "NoEdges": "These are registry members. No service-to-service dependency edges are inferred from domain membership.",
-      "MembershipHint": "Registry presence describes membership; it does not prove application health or availability.",
-      "Empty": "No services in this snapshot",
-      "EmptyHint": "Registered services and preloaded catalog entries will appear when the provider returns them."
-    },
-    "Domains": {
-      "Eyebrow": "Static API dependency map",
-      "Description": "Follow published API uses in the compiled application catalog. Placement and live registrations are separate evidence.",
-      "MapLabel": "Directed domain map",
-      "MapSummary": "{0}/{1} domains · {2}/{3} relationships",
-      "Evidence": "Dependency evidence",
-      "Ledger": "API usages",
-      "Roster": "Domains",
-      "LedgerHint": "Each row is a source domain → target domain relationship. Expand the evidence to inspect calling types and operations.",
-      "RosterHint": "Catalog and observed domains in this view, including those without collected API dependencies.",
-      "ServiceCount": "{0} services in this domain",
-      "Declarations": "{0} API usage records",
-      "Unlisted": "Unlisted endpoint",
-      "UnlistedEdge": "Includes an endpoint absent from the domain catalog",
-      "UnlistedDescription": "This identity appears in observed membership or dependency evidence but is absent from the domain catalog.",
-      "UnlistedSummary": "{0} is not registered in the shared domain catalog.",
-      "FocusRelationship": "Show related API usages",
-      "EdgeHint": "Arrows show compiled API usage, not observed traffic. Same-domain calls are omitted from this cross-domain view.",
-      "CatalogNode": "Catalog domain",
-      "SnapshotHint": "Dependencies come from this host’s compiled product catalog; counts and membership come from the registry snapshot.",
-      "Empty": "No domains to display",
-      "EmptyHint": "Configure shared domain metadata or include a generated application catalog.",
-      "EmptyRoster": "No endpoints in the current view",
-      "EmptyLedger": "No collected cross-domain API usages in this view",
-      "Unassigned": "Unassigned",
-      "UnassignedScope": "{0} services have no observed owning domain. Inspect their identities in Unassigned; dependency ownership is not inferred from application names.",
-      "UnassignedHint": "Applications without observed domain ownership. Static source ownership is never inferred from their identity.",
-      "NoOwner": "No owning domain",
-      "UnassignedDeclarations": "API targets identified by observed source roles",
-      "NoUnassignedDeclarations": "No collected API caller is associated with this service.",
-      "NoUnassignedServices": "No unassigned services in this snapshot.",
-      "Unavailable": "Compiled application dependency evidence is unavailable on this host."
     }
+  },
+  "Navigation": {
+    "Category": "Service discovery"
+  },
+  "Discovery": {
+    "ageSeconds": "{0}s",
+    "allDomains": "All subdomains",
+    "allStatuses": "All statuses",
+    "atlasCalm": "The available placement and role health cover {0} roles across {1} services.",
+    "atlasChooseRole": "Select a service or role",
+    "atlasClearHighlight": "Clear focus",
+    "atlasDecisionLabel": "Deployed application roles",
+    "atlasDecisionUnit": "/ {0} deployed apps",
+    "atlasFilterAll": "All roles",
+    "atlasFilterDegraded": "Degraded",
+    "atlasFilterFaulted": "Faulted",
+    "atlasFilterRemote": "Cross-service remote",
+    "atlasFilterRequired": "Required",
+    "atlasGroupApp": "By deployment app",
+    "atlasGroupDomain": "By subdomain",
+    "atlasHighlightRole": "Highlighting peers of role \"{0}\"",
+    "atlasInstancesShort": "{0}/{1} inst",
+    "atlasNoCalls": "No compiled calls match this selection.",
+    "atlasNoEdgesNote": "In Monica, deployment topology decides active role placement and fault isolation—not remote calls. Ordinary calls without [RunOnRole] run locally in-process inside unified artifacts (such as Fips.Host); only [RunOnRole] across AppIds or selective-artifact omissions cross the network over HTTP.",
+    "atlasNoPlacement": "This host did not provide compiled role placement evidence. Registration evidence remains available.",
+    "atlasNoRolesAssigned": "No active roles assigned to this deployed service (e.g., edge ingress gateway).",
+    "atlasNoRolesMatchFilter": "No roles in this service match the active filter.",
+    "atlasOpenDeps": "Role dependency graph",
+    "atlasOpenRoleHealthBoard": "Role health",
+    "atlasPickNotFound": "This selection is absent from the capture",
+    "atlasReasonDegraded": "Degraded {0}",
+    "atlasReasonFaulted": "Faulted (503) {0}",
+    "atlasReasonHealthy": "Healthy {0}",
+    "atlasReasonRemote": "Remote calls {0}",
+    "atlasRemoteCapableTip": "Participates in real cross-service remote calls ([RunOnRole] or selective artifact)",
+    "atlasRemoteEdgeFoot": "Remote ↑{0} ↓{1}",
+    "atlasRolesCount": "{0} roles",
+    "atlasRoleUnavailableCount": "{0} offline",
+    "atlasSelectiveArtifact": "Selective artifact",
+    "atlasTitle": "Deployment services & role topology",
+    "autoFailing": "Polling failing",
+    "autoOff": "Auto refresh off",
+    "autoOn": "Auto · {0}s",
+    "cancel": "Cancel",
+    "captured": "Captured",
+    "clearSearch": "Clear search",
+    "colActions": "Actions",
+    "colBuild": "Observed build",
+    "colDomains": "Hosted subdomains",
+    "colEndpoints": "Listening addresses",
+    "colFreshness": "Heartbeat age",
+    "colInstances": "Instances & leader",
+    "colService": "Service & identity",
+    "confirmForceAction": "Revoke leader lease",
+    "confirmForceBody": "Delete the current leader lease key for application {0}? This targets the application key even if leadership changed since capture. Registrations remain intact and a host may acquire a new term on its next election cycle.",
+    "confirmForceTitle": "Force delete leader lease",
+    "confirmForceWarn": "Revoking the leader key immediately removes the active leader's lease and triggers a new election. Intended for diagnostics and recovery.",
+    "confirmReleaseAction": "Release leader",
+    "confirmReleaseBody": "Gracefully resign leadership on {0}? Lease renewal will stop and leader-scoped work will be cancelled while takeover awaits natural TTL expiry.",
+    "confirmReleaseTitle": "Release local leader status",
+    "confirmReleaseWarn": "A successor can acquire leadership after the current lease expires.",
+    "copyId": "Copy App ID",
+    "coverage": {
+      "shared": "Multi-hosted",
+      "single": "Single-service",
+      "unhosted": "Unhosted",
+      "unlisted": "Unlisted"
+    },
+    "criticality": {
+      "Optional": "Optional",
+      "Required": "Required"
+    },
+    "criticalityShort": {
+      "Optional": "Opt",
+      "Required": "Req"
+    },
+    "depCallsCount": "{0} API usage records",
+    "depCatalogNodeTag": "Catalog",
+    "depClearFocus": "Show all",
+    "depDecisionLabel": "Real remote pairs (subdomains)",
+    "depDecisionLabelRole": "Real remote pairs (roles)",
+    "depDecisionUnit": "/ {0} pairs ({1}/{2} remote)",
+    "depDockCount": "{0} / {1} pairs",
+    "depDockInbound": "Inbound callers ({0})",
+    "depDockOutbound": "Outbound calls ({0})",
+    "depDomainCoreCaller": "Domain core caller",
+    "Dependencies": {
+      "Nav": "Dependencies",
+      "Title": "Subdomain dependencies"
+    },
+    "depExpandCanvas": "Expand canvas",
+    "depFactLocalOrdinary": "Ordinary local-first pairs",
+    "depFactLocalOrdinarySub": "In-process inside unified hosts",
+    "depFactRemote": "Real remote HTTP calls",
+    "depFactRemoteSub": "Across {0} cross-service pairs",
+    "depFactRisk": "Faulted / offline / unlisted",
+    "depFactRiskSub": "503 {0} · Offline {1} · Unlisted {2}",
+    "depFactRunOnRole": "[RunOnRole] constrained",
+    "depFactRunOnRoleSub": "{0} pairs (remote + co-located)",
+    "depFilterShort": {
+      "local": "Local-first",
+      "remote": "Real remote",
+      "risk": "Risks / 503",
+      "runonrole": "[RunOnRole]",
+      "remoteartifact": "Selective"
+    },
+    "depFinding": "Of {0} compiled pairs, {1} use cross-service HTTP. {2} Other ordinary calls may execute locally with their handler included.",
+    "depFitView": "Reset view",
+    "depFlowTab": "Dependency graph",
+    "depFlowTitle": "Subdomain & role dependency graph",
+    "depFocusNode": "Neighborhood focus: {0}",
+    "depGestureHint": "Scroll to zoom · drag canvas/nodes · dashed = ordinary local-first · solid = [RunOnRole]/selective remote",
+    "depGranDomain": "Subdomains",
+    "depGranRole": "Roles",
+    "depGranularityLabel": "Graph granularity",
+    "depGraphLoadError": "D3.js graph engine failed to load; switch to Coupling matrix to inspect the same snapshot.",
+    "depGraphReadoutIdle": "Hover or select any node or edge to sync calling roles, [RunOnRole] constraints, and routing verdict; filter 'Real remote' to isolate network hops.",
+    "depLayoutLabel": "D3 layout",
+    "depLayouts": {
+      "force": "Force",
+      "layered": "Layered",
+      "radial": "Radial"
+    },
+    "depLedgerSearch": "Search domain, role, AppId, [RunOnRole], or contract…",
+    "depLedgerTitle": "Compiled API usage ledger",
+    "depLegendRiskErr": "Target offline / 503 faulted",
+    "depLegendRiskWarn": "Degraded / unlisted",
+    "depMatrixTab": "Coupling matrix",
+    "depNodeSvcBadge": "{0} svc",
+    "depNoLedgerMatch": "No compiled API usages match the active filters.",
+    "depNoPairsBody": "The application model loaded successfully and contains no cross-boundary pairs for this granularity.",
+    "depNoPairsTitle": "No compiled pairs in this scope",
+    "depNoTopology": "This host does not expose IApplicationModel dependency declarations. Static API usages are unavailable; observed domain ownership remains visible.",
+    "depOpenDeployAtlas": "Deployment & roles",
+    "depOpenDomain": "Open in directory",
+    "depOpenRoleInAtlas": "Inspect role in deployment",
+    "depReadoutCell": "{0} → {1} · {2} usages · {3} ({4})",
+    "depReadoutNode": "{0} ({1}) · {2} · ↓{3} / ↑{4} compiled API usages",
+    "depRealPairs": "{0} pairs",
+    "depReasonLocalRunOn": "Co-located {0}",
+    "depReasonOrdinary": "Local-first {0}",
+    "depReasonRemoteArtifact": "Selective {0}",
+    "depReasonRemoteRunOn": "[RunOnRole] remote {0}",
+    "depReasonRisk": "Risks {0}",
+    "depRoutingAll": "All pairs",
+    "depRoutingLabels": {
+      "unknown": "Unverified path",
+      "unlisted": "Unlisted endpoint",
+      "localordinary": "Ordinary · local-first",
+      "localrunonrole": "[RunOnRole] co-located",
+      "remoteartifact": "Selective artifact remote",
+      "remoterunonrole": "[RunOnRole] remote HTTP",
+      "targetdegraded": "Target role degraded",
+      "targetfaulted": "Target quarantined (503)",
+      "targetoffline": "Remote target offline"
+    },
+    "depSplitView": "Split view",
+    "depStaticScopeNote": "Compiled API declarations do not measure runtime traffic. Ordinary calls without [RunOnRole] execute locally in-process inside unified artifacts; runtime product authority policies (e.g., primary/secondary forwarding) are resolved per request.",
+    "depTabEvidence": "API evidence",
+    "depTabUnassigned": "Unassigned ({0})",
+    "depTierHubs": "Core hubs",
+    "depTierTargets": "Targets & unlisted",
+    "depTierUpstream": "Upstream callers",
+    "depUnassignedNote": "{0} services report no observed owning domain. Static dependency ownership is never inferred from application names.",
+    "depUnavailableBody": "This host does not expose IApplicationModel dependency declarations. Static API usages are unavailable; observed domain ownership remains visible.",
+    "depUnavailableTitle": "Compiled application topology unavailable",
+    "depUnknownPaths": "{0} call paths have unverified artifact evidence.",
+    "depWorkbenchLabel": "Subdomain and role dependency graph and compiled API evidence workbench",
+    "depZoomControls": "Canvas zoom controls",
+    "depZoomIn": "Zoom in",
+    "depZoomOut": "Zoom out",
+    "directions": {
+      "remote": "Remote ({0})",
+      "localrun": "Co-located [RunOnRole] ({0})",
+      "ordinary": "Local-first ({0})"
+    },
+    "domainBarReadout": "{0} · {1} services · {2} inbound · {3} outbound",
+    "domainDirectoryEmpty": "No subdomain records",
+    "domainDirectoryEmptyBody": "Select a listed subdomain or adjust the directory filters to find evidence.",
+    "Domains": {
+      "Nav": "Subdomains",
+      "Title": "Subdomain directory"
+    },
+    "domDecisionLabel": "Catalog subdomains hosted",
+    "domDecisionUnit": "/ {0} catalog domains",
+    "domFactInbound": "Inbound API usages",
+    "domFactInstances": "Hosted instances",
+    "domFactOutbound": "Outbound API usages",
+    "domFactOwned": "Owning services",
+    "domFilterAll": "All",
+    "domFilterHosted": "Hosted",
+    "domFilterMulti": "Multi-hosted",
+    "domFilterUnhosted": "Unhosted",
+    "domFilterUnlisted": "Unlisted",
+    "domFinding": "{0} of {1} catalog domains have observed hosting.",
+    "domInboundHelp": "Observed external services owning compiled callers targeting this domain. This does not prove runtime execution.",
+    "domInboundTitle": "External caller services & inbound APIs",
+    "domMissingBody": "This subdomain is absent from both the shared catalog and the current capture's dependency or ownership evidence.",
+    "domMissingTitle": "Subdomain \"{0}\" not found",
+    "domNoDesc": "No description supplied by the shared domain catalog.",
+    "domNoInbound": "No observed external service owns a collected caller targeting this domain.",
+    "domNoOutbound": "No compiled cross-domain outbound calls declared from this subdomain.",
+    "domNoOwned": "No captured service reports this subdomain as its owner.",
+    "domNoRoles": "No fine-grained roles reported by online instances for this subdomain.",
+    "domOutboundHelp": "Compiled cross-domain targets invoked by callers inside this subdomain.",
+    "domOutboundTitle": "Outbound cross-domain API calls",
+    "domOwnedHelp": "Registered services declaring ownership of this subdomain; select one to open the frozen Service Evidence Sheet.",
+    "domOwnedTitle": "Owning services",
+    "domRolesTitle": "Observed roles in this subdomain",
+    "domSearchPlaceholder": "Find subdomain by ID, display name, or description…",
+    "domStripDesc": "One mark per subdomain; bar height reflects inbound compiled API usages. Select any subdomain to inspect owning services, observed roles, and inbound/outbound calls.",
+    "domStripTitle": "Subdomain coverage & inbound fan-in",
+    "domUnlistedBadge": "Unlisted endpoint",
+    "domUnlistedWarnBody": "{0} appears in observed membership or compiled dependency evidence without a catalog entry. A dependency declaration alone does not establish a registered subdomain.",
+    "domUnlistedWarnTitle": "Endpoint outside the shared domain catalog",
+    "domViewInDeps": "Focus in dependencies",
+    "emptyBody": "The provider read succeeded and returned no active registrations or predefined services.",
+    "emptyStatus": "Empty registry",
+    "emptyTitle": "No services in this capture",
+    "Endpoints": {
+      "Nav": "Endpoints",
+      "Title": "Endpoint discovery"
+    },
+    "endpointStaleBody": "The last endpoint evidence captured at {0} remains visible.",
+    "epAllSelected": "All selected endpoints",
+    "epAllUnknownLede": "All {0} declared destinations on this process have not been resolved yet. Run Refresh resolution to query the native provider chain without sending business requests.",
+    "epCallCount": "{0} HTTP observations",
+    "epCallErrors": "{0} errors or cancellations",
+    "epCalmLede": "All {1} / {0} declared destinations resolved cleanly within the {3}-minute retention window, with {2} HTTP header observations and zero transport or status failures.",
+    "epCandidateLimit": "Up to 128 candidates. Addresses omit paths, credentials, and query strings. Prior successful candidates remain visible after a failed refresh.",
+    "epColDuration": "To headers",
+    "epColOutcome": "Outcome & status",
+    "epColSelected": "Selected endpoint",
+    "epColTime": "Observed at",
+    "epColTrace": "TraceId",
+    "epCopyEndpoint": "Copy endpoint",
+    "epCopyTrace": "Copy TraceId",
+    "epCopyUri": "Copy logical URI",
+    "epDecisionLabel": "Destinations needing attention",
+    "epDecisionUnit": "/ {0} declared targets",
+    "epEmptyBody": "Configure ModuleServiceEndpointDiscoveryOption.Targets at host startup to inspect resolution and HTTP evidence.",
+    "epEmptyStatus": "No targets",
+    "epEmptyTitle": "No destinations declared",
+    "epEvidenceBoundary": "Registration, resolution, HTTP response headers, and business success are separate evidence. This page shows this process only. Refresh resolves declared targets (5s per-target, 30s total budget) without sending business requests; HTTP 2xx ends at response headers, and DNS destinations do not identify the serving Pod.",
+    "epExchangeNoMatch": "The selected endpoint has no retained exchanges.",
+    "epFactCalls": "Retained HTTP calls",
+    "epFactCallsSub": "Last {0} min · up to {1}/target",
+    "epFactFailingCalls": "Failed / canceled calls",
+    "epFactFailingCallsSub": "{0} HTTP/transport failures · {1} canceled",
+    "epFactProcess": "Evidence process & policy",
+    "epFactResolved": "Resolved targets",
+    "epFactResolvedSub": "{0} candidate endpoints · {1} providers",
+    "epFilterAll": "All targets",
+    "epFilterProblems": "Failures or empty",
+    "epFilterResolved": "Resolved",
+    "epFilterStale": "Stale",
+    "epFilterUnknown": "Not observed",
+    "epHostChip": "Host · {0} (PID {1})",
+    "epInspectRegistry": "Inspect in registry",
+    "epInspectRegistryTip": "Registry membership is separate from outbound resolution",
+    "epLaneAgo": "-{0}m",
+    "epLaneCandCount": "{0} eps",
+    "epLaneColMeta": "Endpoints / p95",
+    "epLaneColTarget": "Destination & state",
+    "epLaneDesc": "Plots resolution attempts and retained HTTP header exchanges across this process's last {0} minutes ({1}s per-target resolution deadline).",
+    "epLaneLegendAttempt": "Resolution attempt",
+    "epLaneLegendCancel": "Canceled",
+    "epLaneLegendFail": "Transport / resolution fail",
+    "epLaneLegendHttpErr": "HTTP error",
+    "epLaneLegendRetained": "Prior successful capture",
+    "epLaneLegendSuccess": "HTTP 2xx (headers)",
+    "epLaneNoCalls": "No retained HTTP observations · reachability unknown",
+    "epLaneNow": "Now",
+    "epLaneReadoutIdle": "Hover or use arrow keys across destination lanes; press Enter to inspect candidates and HTTP exchanges below.",
+    "epLaneTitle": "Resolution freshness & HTTP observation window",
+    "epLastAttempt": "Last attempt",
+    "epLastSuccess": "Last successful capture",
+    "epLoadingBody": "Capturing this process's declared destinations and retained observations.",
+    "epLoadingTitle": "Reading endpoint discovery evidence",
+    "epMissingTargetBody": "This logical address is not declared in this process's ModuleServiceEndpointDiscoveryOption.Targets.",
+    "epMissingTargetTitle": "Destination \"{0}\" not found",
+    "epNoCallsBody": "No HTTP exchanges have been captured for this target within the retention window. Reachability and business success are unknown (never 0% error rate).",
+    "epNoCallsTitle": "No retained HTTP observations",
+    "epNoCandidates": "No candidate endpoints available.",
+    "epNoMatchBody": "Clear or adjust state, scope, or search filters to view other declared destinations on this process.",
+    "epNoMatchTitle": "No destinations match these filters",
+    "epNoSelection": "No endpoint selected",
+    "epNotObserved": "Not observed",
+    "epOutcomes": {
+      "Canceled": "Canceled",
+      "Failure": "Transport / resolution failure",
+      "HttpFailure": "HTTP error",
+      "HttpSuccess": "HTTP 2xx"
+    },
+    "epP95Label": "Retained-sample p95 to response headers: {0} ms",
+    "epPassThroughNote": "Described by PassThroughServiceEndpointProvider as a DNS destination: does not query DNS, prove readiness, or identify the serving Pod.",
+    "epPassThroughOff": "DNS pass-through disabled",
+    "epPassThroughOn": "DNS pass-through enabled",
+    "epProcessFact": "{0}s timeout · {1}",
+    "epProcessStatus": "Process-local",
+    "epProvidersLabel": "Provider order",
+    "epReadFailed": "The process endpoint evidence could not be captured.",
+    "epReasonEmpty": "No endpoints {0}",
+    "epReasonFailed": "Failed / timeout {0}",
+    "epReasonHttpErr": "HTTP errors {0}",
+    "epReasonStale": "Stale {0}",
+    "epReasonUnknown": "Not observed {0}",
+    "epRefreshAction": "Refresh resolution",
+    "epRetainedWarnBody": "The latest resolution attempt failed at {0}; prior candidates captured at {1} remain visible below.",
+    "epRetainedWarnTitle": "Latest refresh failed · prior successful candidates retained",
+    "epScopeAll": "All scopes",
+    "epSearchPlaceholder": "Filter scope, AppId, logical URI, or candidate…",
+    "epSecCalls": "Observed HTTP exchanges",
+    "epSecResolution": "Resolution evidence & candidates",
+    "epSelectedDist": "Filter by selected endpoint",
+    "epShownTargets": "Showing {0} / {1} targets",
+    "epStates": {
+      "Empty": "No endpoints",
+      "Failed": "Resolution failed",
+      "Resolved": "Resolved",
+      "Stale": "Stale evidence",
+      "Timeout": "Resolution timed out",
+      "Unknown": "Not observed"
+    },
+    "epTimelineReadout": "{0} / {1} · {2} · {3} candidates · {4} exchanges · p95 {5} ms",
+    "epWorkspaceTitle": "Declared destinations",
+    "expectedOnly": "Predefined only",
+    "eyebrow": "Monica / Service discovery",
+    "failedStatus": "Capture failed",
+    "faultStage": {
+      "HostedServiceStartup": "Hosted service startup",
+      "PipelineSetup": "Pipeline setup",
+      "Runtime": "Runtime",
+      "RuntimeResource": "Runtime resource",
+      "SeederExecution": "Seeder execution",
+      "StartupConfiguration": "Startup configuration"
+    },
+    "freshHb": "{0}s ago",
+    "hbHealth": {
+      "Healthy": "Healthy",
+      "Offline": "Past TTL",
+      "Unhealthy": "Overdue",
+      "Unknown": "Unavailable"
+    },
+    "Host": {
+      "Nav": "Current host",
+      "Title": "Current host"
+    },
+    "hostAgreementLabel": {
+      "match": "Leadership aligned",
+      "none": "No active provider lease",
+      "sibling": "Sibling holds the lease",
+      "split": "Two-plane mismatch"
+    },
+    "hostAgreementMatch": "Aligned · this host holds the application leader lease",
+    "hostAgreementNone": "No active provider lease",
+    "hostAgreementSibling": "Aligned · lease held by sibling instance ({0})",
+    "hostAgreementSplit": "Two-plane mismatch · local host believes it is Leader while provider lease belongs to {0}",
+    "hostAuthority": "Lease authority",
+    "hostBuildTitle": "Build & identity evidence",
+    "hostConfigDesc": "These settings belong to this querying host and govern heartbeat health evaluation; they do not describe remote services.",
+    "hostConfigTitle": "Querying host election & TTL policy",
+    "hostDecisionLabel": "Querying host heartbeat age",
+    "hostDecisionUnit": "s",
+    "hostElectionDisabled": "Leader election is disabled because this host runs in the Worker role.",
+    "hostFields": {
+      "appId": "App ID",
+      "appName": "App name",
+      "assemblyVer": "Assembly version",
+      "becameLeaderAt": "Became leader at",
+      "buildTime": "Build time",
+      "domains": "Hosted subdomains",
+      "hbAge": "Heartbeat age at capture",
+      "hbPeriod": "Heartbeat period",
+      "hostRole": "Host role",
+      "instanceId": "Instance ID",
+      "instTtl": "Registration TTL",
+      "lastHb": "Last heartbeat",
+      "leaderTtl": "Leader TTL",
+      "leaseAcquired": "Lease acquired at",
+      "leaseApp": "Lease App ID",
+      "leaseHolder": "Lease holder instance",
+      "localStatus": "Local election status",
+      "project": "Project",
+      "regTime": "Registration time",
+      "releaseVer": "Release version",
+      "roles": "Observed roles",
+      "status": "Current status",
+      "storageMode": "State store mode",
+      "termId": "Current term ID"
+    },
+    "hostFinding": "Querying host {0} ({1}) last beat {2} ago ({3}s period / {4}s registration TTL).",
+    "hostLeasePlane": "Provider application lease (IExclusiveLeaseStore)",
+    "hostLocalPlane": "Local election state (LeaderElectionService)",
+    "hostMetadataDesc": "Metadata published by this instance into the state store at capture time.",
+    "hostMetadataTitle": "Host advertised metadata",
+    "hostNoLease": "No active leader lease was present in the provider read for this application.",
+    "hostOpenParentSheet": "Open full service inspector",
+    "hostPlaneDesc": "Local in-process election state and the provider's application leader lease are captured independently.",
+    "hostPlaneTitle": "Two-plane leadership reconciliation",
+    "hostRelease": "Release local leader",
+    "hostReleaseDone": "Local leadership released. The provider lease will expire naturally.",
+    "hostReleaseFailed": "Local leadership changed or could not be released. Refresh the host snapshot.",
+    "hostRoles": {
+      "Registry": "Registry control plane",
+      "Standalone": "Standalone control plane & worker",
+      "Worker": "Worker"
+    },
+    "hostRunwayDesc": "Positions this host's last successful heartbeat against its configured heartbeat period, overdue threshold, leader TTL, and registration expiry TTL.",
+    "hostRunwayTitle": "Host heartbeat & TTL runway",
+    "hostSiblingsDesc": "All instances registered under {0} in the current snapshot for side-by-side build, heartbeat, address, and leadership comparison.",
+    "hostSiblingsTitle": "Sibling instances of this application",
+    "hostSplitMissing": "Local election reports Leader. The provider returned no active lease.",
+    "hostStateTransitionNote": "Membership heartbeats and lease renewal run independently. Exhausted heartbeat retries stop renewal and cancel leader work while the host stays running.",
+    "hzDesc": "Each registered instance plotted against querying-host thresholds ({0}s period · {1}s overdue · {2}s leader TTL · {3}s registration TTL).",
+    "hzDisappearedTag": "{0} disappeared",
+    "hzLeaderFlag": "{0}s leader TTL",
+    "hzLegendDisappeared": "UI-observed disappearance",
+    "hzLegendFresh": "Fresh (< 1.5× period)",
+    "hzLegendLeader": "Heartbeat-reported leader",
+    "hzLegendOverdue": "Overdue (nearing TTL)",
+    "hzLegendPredefined": "Predefined only (0 instances)",
+    "hzLegendUpdating": "Updating",
+    "hzNoInstances": "0 live instances (predefined)",
+    "hzPeriodFlag": "{0}s period",
+    "hzReadoutIdle": "Hover or use arrow keys across instance marks; press Enter to open the frozen Service Evidence Sheet.",
+    "hzReadoutInst": "{0} · {1} · heartbeat age {2}s ({3}) · {4} · v{5}",
+    "hzReadoutPredefined": "{0} ({1}) · Predefined only, 0 active registrations",
+    "hzRegFlag": "{0}s reg TTL",
+    "hzSkewBadge": "{0} builds",
+    "hzTitle": "Instance heartbeat age & TTL horizon",
+    "hzWarnFlag": "{0}s overdue",
+    "inspect": "Inspect",
+    "leaderStatuses": {
+      "Follower": "Follower",
+      "Leader": "Leader",
+      "Looking": "Looking",
+      "Unknown": "Unknown"
+    },
+    "leaseAdminUnavailable": "This lease authority has no administrative revoke capability.",
+    "leaseExpires": "Lease expires",
+    "leaseOperationTimeout": "Lease operation timeout",
+    "leaseStandbyInterval": "Standby interval",
+    "live": "Auto-polling",
+    "loadFailedBody": "The selected provider could not supply a discovery capture. Check host logs for the failed read.",
+    "loadFailedTitle": "Registry capture unavailable",
+    "loadingBody": "Reading registrations from the state store, domain catalog, and compiled topology.",
+    "loadingStatus": "Reading",
+    "loadingTitle": "Capturing discovery evidence",
+    "manualBody": "Registry, topology, and host queries remain available; local registration, election, and leader revocation mutations are disabled.",
+    "manualStatus": "Manual · Read-only",
+    "manualTitle": "Autonomous work held (Application:AutonomousWork = false)",
+    "membershipScopeNote": "An unexpired registration confirms membership in this store; it is separate from readiness and health probes. Multi-instance rows surface the oldest heartbeat and build skew.",
+    "msUnit": "{0} ms",
+    "navLabel": "Service Discovery workspaces",
+    "noHb": "No heartbeat",
+    "noMatchBody": "Adjust status, subdomain, or search filters to reveal other services in this capture.",
+    "noMatchTitle": "No matching services",
+    "notAvailable": "Not available",
+    "notCaptured": "Not captured",
+    "notSpecified": "Not specified",
+    "onlyRegistered": "With instances only",
+    "openLocalRoleHealth": "Open role health",
+    "ordinaryContract": "Ordinary",
+    "paused": "Manual snapshot",
+    "provenance": {
+      "Heartbeat": "Heartbeat summary",
+      "Local": "Local live",
+      "Offline": "Offline / unavailable",
+      "Unknown": "Not reported"
+    },
+    "refresh": "Refresh",
+    "regDecisionLabel": "Services needing attention",
+    "regDecisionUnit": "/ {0} services",
+    "regFactDisappeared": "Observed disappearances",
+    "regFactDisappearedSub": "UI session diff only, not provider evictions",
+    "regFactInstances": "Live instances",
+    "regFactInstancesSub": "{0} heartbeat-reported leaders · {1} fresh",
+    "regFactOverdue": "Overdue heartbeats",
+    "regFactRegistered": "Registered services",
+    "regFactRegisteredSub": "{0} predefined services without instances",
+    "Registry": {
+      "Nav": "Registry",
+      "Title": "Service registry"
+    },
+    "registryPolicyHint": "Evaluated against each instance's reported policy when available",
+    "regReasonDisappeared": "Observed disappeared {0}",
+    "regReasonError": "Service errors {0}",
+    "regReasonOffline": "Predefined offline {0}",
+    "regReasonOverdue": "Overdue heartbeat {0}",
+    "regReasonSkew": "Version skew {0}",
+    "regReasonUpdating": "Updating {0}",
+    "resetFilters": "Reset filters",
+    "retry": "Retry read",
+    "roleCallsHeading": "Role-to-role compiled API calls",
+    "roleHealthExplanation": {
+      "Heartbeat": "Most severe status reported by registered peers for this role. Open that host to see its full admission evidence.",
+      "Local": "Process-local admission evidence from the querying instance.",
+      "Offline": "No live registration for the assigned service.",
+      "Unknown": "Online registrations did not publish role-health evidence. Inspect the role on the target host."
+    },
+    "roleHealthHeading": "Role health & quarantine",
+    "roleHealthShort": {
+      "Degraded": "Degraded"
+    },
+    "roleHealthStatuses": {
+      "Degraded": "Degraded",
+      "Faulted": "Faulted",
+      "Healthy": "Healthy",
+      "Inactive": "Inactive",
+      "Initializing": "Initializing",
+      "Unavailable": "Unavailable"
+    },
+    "roleTransition": "Last transition {0}",
+    "routesVerdict": {
+      "unknown": "Execution path unverified",
+      "localordinary": "Local in-process",
+      "localrunonrole": "Co-located required role",
+      "remoteartifact": "Remote · handler not included",
+      "remoterunonrole": "Remote · required role"
+    },
+    "routingBoundaryNote": "Compiled declarations describe placement and handler availability. Request-time authority policies can change the actual destination.",
+    "routingRisk": {
+      "unlisted": "Unlisted endpoint",
+      "targetdegraded": "Target role degraded",
+      "targetfaulted": "Target quarantined (503)",
+      "targetoffline": "Remote target offline"
+    },
+    "scopeChip": "Store · {0}",
+    "searchPlaceholder": "Search service, App ID, project, domain, or role…",
+    "secUnit": "{0} s",
+    "sheetDeleteDisabledManual": "Disabled in Manual mode",
+    "sheetDeleteDisabledNoLeader": "No heartbeat-reported leader in this capture",
+    "sheetDeleteDone": "Revocation completed. This frozen capture remains unchanged; refresh the registry for fresh provider evidence.",
+    "sheetDeleteFailed": "The lease authority could not revoke this application's lease.",
+    "sheetDisappearedAt": "Disappearance observed",
+    "sheetDisappearedBadge": "Observed disappearance",
+    "sheetForceDelete": "Force delete leader lease",
+    "sheetFrozenBadge": "Frozen service capture",
+    "sheetFrozenScope": "Captured {0} · frozen at {1}. Ongoing directory polling does not mutate this inspector's registration or metadata evidence.",
+    "sheetHostConfigRef": "Querying host heartbeat & TTL baseline (not this remote service's config)",
+    "sheetInstanceNote": "Leadership badges reflect the captured registration heartbeat. Disappearances are UI session observations, not provider evictions. Heartbeat health uses the querying host's period and registration TTL.",
+    "sheetNoInstances": "No registered instances exist for this service in the current capture.",
+    "sheetNoMetadata": "This instance reported no metadata keys.",
+    "sheetOpenDeps": "View related dependencies",
+    "sheetOpenHost": "Inspect full policy on Current host",
+    "sheetTabIdentity": "Identity & placement",
+    "sheetTabInstances": "Instances & health ({0})",
+    "sheetTabMetadata": "Metadata",
+    "sheetUnknownBody": "This App ID is absent from the captured registry snapshot. It may have expired or the link may be outdated.",
+    "sheetUnknownTitle": "Service \"{0}\" not found",
+    "shownServices": "Showing {0} / {1} services",
+    "sortLabel": "Sort",
+    "sortOptions": {
+      "attention": "Attention priority",
+      "domains": "Hosted subdomains",
+      "heartbeat": "Oldest heartbeat",
+      "instances": "Instance count",
+      "name": "Service name"
+    },
+    "staleBody": "The selected provider could not supply a fresh capture. Evidence from {0} remains visible below with heartbeat ages frozen.",
+    "staleStatus": "Retained snapshot",
+    "staleTitle": "Refresh failed · previous complete snapshot retained",
+    "statuses": {
+      "Error": "Error",
+      "Offline": "Offline",
+      "Running": "Running",
+      "Unhealthy": "Unhealthy",
+      "Unknown": "Unknown",
+      "Updating": "Updating"
+    },
+    "storageModes": {
+      "Distributed": "Distributed state store",
+      "ExternalKeyed": "External keyed state store",
+      "Memory": "Process-local memory store"
+    },
+    "thisHostTag": "This host",
+    "ttlFormula": "{0} × {1} + {2} = {3} s",
+    "tzChip": "Host zone · {0}",
+    "unassignedDomain": "Unassigned domain",
+    "versionSkew": "{0} versions",
+    "viewAtlas": "Deployment & roles",
+    "viewRoster": "Roster",
+    "worstHb": "Oldest {0}s ago",
+    "regCalmObserved": "{0} services have {1} registered instances. {2} reported fresh heartbeats.",
+    "roleInspectorTitle": "Role & call inspector",
+    "atlasAppInspector": "Deployment service",
+    "atlasAppRoleHealth": "Role health summary",
+    "atlasLocalRunHint": "The required role is placed on the same application. Splitting this placement would use HTTP.",
+    "atlasOrdinaryHint": "Ordinary calls run in-process when the source artifact includes the handler. Calls with incomplete evidence are marked individually.",
+    "targetInstanceEvidence": "{0} observed target instances",
+    "splitImpact": "Would route over HTTP if split"
   },
   "Endpoints": {
     "KnownTargets": "Declared destinations",
@@ -604,8 +682,5 @@
       "Failure": "Transport / resolution failure",
       "Canceled": "Canceled"
     }
-  },
-  "Navigation": {
-    "Category": "Service discovery"
   }
 }

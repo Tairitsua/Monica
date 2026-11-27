@@ -1,0 +1,78 @@
+@inherits DiscoveryComponent
+@implements IAsyncDisposable
+@using Monica.Core.Results
+@using Monica.ServiceDiscovery.Facades
+@inject IDialogService DialogService
+@inject ISnackbar Snackbar
+@inject ServiceDiscoveryFacade Facade
+
+<button type="button" class="btn btn-soft role-@(Release ? "warning" : "error")" disabled="@(Disabled || _pending is not null || _completed is not null)"
+        title="@DisabledReason" @onclick="RequestAsync">
+    <MoIcon Icon="@(Release ? MoIcons.Power : MoIcons.Delete)" Size="15px" />@T(Release ? "hostRelease" : "sheetForceDelete")
+</button>
+@if (DisabledReason is not null && Disabled)
+{
+    <span class="sv-sheet-hint">@DisabledReason</span>
+}
+@if (_completed is not null)
+{
+    <span class="sv-sheet-hint" role="status">@_completed</span>
+}
+
+@code {
+    [Parameter, EditorRequired] public string AppId { get; set; } = "";
+    [Parameter] public string? InstanceId { get; set; }
+    [Parameter] public bool Release { get; set; }
+    [Parameter] public string? DisabledReason { get; set; }
+    [Parameter] public bool Disabled { get; set; }
+    [Parameter] public EventCallback OnSuccess { get; set; }
+    private Task? _pending;
+    private IDialogReference? _confirmation;
+    private string? _completed;
+    private bool _disposed;
+
+    private Task RequestAsync() => _disposed || Disabled || _pending is not null ? Task.CompletedTask : _pending = RequestCoreAsync();
+
+    private async Task RequestCoreAsync()
+    {
+        try
+        {
+            var appId = AppId;
+            var parameters = new DialogParameters<DiscoveryLeaderConfirmation>
+            {
+                { dialog => dialog.Message, Release ? T("confirmReleaseBody", InstanceId ?? appId) : T("confirmForceBody", appId) },
+                { dialog => dialog.Warning, T(Release ? "confirmReleaseWarn" : "confirmForceWarn") },
+                { dialog => dialog.CancelText, T("cancel") },
+                { dialog => dialog.ConfirmText, T(Release ? "confirmReleaseAction" : "confirmForceAction") }
+            };
+            var dialog = await DialogService.ShowAsync<DiscoveryLeaderConfirmation>(T(Release ? "confirmReleaseTitle" : "confirmForceTitle"),
+                parameters, new DialogOptions { CloseOnEscapeKey = true, FullWidth = true, MaxWidth = MaxWidth.Small });
+            if (_disposed)
+            {
+                dialog.Close(DialogResult.Cancel());
+                return;
+            }
+            _confirmation = dialog;
+            var answer = await dialog.Result;
+            if (_disposed || Disabled || AppId != appId || answer is not { Canceled: false }) return;
+            var result = Release ? await Facade.ReleaseLeaderAsync() : await Facade.ForceDeleteLeaderAsync(appId);
+            if (_disposed) return;
+            if (result.IsSuccess())
+            {
+                var copy = T(Release ? "hostReleaseDone" : "sheetDeleteDone");
+                if (!Release) _completed = copy;
+                Snackbar.Add(copy, Severity.Success);
+                await OnSuccess.InvokeAsync();
+            }
+            else Snackbar.Add(T(Release ? "hostReleaseFailed" : "sheetDeleteFailed"), Severity.Error);
+        }
+        finally { _pending = null; _confirmation = null; }
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        _disposed = true;
+        _confirmation?.Close(DialogResult.Cancel());
+        if (_pending is not null) await _pending;
+    }
+}

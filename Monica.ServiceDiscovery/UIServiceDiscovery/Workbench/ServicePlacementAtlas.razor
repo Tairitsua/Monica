@@ -1,0 +1,362 @@
+@inherits DiscoveryComponent
+
+<DiscoverySignature Label="@T("atlasDecisionLabel")" Value="@Model.Roles.Count.ToString()" Unit="@T("atlasDecisionUnit", Model.Services.Count)"
+                    Role="@(Faulted > 0 ? "error" : Degraded > 0 ? "warning" : "success")" Compact>
+    <Reasons>
+        <DiscoveryReason Role="success" Count="@Healthy">@T("atlasReasonHealthy", Healthy)</DiscoveryReason>
+        <DiscoveryReason Role="error" Count="@Faulted">@T("atlasReasonFaulted", Faulted)</DiscoveryReason>
+        <DiscoveryReason Role="warning" Count="@Degraded">@T("atlasReasonDegraded", Degraded)</DiscoveryReason>
+        <DiscoveryReason Role="primary" Count="@Remote">@T("atlasReasonRemote", Remote)</DiscoveryReason>
+    </Reasons>
+    <Finding>
+        @if (!Model.Topology.IsAvailable) { @T("atlasNoPlacement") }
+        else if (Faulted == 0 && Degraded == 0 && Unavailable == 0) { @T("atlasCalm", Model.Roles.Count, Model.Services.Count) }
+        else
+        {
+            @foreach (var group in Model.Roles.Where(role => role.Status is null or RoleHealthStatus.Degraded or RoleHealthStatus.Faulted)
+                .GroupBy(role => role.Status))
+            {
+                var role = group.First();
+                <MoValueMark Role="@(role.Status == RoleHealthStatus.Faulted ? MoVisualRole.Error : role.Status == RoleHealthStatus.Degraded ? MoVisualRole.Warning : MoVisualRole.Neutral)"
+                             Href="@Workbench.Here(("role", role.Id), ("app", null))">
+                    @T(role.Status == RoleHealthStatus.Faulted ? "atlasReasonFaulted" : role.Status == RoleHealthStatus.Degraded ? "atlasReasonDegraded" : "atlasRoleUnavailableCount", group.Count()) · @role.Id
+                </MoValueMark><text> </text>
+            }
+        }
+    </Finding>
+</DiscoverySignature>
+
+<DiscoverySurface Title="@T("viewAtlas")" Icon="@MoIcons.ChartScatter" Class="sv-inv" Detail="@T("shownServices", _apps.Count, Model.Services.Count)">
+    <Aside><DiscoveryViewSwitch /></Aside>
+    <ChildContent>
+        <div class="sv-atlas sv-deploy">
+            <div class="sv-atlas-bar">
+                <DiscoverySearch Value="@Workbench.Param("q")" Label="@T("searchPlaceholder")" ClearLabel="@T("clearSearch")" ValueChanged='value => Workbench.Pick("q", value.Length == 0 ? null : value, true)' />
+                <div class="sv-atlas-bar-ctrl">
+                    <div class="seg" role="group" aria-label="@T("atlasTitle")">
+                        <button type="button" aria-pressed="@DiscoveryWorkbench.Bool(!GroupingDomains)" @onclick='() => Workbench.Pick("group", null)'>@T("atlasGroupApp")</button>
+                        <button type="button" aria-pressed="@DiscoveryWorkbench.Bool(GroupingDomains)" @onclick='() => Workbench.Pick("group", "domain")'>@T("atlasGroupDomain")</button>
+                    </div>
+                    <a class="btn btn-outline btn-sm" href="@Workbench.Link("health-checks/roles")"><MoIcon Icon="@MoIcons.ShieldCheck" Size="14px" />@T("atlasOpenRoleHealthBoard")</a>
+                    <a class="btn btn-outline btn-sm" href="@Workbench.Link(DiscoveryWorkbench.DEPENDENCIES, ("granularity", "role"))"><MoIcon Icon="@MoIcons.Workflow" Size="14px" />@T("atlasOpenDeps")</a>
+                </div>
+            </div>
+            <div class="fchips sv-deploy-fchips" aria-label="@T("hostFields:roles")">
+                @foreach (var filter in Filters)
+                {
+                    <MoFilterChip Role="@filter.Role" Pill ShowDot="@(filter.Key != "all")" Label="@T(filter.Label)" Count="@_roles.Count(role => Matches(role, filter.Key))"
+                                  Selected="@(Filter == filter.Key)" SelectedChanged='selected => Workbench.Pick("roleFilter", selected && filter.Key != "all" ? filter.Key : null)' />
+                }
+                @if (SelectedRole is { } active)
+                {
+                    <span class="sv-atlas-hl role-primary">@T("atlasHighlightRole", active.Id)
+                        <button type="button" class="icon-btn is-quiet" aria-label="@T("atlasClearHighlight")" @onclick='() => Workbench.Pick("role", null)'><MoIcon Icon="@MoIcons.Close" Size="13px" /></button>
+                    </span>
+                }
+            </div>
+            @if (_apps.Count == 0)
+            {
+                <MoContentState Compact><h3>@T("noMatchTitle")</h3><p>@T("noMatchBody")</p>
+                    <button type="button" class="btn btn-outline btn-sm" @onclick="ResetFilters">@T("resetFilters")</button>
+                </MoContentState>
+            }
+            else
+            {
+                <div class="sv-deploy-wb">
+                    <div class="sv-deploy-board">
+                        @if (GroupingDomains)
+                        {
+                            <div class="sv-deploy-dom-groups">
+                                @foreach (var domain in _roles.GroupBy(role => role.Domain).OrderByDescending(group => group.Select(role => role.App).Distinct().Count()).ThenBy(group => group.Key))
+                                {
+                                    var visible = domain.Where(role => Matches(role, Filter)).ToArray();
+                                    if (visible.Length == 0) continue;
+                                    <section class="sv-deploy-dom-card">
+                                        <header class="sv-atlas-group-head">
+                                            <h4>@DomainName(domain.Key) <code class="mono sv-dim">@domain.Key</code></h4>
+                                            <span class="sv-dim">@T("atlasRolesCount", visible.Length)</span>
+                                            <a class="sv-atlas-dom-link" href="@Workbench.Link(DiscoveryWorkbench.DOMAINS, ("domain", domain.Key))">@T("depOpenDomain") <MoIcon Icon="@MoIcons.ArrowUpRight" Size="13px" /></a>
+                                        </header>
+                                        <div class="sv-role-cloud">
+                                            @foreach (var role in visible) { @RolePill(role, true) }
+                                        </div>
+                                    </section>
+                                }
+                            </div>
+                        }
+                        else
+                        {
+                            <div class="sv-deploy-cards">
+                                @foreach (var app in _apps)
+                                {
+                                    var roles = _roles.Where(role => role.App == app.Id).ToArray();
+                                    var visible = roles.Where(role => Matches(role, Filter)).ToArray();
+                                    var artifacts = Artifacts(app);
+                                    var selective = app.Instances.Any(instance => instance.State.Diagnostics?.IncludedRoles is { } ids && ids.Count < Model.Roles.Count);
+                                    <article @key="app.Id" class="sv-deploy-card role-@StatusRole(app.State.OverallStatus) @(SelectedRole is null && SelectedApp?.Id == app.Id ? "is-selected-app" : null) @(app.Offline ? "is-offline" : null) @(roles.Length > 0 && visible.Length == 0 ? "is-dim" : null)">
+                                        <header class="sv-deploy-card-head">
+                                            <div class="sv-deploy-card-id">
+                                                <div class="sv-deploy-card-title-row">
+                                                    <a class="sv-atlas-name" href="@Workbench.Here(("app", app.Id), ("role", null))">@app.Name</a>
+                                                    <DiscoveryBadge Role="@StatusRole(app.State.OverallStatus)">@T("statuses:" + app.State.OverallStatus)</DiscoveryBadge>
+                                                    @if (app.Id == Model.Host.CurrentInstance.AppId) { <span class="chip role-info">@T("thisHostTag")</span> }
+                                                </div>
+                                                <div class="sv-atlas-sub"><code>@app.Id</code><MoCopyButton Value="@app.Id" Label="@T("copyId")" />
+                                                    @if (artifacts.Length > 0)
+                                                    {
+                                                        <span class="sv-artifact-tag mono @(selective ? "is-selective" : null)">@string.Join(" / ", artifacts) @(selective ? T("atlasSelectiveArtifact") : "")</span>
+                                                    }
+                                                </div>
+                                            </div>
+                                            <div class="sv-deploy-card-actions"><a class="btn btn-outline btn-sm" href="@Workbench.Here(("inspect", app.Id), ("tab", null))">@T("inspect")</a></div>
+                                        </header>
+                                        <div class="sv-deploy-metrics">
+                                            <div class="sv-atlas-pips" aria-label="@T("colInstances")">
+                                                @if (app.Offline) { <span class="sv-atlas-zero hatch">@T("expectedOnly")</span> }
+                                                @foreach (var instance in app.Instances)
+                                                {
+                                                    <span class="sv-atlas-pip role-@HeartbeatRole(instance.Health)" title="@instance.State.InstanceId">
+                                                        <span class="sw @(instance.State.IsLeader ? "is-diamond" : null)"></span><span class="mono">@T("ageSeconds", Num(instance.Age))</span>
+                                                    </span>
+                                                }
+                                                @if (app.State.EvictedInstances.Count > 0) { <span class="sv-atlas-ev-chip role-warning">@T("hzDisappearedTag", app.State.EvictedInstances.Count)</span> }
+                                            </div>
+                                            <div class="sv-deploy-health-strip">
+                                                @foreach (var group in roles.GroupBy(role => role.Status))
+                                                {
+                                                    <span class="sv-hz-pill role-@HealthRole(group.Key)">@T("roleHealthStatuses:" + (group.Key?.ToString() ?? "Unavailable")) @group.Count()</span>
+                                                }
+                                                @foreach (var source in roles.Select(role => role.Provenance).Distinct())
+                                                {
+                                                    <span class="sv-deploy-hsrc mono">@T("provenance:" + source)</span>
+                                                }
+                                            </div>
+                                        </div>
+                                        <div class="sv-deploy-roles-wrap">
+                                            @if (visible.Length == 0)
+                                            {
+                                                <p class="sv-atlas-unassigned">@T(roles.Length == 0 ? "atlasNoRolesAssigned" : "atlasNoRolesMatchFilter")</p>
+                                            }
+                                            else
+                                            {
+                                                <div class="sv-role-cloud" role="group" aria-label="@($"{app.Id} {T("hostFields:roles")}")">
+                                                    @foreach (var role in visible) { @RolePill(role, false) }
+                                                </div>
+                                            }
+                                        </div>
+                                        <footer class="sv-atlas-card-foot mono">
+                                            @T("atlasRolesCount", roles.Length) · @T("atlasRemoteEdgeFoot", Model.Calls.Count(call => call.SourceApp == app.Id && call.Remote), Model.Calls.Count(call => call.TargetApp == app.Id && call.Remote))
+                                        </footer>
+                                    </article>
+                                }
+                            </div>
+                        }
+                    </div>
+                    <aside class="mo-vl-surface sv-deploy-dock" aria-label="@T("roleInspectorTitle")">
+                        <header class="sv-deploy-dock-head">
+                            <div class="sv-deploy-dock-eyebrow sv-dim">
+                                <span>@T(SelectedRole is null ? "atlasAppInspector" : "roleInspectorTitle")</span>
+                                @if (SelectedRole?.App is { } parent)
+                                {
+                                    <a class="btn btn-ghost btn-sm" href="@Workbench.Here(("app", parent), ("role", null), ("direction", null))">← @parent</a>
+                                }
+                                else if (SelectedApp is { } inspected)
+                                {
+                                    <a class="btn btn-outline btn-sm" href="@Workbench.Here(("inspect", inspected.Id), ("tab", null))"><MoIcon Icon="@MoIcons.ArrowUpRight" Size="13px" />@T("inspect")</a>
+                                }
+                            </div>
+                            <div class="sv-deploy-dock-title">
+                                <h3>@(SelectedRole?.Id ?? SelectedApp?.Name ?? T("atlasChooseRole"))</h3>
+                                @if (SelectedRole is { } focusedRole)
+                                {
+                                    <DiscoveryBadge Role="@HealthRole(focusedRole.Status)">@T("roleHealthStatuses:" + (focusedRole.Status?.ToString() ?? "Unavailable"))</DiscoveryBadge>
+                                }
+                            </div>
+                            @if (SelectedRole is { } placed)
+                            {
+                                <div class="sv-deploy-dock-meta"><a class="chip is-outline" href="@Workbench.Link(DiscoveryWorkbench.DOMAINS, ("domain", placed.Domain))">@DomainName(placed.Domain)</a><code>@placed.App</code><span class="chip role-third">@T("criticality:" + placed.Criticality)</span></div>
+                            }
+                            else if (SelectedApp is { } selected)
+                            {
+                                <div class="sv-deploy-dock-meta mono"><code>@selected.Id</code><span>·</span><span>@string.Join(" / ", Artifacts(selected))</span><span>·</span><span>@T("atlasRolesCount", Model.Roles.Count(role => role.App == selected.Id))</span></div>
+                            }
+                        </header>
+                        <div class="sv-deploy-dock-body">
+                            @if ((Workbench.Param("role") is not null && SelectedRole is null) ||
+                                 (Workbench.Param("app") is not null && SelectedApp is null))
+                            {
+                                <MoSemanticCallout Severity="MoVisualRole.Warning" Title="@T("atlasPickNotFound")">@T("atlasNoPlacement")</MoSemanticCallout>
+                            }
+                            @if (SelectedRole is { } roleDetail)
+                            {
+                                <div class="sv-role-health-card role-@HealthRole(roleDetail.Status)">
+                                    <div class="sv-role-health-top"><b>@T("roleHealthHeading")</b><span class="sv-role-health-src">@T("provenance:" + roleDetail.Provenance)</span></div>
+                                    <p class="sv-role-health-note">@T("roleHealthExplanation:" + roleDetail.Provenance)</p>
+                                    @if ((roleDetail.Local?.LastTransitionAt ?? roleDetail.Heartbeat?.LastTransitionAt) is { } transition)
+                                    {
+                                        <p class="sv-role-health-note">@T("roleTransition", UiTime.Format(transition))</p>
+                                    }
+                                    @if (roleDetail.Local is { } local)
+                                    {
+                                        @foreach (var fault in local.Faults)
+                                        {
+                                            <div class="sv-role-health-note"><span class="chip role-warning">@T("faultStage:" + fault.Stage)</span> <time>@UiTime.Format(fault.OccurredAt)</time>
+                                                @foreach (var issue in fault.ConfigurationIssues) { <p><code>@issue.DefinitionKey · @issue.LogicalPath</code></p> }
+                                            </div>
+                                        }
+                                    }
+                                    <div class="sv-role-health-actions">
+                                        @if (roleDetail.Local is not null)
+                                        {
+                                            <a class="btn btn-outline btn-sm" href="@Workbench.Link("health-checks/roles", ("role", roleDetail.Id))">@T("openLocalRoleHealth")</a>
+                                        }
+                                        <a class="btn btn-outline btn-sm" href="@Workbench.Link(DiscoveryWorkbench.DEPENDENCIES, ("granularity", "role"), ("focus", roleDetail.Id))">@T("atlasOpenDeps")</a>
+                                    </div>
+                                </div>
+                            }
+                            else if (SelectedApp is { } appDetail)
+                            {
+                                var appRoles = Model.Roles.Where(role => role.App == appDetail.Id).ToArray();
+                                <section class="sv-deploy-app-health role-@(appRoles.Any(role => role.Status == RoleHealthStatus.Faulted) ? "error" : "info")">
+                                    <div class="sv-role-health-top">
+                                        <b>@T("atlasAppRoleHealth")</b>
+                                        <span class="sv-role-health-src">@string.Join(" · ", appRoles.Select(role => T("provenance:" + role.Provenance)).Distinct())</span>
+                                    </div>
+                                    <div class="sv-deploy-hcounts">
+                                        @foreach (var status in AppHealthStatuses)
+                                        {
+                                            <span><span class="sw role-@HealthRole(status)"></span>@T("roleHealthStatuses:" + status) <b class="mono">@appRoles.Count(role => role.Status == status)</b></span>
+                                        }
+                                    </div>
+                                    <div class="sv-deploy-unhealthy-list">
+                                        @foreach (var role in appRoles.Where(role => role.Status is RoleHealthStatus.Faulted or RoleHealthStatus.Degraded))
+                                        {
+                                            <a class="sv-deploy-uh-row role-@HealthRole(role.Status)" href="@Workbench.Here(("role", role.Id), ("app", null), ("direction", null))">
+                                                <span class="sw"></span><code>@role.Id</code><span class="sv-deploy-uh-note">@T("roleHealthStatuses:" + role.Status)</span>
+                                            </a>
+                                        }
+                                    </div>
+                                    <div class="sv-role-health-actions">
+                                        <a class="btn btn-outline btn-sm" href="@Workbench.Link("health-checks/roles")"><MoIcon Icon="@MoIcons.ShieldCheck" Size="14px" />@T("atlasOpenRoleHealthBoard")</a>
+                                        <a class="btn btn-ghost btn-sm" href="@Workbench.Link(DiscoveryWorkbench.DEPENDENCIES, ("granularity", "role"), ("q", appDetail.Id))">@T("atlasOpenDeps")</a>
+                                    </div>
+                                </section>
+                            }
+                            <div class="sv-deploy-calls-sec">
+                                <div class="sv-deploy-calls-head">
+                                    <h4>@T("roleCallsHeading")</h4>
+                                    <div class="seg sv-deploy-call-seg">
+                                        @foreach (var direction in Directions)
+                                        {
+                                            <button type="button" aria-pressed="@DiscoveryWorkbench.Bool(Direction == direction)" @onclick='() => Workbench.Pick("direction", direction)'>@T("directions:" + direction, Related.Count(call => InBucket(call, direction)))</button>
+                                        }
+                                    </div>
+                                </div>
+                                <p class="sv-deploy-call-hint">@T(Direction == "localrun" ? "atlasLocalRunHint" : Direction == "ordinary" ? "atlasOrdinaryHint" : "routingBoundaryNote")</p>
+                                @if (DockCalls.Count == 0) { <p class="sv-deploy-empty-note sv-dim">@T("atlasNoCalls")</p> }
+                                else
+                                {
+                                    <ul class="sv-rcall-list">@foreach (var call in DockCalls) { <li><DiscoveryCallCard Call="@call" /></li> }</ul>
+                                }
+                            </div>
+                        </div>
+                    </aside>
+                </div>
+            }
+        </div>
+        <footer class="sv-scope-foot"><MoIcon Icon="@MoIcons.Info" Size="14px" /><span>@T("atlasNoEdgesNote")</span></footer>
+    </ChildContent>
+</DiscoverySurface>
+
+@code {
+    private static readonly (string Key, string Label, MoVisualRole Role)[] Filters =
+    [
+        ("all", "atlasFilterAll", MoVisualRole.Primary), ("faulted", "atlasFilterFaulted", MoVisualRole.Error),
+        ("degraded", "atlasFilterDegraded", MoVisualRole.Warning), ("remote", "atlasFilterRemote", MoVisualRole.Primary),
+        ("required", "atlasFilterRequired", MoVisualRole.Info)
+    ];
+    private static readonly string[] Directions = ["remote", "localrun", "ordinary"];
+    private static readonly RoleHealthStatus[] AppHealthStatuses = [RoleHealthStatus.Healthy, RoleHealthStatus.Degraded, RoleHealthStatus.Faulted];
+    private IReadOnlyList<ServiceRow> _apps = [];
+    private IReadOnlyList<RoleRow> _roles = [];
+    private IReadOnlyDictionary<string, string> _peers = new Dictionary<string, string>();
+    private DiscoveryEvidence Model => Workbench.Evidence!;
+    private int Faulted => Model.Roles.Count(role => role.Status == RoleHealthStatus.Faulted);
+    private int Degraded => Model.Roles.Count(role => role.Status == RoleHealthStatus.Degraded);
+    private int Healthy => Model.Roles.Count(role => role.Status == RoleHealthStatus.Healthy);
+    private int Unavailable => Model.Roles.Count(role => role.Status is null);
+    private int Remote => Model.Calls.Count(call => call.Remote);
+    private string Filter => Workbench.Param("roleFilter") ?? "all";
+    private string Direction => Workbench.Param("direction") ?? Directions.FirstOrDefault(bucket => Related.Any(call => InBucket(call, bucket))) ?? "remote";
+    private bool GroupingDomains => Workbench.Param("group") == "domain";
+    private RoleRow? SelectedRole => Model.RoleById.GetValueOrDefault(Workbench.Param("role") ?? "");
+    private ServiceRow? SelectedApp => Workbench.Param("app") is { } key ? Model.ServiceById.GetValueOrDefault(key) : _apps.FirstOrDefault();
+    private IReadOnlyList<CallRow> Related { get; set; } = [];
+    private IReadOnlyList<CallRow> DockCalls { get; set; } = [];
+    private string DomainName(string id) => Model.Domains.FirstOrDefault(domain => domain.Id == id)?.Catalog?.DisplayName ?? id;
+
+    protected override void OnParametersSet()
+    {
+        var query = Workbench.Param("q")?.Trim();
+        var status = Workbench.Param("status");
+        var domain = Workbench.Param("domain");
+        var registered = Workbench.Param("registered") == "1";
+        _apps = Model.Services.Where(app => (!registered || !app.Offline) &&
+            (status is null or "all" || app.State.OverallStatus.ToString() == status) &&
+            (domain is null or "all" || (domain == "unassigned" ? app.Domains.Count == 0 : app.Domains.Contains(domain))) &&
+            (string.IsNullOrWhiteSpace(query) ||
+            new[] { app.Id, app.Name, app.State.ProjectName }.Concat(app.Domains).Concat(app.State.RoleIds)
+                .Concat(Model.Roles.Where(role => role.App == app.Id).Select(role => role.Id))
+                .Any(value => value?.Contains(query, StringComparison.OrdinalIgnoreCase) == true)))
+            .OrderByDescending(app => app.Id == Model.Host.CurrentInstance.AppId)
+            .ThenByDescending(app => Model.Roles.Count(role => role.App == app.Id && role.Status == RoleHealthStatus.Faulted))
+            .ThenByDescending(app => Model.Roles.Count(role => role.App == app.Id && role.Status == RoleHealthStatus.Degraded))
+            .ThenByDescending(app => Model.Roles.Count(role => role.App == app.Id))
+            .ThenBy(app => app.Name).ToArray();
+        _roles = Model.Roles.Where(role => _apps.Any(app => app.Id == role.App)).ToArray();
+        var active = SelectedRole?.Id;
+        var related = Model.Calls.Where(call => active is not null ? call.SourceRole == active || call.TargetRole == active :
+            call.SourceApp == SelectedApp?.Id && call.SourceApp is not null || call.TargetApp == SelectedApp?.Id && call.TargetApp is not null).ToArray();
+        _peers = active is null ? new Dictionary<string, string>() : related.Select(call =>
+            (Id: call.SourceRole == active ? call.TargetRole : call.SourceRole, Call: call))
+            .Where(item => item.Id is not null).GroupBy(item => item.Id!)
+            .ToDictionary(set => set.Key, set => set.Any(item => item.Call.Severity == 2) ? "is-peer-risk"
+                : set.Any(item => item.Call.Remote) ? "is-peer-remote" : "is-peer-local", StringComparer.Ordinal);
+        Related = related;
+        DockCalls = related.Where(call => InBucket(call, Direction)).OrderByDescending(call => call.Severity)
+            .ThenBy(call => call.Definition.Operation).ToArray();
+    }
+
+    private static string[] Artifacts(ServiceRow app) => app.Instances
+        .Select(instance => instance.State.Diagnostics?.Artifact ?? instance.State.Metadata.GetValueOrDefault("ARTIFACT"))
+        .OfType<string>().Distinct(StringComparer.Ordinal).ToArray();
+
+    private static bool InBucket(CallRow call, string bucket) => bucket switch
+    {
+        "remote" => call.Remote, "localrun" => call.Route == "local-runonrole", _ => call.Route is "local-ordinary" or "unknown"
+    };
+
+    private void ResetFilters() => Workbench.SetQuery(false, ("q", null), ("status", null), ("domain", null), ("registered", null), ("roleFilter", null));
+
+    private bool Matches(RoleRow role, string filter) => filter switch
+    {
+        "faulted" => role.Status == RoleHealthStatus.Faulted,
+        "degraded" => role.Status == RoleHealthStatus.Degraded,
+        "required" => role.Criticality == RoleCriticality.Required,
+        "remote" => HasRemote(role.Id),
+        _ => true
+    };
+
+    private bool HasRemote(string id) => Model.Calls.Any(call => call.Remote && (call.SourceRole == id || call.TargetRole == id));
+
+    private RenderFragment RolePill(RoleRow role, bool domainGroup) => @<button type="button"
+        class="sv-role-pill role-@HealthRole(role.Status) @(SelectedRole?.Id == role.Id ? "is-selected" : _peers.GetValueOrDefault(role.Id, SelectedRole is null ? "" : "is-peer-dim"))"
+        aria-pressed="@DiscoveryWorkbench.Bool(SelectedRole?.Id == role.Id)" @onclick='() => Workbench.SetQuery(false, ("role", SelectedRole?.Id == role.Id ? null : role.Id), ("app", null), ("direction", null))'>
+        <span class="sw"></span><span class="sv-role-pill-id mono">@role.Id</span>
+        @if (domainGroup) { <span class="sv-role-app-sub mono">@role.App</span> }
+        else { <span class="sv-role-crit mono @(role.Criticality == RoleCriticality.Required ? "is-req" : "is-opt")">@T("criticalityShort:" + role.Criticality)</span> }
+        @if (role.Status == RoleHealthStatus.Faulted) { <span class="sv-role-flag role-error mono">503</span> }
+        @if (role.Status == RoleHealthStatus.Degraded) { <span class="sv-role-flag role-warning">@T("roleHealthShort:Degraded")</span> }
+        @if (HasRemote(role.Id)) { <span class="sv-role-remote-cue" title="@T("atlasRemoteCapableTip")">⇄</span> }
+    </button>;
+}

@@ -1,0 +1,26 @@
+@inherits DiscoveryComponent
+
+<div class="sv-rcall-item role-@(Call.Risk is { } risk ? RiskRole(risk) : RoutingRole(Call.Route))">
+    <div class="sv-rcall-top">
+        <span class="sv-rcall-dir" aria-hidden="true">→</span>
+        <a class="sv-rcall-peer mono" href="@Workbench.Link(DiscoveryWorkbench.REGISTRY, ("view", "atlas"), ("role", Call.TargetRole))">@Call.TargetRole</a>
+        @if (Call.TargetApp is { } destination) { <code class="sv-rcall-app">@destination</code> }
+        <DiscoveryBadge Role="@RoutingRole(Call.Route)">@T("routesVerdict:" + Call.Route)</DiscoveryBadge>
+        @if (Call.Risk is { } danger) { <DiscoveryBadge Role="@RiskRole(danger)">@T("routingRisk:" + danger)</DiscoveryBadge> }
+    </div>
+    <div class="sv-rcall-op">
+        <code title="@Call.Definition.Operation">@ShortName(Call.Definition.Operation)</code>
+        @if (Call.Definition.RequiredRole is { } required) { <span class="sv-runon-tag mono">[RunOnRole(@required)]</span> }
+        else { <span class="sv-ord-tag">@T("ordinaryContract")</span> }
+    </div>
+    <div class="sv-rcall-meta">
+        <code>@(Call.SourceApp ?? "—") → @(Call.TargetApp ?? "—")</code>
+        <code title="@Call.Definition.SourceType">@ShortName(Call.Definition.SourceType)</code>
+        @if (Call.Remote) { <span>@T("targetInstanceEvidence", Call.TargetInstances)</span> }
+        @if (Call.Route == "local-runonrole") { <span>@T("splitImpact")</span> }
+    </div>
+</div>
+
+@code {
+    [Parameter, EditorRequired] public CallRow Call { get; set; } = default!;
+}
