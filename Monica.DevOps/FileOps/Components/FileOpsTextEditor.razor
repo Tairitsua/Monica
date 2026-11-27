@@ -1,0 +1,175 @@
+@using System.Globalization
+@using System.Text
+@using Microsoft.JSInterop
+@using Microsoft.Extensions.Logging
+@implements IAsyncDisposable
+@inject IJSRuntime JS
+@inject ILogger<FileOpsTextEditor> Logger
+@inject IStringLocalizer<FileOpsResource> L
+
+<section class="fo-editor-wrap">
+    <div class="fo-editor-bar">
+        <div class="fo-editor-find">
+            <MoIcon Icon="@MoIcons.Search" Size="14px" />
+            <input type="search" value="@_search" @oninput="FindChanged" @onkeydown="FindKeyAsync"
+                   placeholder="@L["Design:InspFindPlaceholder"]" aria-label="@L["Design:InspFindPlaceholder"]" />
+            @if (_search.Length > 0)
+            {
+                <span class="fo-find-count mo-vl-mono" aria-live="polite">@L["Design:InspFindHits", _matches.Count == 0 ? 0 : Math.Max(1, _hit + 1), _matches.Count]</span>
+                <button type="button" class="fo-icon" disabled="@(_matches.Count == 0)" aria-label="@L["Design:PreviousMatch"]"
+                        @onclick="@(() => SelectMatchAsync(-1))"><MoIcon Icon="@MoIcons.ChevronUp" Size="16px" /></button>
+                <button type="button" class="fo-icon" disabled="@(_matches.Count == 0)" aria-label="@L["Design:NextMatch"]"
+                        @onclick="@(() => SelectMatchAsync(1))"><MoIcon Icon="@MoIcons.ChevronDown" Size="16px" /></button>
+            }
+        </div>
+        <div class="fo-budget @BudgetRole.ToCssClass()">
+            <span class="mo-vl-mono">@L[Size > Limit ? "Design:InspBudgetOver" : "Design:InspBudget", FileOpsLabels.Bytes(Size), FileOpsLabels.Bytes(Limit)]</span>
+            <span class="fo-budget-track" aria-hidden="true"><i style="@BudgetStyle"></i></span>
+        </div>
+    </div>
+    <div class="fo-codebox @(ReadOnly ? "is-readonly" : null)">
+        <div class="fo-gutter mo-vl-mono" aria-hidden="true" @ref="_gutter"><pre>1</pre></div>
+        <textarea @ref="_textarea" class="fo-code-input mo-vl-mono" aria-label="@L["Design:InspEditorLabel"]"
+                  spellcheck="false" autocomplete="off" wrap="off" readonly="@ReadOnly" value="@Draft"></textarea>
+        <button type="button" hidden @ref="_inputSignal" @onclick="NotifyDraftAsync"></button>
+    </div>
+    @if (_draftError)
+    {
+        <p class="fo-field-err" role="alert">@L["Design:EditorSyncFailed"]</p>
+    }
+    @if (!ReadOnly)
+    {
+        <p class="fo-save-note"><MoIcon Icon="@MoIcons.Info" Size="14px" /><span>@L["Design:InspSaveWarning"]</span></p>
+    }
+</section>
+
+@code {
+    [Parameter, EditorRequired] public FileOpsFileTextContent File { get; set; } = null!;
+    [Parameter] public long Limit { get; set; }
+    [Parameter, EditorRequired] public string Draft { get; set; } = "";
+    [Parameter] public EventCallback<string> DraftChanged { get; set; }
+    [Parameter] public bool ReadOnly { get; set; }
+
+    private readonly SemaphoreSlim _streams = new(1);
+    private Task<IJSObjectReference>? _import;
+    private ElementReference _textarea, _gutter, _inputSignal;
+    private List<int> _matches = [];
+    private string _search = "", _lastDraft = "";
+    private int _hit;
+    private int Size { get; set; }
+    private bool _retired, _draftError;
+    private MoVisualRole BudgetRole => Size > Limit ? MoVisualRole.Error : Limit > 0 && Size / (double)Limit >= .8 ? MoVisualRole.Warning : MoVisualRole.Success;
+    private string BudgetStyle => $"width:{Math.Clamp(Size * 100d / Math.Max(1, Limit), 0d, 100d).ToString("0.0", CultureInfo.InvariantCulture)}%";
+
+    protected override void OnParametersSet()
+    {
+        Size = ByteCount(File, Draft);
+        if (Draft == _lastDraft) return;
+        _lastDraft = Draft;
+        FindMatches(Draft);
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (_retired) return;
+        try
+        {
+            _import ??= JS.InvokeAsync<IJSObjectReference>("import", "./_content/Monica.DevOps/FileOps/Components/FileOpsTextEditor.razor.js").AsTask();
+            var module = await _import;
+            if (!_retired) await module.InvokeVoidAsync("sync", _textarea, _gutter, _inputSignal);
+        }
+        catch (JSDisconnectedException) { }
+    }
+
+    private async Task NotifyDraftAsync() => await FlushAsync();
+
+    internal async Task<bool> FlushAsync()
+    {
+        if (_retired) return false;
+        if (ReadOnly || _import is null) return true;
+        await _streams.WaitAsync();
+        try
+        {
+            if (_retired) return false;
+            var module = await _import;
+            await using var source = await module.InvokeAsync<IJSStreamReference>("read", _textarea);
+            // A browser edit can cross the encoded cap; allow room to show it without raising the circuit message limit.
+            var maximum = Limit >= (long.MaxValue - 4096) / 4 ? long.MaxValue : Limit * 4 + 4096;
+            await using var stream = await source.OpenReadStreamAsync(maximum);
+            using var reader = new StreamReader(stream, Encoding.UTF8);
+            var value = RestoreLineEndings(await reader.ReadToEndAsync());
+            if (_retired) return false;
+            _draftError = false;
+            if (!string.Equals(value, Draft, StringComparison.Ordinal))
+                await DraftChanged.InvokeAsync(value);
+            return true;
+        }
+        catch (JSDisconnectedException) { return false; }
+        catch (OperationCanceledException) when (_retired) { return false; }
+        catch (Exception exception) when (exception is IOException or ArgumentOutOfRangeException or JSException)
+        {
+            if (!_retired)
+            {
+                _draftError = true;
+                Logger.LogWarning(exception, "Could not synchronize the FileOps editor draft.");
+                StateHasChanged();
+            }
+            return false;
+        }
+        finally { _streams.Release(); }
+    }
+
+    internal static int ByteCount(FileOpsFileTextContent file, string text) => Encoding.GetEncoding(file.EncodingName).GetByteCount(text);
+
+    private string RestoreLineEndings(string text)
+    {
+        var baseline = File.Content;
+        return baseline.Contains("\r\n", StringComparison.Ordinal) && !baseline.Replace("\r\n", "", StringComparison.Ordinal).Contains('\n')
+            ? text.Replace("\n", "\r\n", StringComparison.Ordinal) : text;
+    }
+
+    private void FindChanged(ChangeEventArgs args)
+    {
+        _search = args.Value?.ToString() ?? "";
+        _hit = -1;
+        FindMatches(Draft);
+    }
+
+    private void FindMatches(string draft)
+    {
+        _matches = [];
+        if (_search.Length == 0) return;
+        var text = draft.Replace("\r\n", "\n", StringComparison.Ordinal).Replace('\r', '\n');
+        for (var i = 0; i <= text.Length - _search.Length;)
+        {
+            var match = text.IndexOf(_search, i, StringComparison.OrdinalIgnoreCase);
+            if (match < 0) break;
+            _matches.Add(match);
+            i = match + _search.Length;
+        }
+        _hit = Math.Clamp(_hit, -1, _matches.Count - 1);
+    }
+
+    private Task FindKeyAsync(KeyboardEventArgs e) => e.Key == "Enter" ? SelectMatchAsync(e.ShiftKey ? -1 : 1) : Task.CompletedTask;
+
+    private async Task SelectMatchAsync(int direction)
+    {
+        if (!await FlushAsync() || _retired || _matches.Count == 0 || _import is null) return;
+        _hit = _hit < 0 && direction < 0 ? _matches.Count - 1 : (_hit + direction + _matches.Count) % _matches.Count;
+        try { await (await _import).InvokeVoidAsync("selectMatch", _textarea, _matches[_hit], _search.Length); }
+        catch (JSDisconnectedException) { }
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        _retired = true;
+        await _streams.WaitAsync();
+        try
+        {
+            if (_import is not null) await (await _import).DisposeAsync();
+        }
+        catch (JSDisconnectedException) { }
+        catch (OperationCanceledException) when (_retired) { }
+        finally { _streams.Release(); }
+    }
+}

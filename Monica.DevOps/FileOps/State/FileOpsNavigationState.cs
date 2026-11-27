@@ -1,18 +1,36 @@
+using Monica.DevOps.FileOps.Facades;
+
 namespace Monica.DevOps.FileOps.State;
 
-/// <summary>Passive circuit-local identities used to revalidate a return to Files.</summary>
-/// <remarks>Contains no drafts, content, producers or disposable owners. Each Files visit reads current
-/// policy and disk evidence before restoring these identities. Paths never enter URLs or browser storage.</remarks>
-public sealed class FileOpsNavigationState
+/// <summary>Owns one Files workbench session inside a Blazor circuit.</summary>
+/// <remarks>Sibling routes borrow the same controller and drafts. A confirmed departure ends the visit.
+/// Neither draft contents nor checked batch paths are written to browser history or storage.</remarks>
+public sealed class FileOpsNavigationState : IAsyncDisposable
 {
-    /// <summary>The last accepted directory, or null for the normalized startup directory.</summary>
-    public string? DirectoryPath { get; set; }
-    /// <summary>The client sort key for the accepted displayed subset.</summary>
-    public FileOpsSortField SortField { get; set; }
-    /// <summary>Whether to reverse the selected key while retaining directories first.</summary>
-    public bool SortDescending { get; set; }
-    /// <summary>Checked identities pruned against fresh returned entries on restoration.</summary>
-    public List<string> CheckedPaths { get; set; } = [];
-    /// <summary>A clean inspected path to reopen through a fresh read; never cached text.</summary>
-    public string? InspectedPath { get; set; }
+    private FileOpsWorkspaceController? _controller;
+    internal event Func<Task>? Changed;
+    internal FileOpsPolicyDraft? PolicyDraft { get; set; }
+    internal FileOpsViewQuery FilesQuery { get; set; } = new();
+
+    internal FileOpsWorkspaceController Borrow(FileOpsFacade facade) =>
+        _controller ??= new FileOpsWorkspaceController(facade, NotifyAsync);
+
+    internal async ValueTask EndVisitAsync(FileOpsWorkspaceController controller)
+    {
+        if (!ReferenceEquals(controller, _controller)) return;
+        _controller = null;
+        PolicyDraft = null;
+        FilesQuery = new();
+        await controller.DisposeAsync();
+    }
+
+    /// <summary>Retires the active controller and drains its admitted work when the circuit ends.</summary>
+    public ValueTask DisposeAsync() => _controller is { } controller ? EndVisitAsync(controller) : ValueTask.CompletedTask;
+
+    private async Task NotifyAsync()
+    {
+        if (Changed is not { } handlers) return;
+        foreach (Func<Task> handler in handlers.GetInvocationList())
+            await handler();
+    }
 }

@@ -1,68 +1,343 @@
-@using Monica.UI.Shared.Components.Dialogs
-@using Monica.DevOps.FileOps.Models
-@using Monica.DevOps.FileOps.State
-@using Monica.Tool.Text
-@implements IAsyncDisposable
-<div class="policy-dialog-owner">
-<MudDialog DefaultFocus="DefaultFocus.FirstChild" ContentClass="policy-content" ActionsClass="policy-footer" Style="width:calc(100vw - 32px);max-width:960px;max-height:calc(100dvh - 32px);margin:16px;overflow:hidden;border-radius:12px" OnKeyUp="KeyUpAsync" OnBackdropClick="@(_ => RequestDismissAsync())">
-    <TitleContent><div class="policy-titlebar"><div class="policy-title"><MoDialogHeading Text="@L["Policy:Title"]" /><span>@L["Policy:HostMemory"]</span></div><MudIconButton Icon="@MoIcons.Close" aria-label="@L["Policy:Close"]" aria-disabled="@(Busy ? "true" : "false")" OnClick="RequestDismissAsync" /></div></TitleContent>
-    <DialogContent>
-<div class="policy-workspace">
-    <MudAlert Severity="Severity.Info" Variant="Variant.Outlined" Icon="@MoIcons.Info">@L["Policy:Scope"]</MudAlert>
-    @if (_accessDenied)
-    { <MudAlert Severity="Severity.Warning" Variant="Variant.Outlined" role="status" Icon="@MoIcons.Warning">@L["Policy:AccessDenied"]</MudAlert> }
-    else if (!_initialized)
-    {
-        @if (Busy) { <MudProgressLinear Indeterminate="true" Color="Color.Primary" aria-label="@L["Policy:Loading"]" /> }
-        <FileOpsOutcomeView Outcome="@_read" />
-    }
-    else
-    {
-        @if (Busy) { <MudProgressLinear Indeterminate="true" Color="Color.Primary" aria-label="@L["Workspace:Working"]" /> }
-        <section class="policy-surface" aria-label="@L["Policy:Form"]">
-            <div class="policy-groups">
-                <section class="policy-locations"><h2>@L["Policy:Locations"]</h2>
-                    <div class="technical-fields">
-                        <MudTextField T="string" Label="@L["Policy:AllowedRoots"]" HelperText="@L["Policy:RootsHelper"]" Value="@_roots" ValueChanged="SetRoots" Lines="2" Sizing="InputSizing.Auto" MaxLines="12" Variant="Variant.Outlined" Immediate="true" spellcheck="false" />
-                        <MudAlert Severity="Severity.Warning" Variant="Variant.Outlined" Icon="@MoIcons.Warning">@L["Policy:EmptyRoots"]</MudAlert>
-                        <MudTextField T="string" Label="@L["Policy:Startup"]" HelperText="@L["Policy:StartupHelper"]" Value="@_draft.StartupPath" ValueChanged="SetStartup" Variant="Variant.Outlined" Immediate="true" spellcheck="false" />
-                        <MudTextField T="string" Label="@L["Policy:ReadOnlyPaths"]" HelperText="@L["Policy:ReadOnlyHelper"]" Value="@_readOnly" ValueChanged="SetReadOnly" Lines="2" Sizing="InputSizing.Auto" MaxLines="12" Variant="Variant.Outlined" Immediate="true" spellcheck="false" />
-                    </div>
-                </section>
-                <div class="policy-right">
-                    <section><h2>@L["Policy:Operations"]</h2><div class="switch-rows">
-                        <div><MudSwitch T="bool" Value="@_draft.AllowWriteOperations" ValueChanged="SetWrite" Color="Color.Primary" Label="@L["Policy:AllowWrite"]" /><p>@L["Policy:WriteHelper"]</p></div>
-                        <div><MudSwitch T="bool" Value="@_draft.AllowDeleteOperations" ValueChanged="SetDelete" Color="@(_draft.AllowDeleteOperations ? Color.Warning : Color.Default)" Label="@L["Policy:AllowDelete"]" /><p>@L["Policy:DeleteHelper"]</p></div>
-                        <div><MudSwitch T="bool" Value="@_draft.AllowHiddenEntries" ValueChanged="SetHidden" Color="@(_draft.AllowHiddenEntries ? Color.Info : Color.Default)" Label="@L["Policy:AllowHidden"]" /><p>@L["Policy:HiddenHelper"]</p></div>
-                    </div></section>
-                    <section><h2>@L["Policy:Limits"]</h2><div class="limit-fields">
-                        <MudNumericField T="long" Label="@L["Policy:MaxText"]" HelperText="@L["Policy:TextLimitHelper", _draft.MaxTextFileSizeBytes.FormatByteSize()]" Value="@_draft.MaxTextFileSizeBytes" ValueChanged="SetTextLimit" Min="4096" Variant="Variant.Outlined" Immediate="true" Error="@(_draft.MaxTextFileSizeBytes < 4096)" ErrorText="@L["Policy:TextMinimum"]" />
-                        <MudNumericField T="long" Label="@L["Policy:MaxUpload"]" HelperText="@L["Policy:UploadLimitHelper", _draft.MaxUploadFileSizeBytes.FormatByteSize()]" Value="@_draft.MaxUploadFileSizeBytes" ValueChanged="SetUploadLimit" Min="65536" Variant="Variant.Outlined" Immediate="true" Error="@(_draft.MaxUploadFileSizeBytes < 65536)" ErrorText="@L["Policy:UploadMinimum"]" />
-                        <MudNumericField T="long" Label="@L["Policy:MaxDownload"]" HelperText="@L["Policy:DownloadLimitHelper", _draft.MaxDownloadFileSizeBytes.FormatByteSize()]" Value="@_draft.MaxDownloadFileSizeBytes" ValueChanged="SetDownloadLimit" Min="65536" Variant="Variant.Outlined" Immediate="true" Error="@(_draft.MaxDownloadFileSizeBytes < _draft.MaxUploadFileSizeBytes)" ErrorText="@L["Policy:DownloadMinimum"]" />
-                        <MudNumericField T="int" Label="@L["Policy:MaxEntries"]" HelperText="@L["Policy:EntriesHelper"]" Value="@_draft.MaxDirectoryEntries" ValueChanged="SetEntryLimit" Min="50" Max="5000" Variant="Variant.Outlined" Immediate="true" Error="@(_draft.MaxDirectoryEntries < 50 || _draft.MaxDirectoryEntries > 5000)" ErrorText="@L["Policy:EntryRange"]" />
-                    </div></section>
-                    <section><h2>@L["Policy:TextEditing"]</h2><div class="technical-fields"><MudTextField T="string" Label="@L["Policy:Extensions"]" HelperText="@L["Policy:ExtensionsHelper"]" Value="@_extensions" ValueChanged="SetExtensions" Lines="2" Sizing="InputSizing.Auto" MaxLines="12" Variant="Variant.Outlined" Immediate="true" spellcheck="false" /></div></section>
+@using System.Globalization
+@inject IStringLocalizer<FileOpsResource> L
+
+<div class="fo-policy-scope fo-sheet-notice mo-vl-role--info" role="note">
+    <MoIcon Icon="@MoIcons.Info" Size="17px" /><span>@L["Design:PolScopeBanner"]</span>
+</div>
+@if (Controller.LastCommand is { Kind: FileOpsOperationKind.SavePolicy } command)
+{
+    <FileOpsOutcomeView Outcome="command" ShowSuccess="true" />
+}
+@if (ReadOutcome is { Succeeded: false } error)
+{
+    <MoSemanticCallout Severity="@((Form is null) ? MoVisualRole.Error : MoVisualRole.Warning)"
+                      Title="@L[Form is null ? "Design:PolLoadFailed" : Controller.LastCommand is { Kind: FileOpsOperationKind.SavePolicy, Succeeded: true } && error.Kind == FileOpsOperationKind.LoadPolicy ? "Design:PolReadbackWarn" : "Design:PolRetained"]">
+        @error.Message
+    </MoSemanticCallout>
+}
+@if (Form is not { } form)
+{
+    <MoContentState Loading="Busy">
+        @if (Busy)
+        {
+            <MudProgressCircular Indeterminate="true" Color="Color.Primary" Size="Size.Small" />
+            <h2>@L["Design:LoadingTitle"]</h2>
+        }
+        else
+        {
+            <span class="mo-vl-tile mo-vl-role--error"><MoIcon Icon="@MoIcons.FolderOff" Size="18px" /></span>
+            <h2>@L["Design:PolLoadFailed"]</h2>
+            <button type="button" class="fo-outline" @onclick="Reload"><MoIcon Icon="@MoIcons.Refresh" Size="15px" />@L["Design:PolReload"]</button>
+        }
+    </MoContentState>
+}
+else
+{
+    var preview = form.Effective;
+    var fields = form.Fields;
+    var activeFile = Controller.InspectedFile;
+    var invalidates = Controller.IsDirty && activeFile is not null &&
+        FileOpsWorkspaceController.Invalidates(preview, activeFile, Controller.InspectedEntry?.IsHidden == true);
+    var extensionList = form.Draft.EditableExtensions.Select(FileOpsRuntimeConfig.NormalizeExtension).Distinct().ToArray();
+
+    <section class="fo-sig" aria-label="@L["Design:PolEnvelopeTitle"]">
+        <div class="fo-decision">
+            <div class="fo-metric">
+                <p class="fo-display-label">
+                    @L[form.IsDirty ? "Design:PolPreviewLabel" : "Design:PolSigLabel"]
+                    @if (form.IsDirty)
+                    {
+                        <span class="mo-vl-capsule mo-vl-role--warning">@L["Design:PolFooterDirty", form.ChangedCount]</span>
+                    }
+                </p>
+                <MoDisplayValue Compact="true" Value="@preview.AllowedRoots.Count.ToString("N0")" Unit="@L["Design:PolSigUnit"]" />
+                <div class="fo-reasons">
+                    @Reason(L[preview.AllowWriteOperations ? "Design:PostureWritable" : "Design:PostureWritesOff"], preview.AllowWriteOperations ? MoVisualRole.Success : MoVisualRole.Warning)
+                    @Reason(L[preview.AllowDeleteOperations ? "Design:PostureDeleteOn" : "Design:PostureDeleteOff"], DeleteRole(preview), !preview.AllowDeleteOperations)
+                    @Reason(L[preview.AllowHiddenEntries ? "Design:PostureHiddenOn" : "Design:PostureHiddenOff"], HiddenRole(preview), !preview.AllowHiddenEntries)
+                    @Reason(L["Design:PolEnvRoTag"], MoVisualRole.Warning, preview.ReadOnlyPaths.Count == 0, preview.ReadOnlyPaths.Count)
                 </div>
             </div>
-            <div class="policy-outcomes">
-                <FileOpsOutcomeView Outcome="@_command" ShowSuccess="true" />
-                <FileOpsOutcomeView Outcome="@_read" />
-                @if (_newerEdits) { <p class="newer-edits">@L["Policy:NewerEdits"]</p> }
-                @if (_readbackFailed)
-                { <MudAlert Severity="Severity.Warning" Variant="Variant.Outlined" Icon="@MoIcons.Warning">@L["Policy:ReadbackFailed"]</MudAlert> }
-            </div>
-
-        </section>
-    }
-</div>
-
-    </DialogContent>
-    <DialogActions><footer class="policy-actions">
-        <span><MoIcon Size="1.25rem" Icon="@(Dirty ? MoIcons.Edit : MoIcons.Check)" Style="@(Dirty ? "color:var(--mud-palette-warning);" : "color:var(--mud-palette-text-secondary);")" />@L[!_initialized ? "Policy:NotLoaded" : Dirty ? "Inspector:Unsaved" : "Policy:NoChanges"]</span>
-        <div><MudButton @ref="_closeButton" aria-disabled="@(Busy ? "true" : "false")" OnClick="RequestDismissAsync">@L["Policy:Close"]</MudButton>
-            <MudButton Variant="Variant.Outlined" Disabled="@(Busy && !_reloadActive)" aria-disabled="@(Busy ? "true" : "false")" OnClick="ReloadAsync">@L["Policy:Reload"]</MudButton>
-            <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@MoIcons.Check" aria-disabled="@(Busy || _accessDenied || !Dirty || !Valid ? "true" : "false")" OnClick="ApplyAsync">@L["Policy:Apply"]</MudButton>
+            <p class="fo-lede">
+                @MoRichFinding.Compose(L[form.IsDirty ? "Design:PolicyPreviewFinding" : "Design:PolicyFinding"],
+                    Mark(L["Design:PolicyRootCount", preview.AllowedRoots.Count], MoVisualRole.Primary),
+                    PolicyReadOnlyFinding(preview.ReadOnlyPaths.Count),
+                    Mark(L[preview.AllowWriteOperations ? "Design:Enabled" : "Design:Disabled"], preview.AllowWriteOperations ? MoVisualRole.Success : MoVisualRole.Warning),
+                    Mark(L[preview.AllowDeleteOperations ? "Design:Enabled" : "Design:Disabled"], DeleteRole(preview)),
+                    Mark(L[preview.AllowHiddenEntries ? "Design:Shown" : "Design:Excluded"], HiddenRole(preview)),
+                    Mark(FileOpsLabels.Bytes(preview.MaxTextFileSizeBytes), MoVisualRole.Info),
+                    Mark(preview.MaxDirectoryEntries.ToString("N0"), MoVisualRole.Neutral))
+                @if (invalidates)
+                {
+                    @MoRichFinding.Compose(L["Design:PolicyFindingImpact"], @<code class="mo-vl-mono">@activeFile!.FullPath</code>)
+                }
+                @if (form.Normalization.UsedDefaultRoots) { @L["Design:PolicyFindingFallback"] }
+            </p>
         </div>
-    </footer></DialogActions>
-</MudDialog>
-</div>
+
+        <div class="fo-env">
+            <div class="fo-env-head">
+                <div><h2>@L["Design:PolEnvelopeTitle"]</h2><p>@L["Design:PolEnvelopeDesc"]</p></div>
+                <span class="fo-env-status">@(form.IsDirty ? L["Design:PolEnvDraftSummary", form.ChangedCount] : L["Design:PolEnvClean"])</span>
+            </div>
+            <div class="fo-env-lanes">
+                @foreach (var root in preview.AllowedRoots)
+                {
+                    var isStartup = FileOpsRuntimeConfig.IsWithinRoot(preview.StartupPath, root);
+                    var missing = form.MissingRoots.Contains(root);
+                    var protectedPaths = preview.ReadOnlyPaths.Where(path => FileOpsRuntimeConfig.IsWithinRoot(path, root)).ToArray();
+                    <div @key="root" class="fo-env-lane @(missing ? "is-missing" : null)">
+                        <div class="fo-env-root">
+                            <span class="fo-env-root-id">
+                                <MoIcon Icon="@(missing ? MoIcons.FolderOff : MoIcons.FolderOpen)" Size="15px" />
+                                <code class="mo-vl-mono">@root</code>
+                            </span>
+                            <div class="fo-env-badges">
+                                <span class="mo-vl-capsule @(missing ? "mo-vl-role--error" : "mo-vl-role--primary")">
+                                    @L[missing ? "Design:PolMissingRoot" : "Design:PolEnvRootTag"]
+                                </span>
+                                @if (isStartup)
+                                {
+                                    <span class="mo-vl-capsule mo-vl-role--success"><MoIcon Icon="@MoIcons.Home" Size="13px" />@L["Design:PolStartupAt", preview.StartupPath]</span>
+                                }
+                                else if (!missing)
+                                {
+                                    <button type="button" class="mo-vl-capsule mo-vl-capsule--outline" @onclick="@(() => Patch(f => f with { Startup = root }))">
+                                        @L["Design:PolEnvSetStartup"]
+                                    </button>
+                                }
+                            </div>
+                        </div>
+                        @if (protectedPaths.Length > 0)
+                        {
+                            <div class="fo-env-ro-list">
+                                @foreach (var path in protectedPaths)
+                                {
+                                    <span class="fo-env-ro-item"><MoIcon Icon="@MoIcons.Lock" Size="13px" />
+                                        <code class="mo-vl-mono">@path</code><small>@L["Design:PolEnvRoTag"]</small></span>
+                                }
+                            </div>
+                        }
+                    </div>
+                }
+            </div>
+            @if (form.Normalization.UsedDefaultRoots || form.Normalization.UsedDefaultStartup ||
+                 form.Normalization.DiscardedReadOnlyPaths.Count > 0 || invalidates)
+            {
+                <div class="fo-env-alerts">
+                    @if (form.Normalization.UsedDefaultRoots)
+                    {
+                        @Notice(MoVisualRole.Warning, L["Design:PolEnvFallbackRoots"])
+                    }
+                    @if (form.Normalization.UsedDefaultStartup)
+                    {
+                        @Notice(MoVisualRole.Info, L["Design:PolEnvFallbackStartup", preview.StartupPath])
+                    }
+                    @if (form.Normalization.DiscardedReadOnlyPaths.Count > 0)
+                    {
+                        @Notice(MoVisualRole.Warning, L["Design:PolDiscardedReadOnly", string.Join(", ", form.Normalization.DiscardedReadOnlyPaths)])
+                    }
+                    @if (invalidates)
+                    {
+                        @Notice(MoVisualRole.Warning, L["Design:PolEnvDirtyImpact", activeFile!.FullPath])
+                    }
+                </div>
+            }
+        </div>
+    </section>
+
+    <section class="fo-pol-surface" aria-label="@L["Pages:FileOpsPolicy:Title"]" aria-busy="@(Busy ? "true" : "false")">
+        <div class="fo-pol-grid">
+            <div class="fo-pol-col">
+                <div class="fo-pol-sec">
+                    <h2>@L["Design:PolSecLocations"]</h2><p class="fo-pol-desc">@L["Design:PolSecLocationsDesc"]</p>
+                    @TextArea(L["Design:PolAllowedRoots"], fields.Roots, L["Design:PolAllowedRootsHelper"], value => Patch(f => f with { Roots = value }))
+                    <div class="fo-field">
+                        <label for="fo-startup-path" class="fo-field-label">@L["Design:PolStartupPath"]</label>
+                        <input type="text" id="fo-startup-path" class="fo-input mo-vl-mono" spellcheck="false" autocomplete="off"
+                               value="@fields.Startup" @oninput="@((ChangeEventArgs e) => Patch(f => f with { Startup = Text(e) }))" />
+                        <div class="fo-preset-row">
+                            @foreach (var root in preview.AllowedRoots.Where(root => !form.MissingRoots.Contains(root)))
+                            {
+                                var current = SamePath(FileOpsRuntimeConfig.NormalizePath(fields.Startup), root);
+                                <button type="button" class="mo-vl-capsule mo-vl-mono @(current ? "mo-vl-role--primary" : "mo-vl-capsule--outline")"
+                                        aria-pressed="@(current ? "true" : "false")" @onclick="@(() => Patch(f => f with { Startup = root }))">@root</button>
+                            }
+                        </div>
+                        <span class="fo-field-help">@L["Design:PolStartupHelper"]</span>
+                    </div>
+                    @TextArea(L["Design:PolReadOnlyPaths"], fields.ReadOnly, L["Design:PolReadOnlyHelper"], value => Patch(f => f with { ReadOnly = value }))
+                </div>
+            </div>
+            <div class="fo-pol-col">
+                <div class="fo-pol-sec">
+                    <h2>@L["Design:PolSecOps"]</h2><p class="fo-pol-desc">@L["Design:PolSecOpsDesc"]</p>
+                    <div class="fo-switches">
+                        @Gate(fields.Write, MoVisualRole.Success, L["Design:PolAllowWrite"], L["Design:PolAllowWriteHelper"], value => Patch(f => f with { Write = value }))
+                        @Gate(fields.Delete, MoVisualRole.Error, L["Design:PolAllowDelete"], L["Design:PolAllowDeleteHelper"], value => Patch(f => f with { Delete = value }))
+                        @Gate(fields.Hidden, MoVisualRole.Info, L["Design:PolAllowHidden"], L["Design:PolAllowHiddenHelper"], value => Patch(f => f with { Hidden = value }))
+                    </div>
+                </div>
+                <div class="fo-pol-sec">
+                    <h2>@L["Design:PolSecLimits"]</h2><p class="fo-pol-desc">@L["Design:PolSecLimitsDesc"]</p>
+                    <div class="fo-limits-grid">
+                        @LimitField("fo-text-limit", L["Design:PolMaxText"], fields.TextLimit, 4096, null, form.TextValid,
+                            L["Design:PolMaxTextHelper", FileOpsLabels.Bytes(form.Draft.MaxTextFileSizeBytes)], L["Design:PolMaxTextErr"],
+                            [4096, 524288, 2097152, 4194304], MoVisualRole.Info, FileOpsLabels.Bytes, value => Patch(f => f with { TextLimit = value }))
+                        @LimitField("fo-upload-limit", L["Design:PolMaxUpload"], fields.UploadLimit, 65536, null, form.UploadValid,
+                            L["Design:PolMaxUploadHelper", FileOpsLabels.Bytes(form.Draft.MaxUploadFileSizeBytes)], L["Design:PolMaxUploadErr"],
+                            [5242880, 20971520, 52428800], MoVisualRole.Secondary, FileOpsLabels.Bytes, value => Patch(f => f with { UploadLimit = value }))
+                        @LimitField("fo-download-limit", L["Design:PolMaxDownload"], fields.DownloadLimit, 65536, null, form.DownloadValid,
+                            L["Design:PolMaxDownloadHelper", FileOpsLabels.Bytes(form.Draft.MaxDownloadFileSizeBytes)], L["Design:PolMaxDownloadErr"],
+                            [20971520, 104857600, 262144000], MoVisualRole.Secondary, FileOpsLabels.Bytes, value => Patch(f => f with { DownloadLimit = value }))
+                        @LimitField("fo-entry-limit", L["Design:PolMaxEntries"], fields.EntryLimit, 50, 5000, form.EntryLimitValid,
+                            L["Design:PolMaxEntriesHelper"], L["Design:PolMaxEntriesErr"],
+                            [50, 200, 500, 2000], MoVisualRole.Primary, value => value.ToString(), value => Patch(f => f with { EntryLimit = value }))
+                    </div>
+                </div>
+                <div class="fo-pol-sec">
+                    <div class="fo-pol-ext-head">
+                        <div><h2>@L["Design:PolSecExt"] <span class="fo-count">@extensionList.Length</span></h2>
+                            <p class="fo-pol-desc">@L["Design:PolSecExtDesc"]</p></div>
+                        <div class="fo-pol-ext-tools">
+                            <button type="button" class="fo-ghost" @onclick="@(() => _rawExtensions = !_rawExtensions)">
+                                @L[_rawExtensions ? "Design:PolExtChipToggle" : "Design:PolExtRawToggle"]
+                            </button>
+                            <button type="button" class="fo-ghost" @onclick="ResetExtensions">@L["Design:PolExtReset"]</button>
+                        </div>
+                    </div>
+                    @if (_rawExtensions)
+                    {
+                        @TextArea(L["Design:PolSecExt"], fields.Extensions, L["Design:PolExtHelper"], value => Patch(f => f with { Extensions = value }))
+                    }
+                    else
+                    {
+                        <div class="fo-ext-box">
+                            <div class="fo-ext-chips">
+                                @foreach (var extension in extensionList)
+                                {
+                                    <span @key="extension" class="fo-ext-tag mo-vl-mono"><span>@extension</span>
+                                        <button type="button" aria-label="@L["Design:RemoveExtension", extension]"
+                                                @onclick="@(() => SetExtensions(extensionList.Where(value => value != extension)))"><MoIcon Icon="@MoIcons.Close" Size="12px" /></button>
+                                    </span>
+                                }
+                            </div>
+                            <form class="fo-ext-add" @onsubmit="@(() => AddExtensions(extensionList))" @onsubmit:preventDefault>
+                                <input type="text" class="fo-input mo-vl-mono" spellcheck="false" autocomplete="off"
+                                       placeholder="@L["Design:PolExtAddPlaceholder"]" aria-label="@L["Design:PolExtAddPlaceholder"]"
+                                       @bind="_extension" @bind:event="oninput" />
+                                <button type="submit" class="fo-outline" disabled="@string.IsNullOrWhiteSpace(_extension)">
+                                    <MoIcon Icon="@MoIcons.Add" Size="15px" />@L["Design:PolExtAdd"]
+                                </button>
+                            </form>
+                            <span class="fo-field-help">@L["Design:PolExtHelper"]</span>
+                        </div>
+                    }
+                </div>
+            </div>
+        </div>
+        <footer class="fo-pol-footer">
+            <span class="fo-pol-status @(!form.IsValid ? "mo-vl-role--error" : form.IsDirty ? "mo-vl-role--warning" : "mo-vl-role--neutral")" role="status">
+                <MoIcon Icon="@(!form.IsValid ? MoIcons.Error : form.IsDirty ? MoIcons.Edit : MoIcons.Check)" Size="15px" />
+                @(!form.IsValid ? L["Design:PolFooterInvalid"] : form.IsDirty ? L["Design:PolFooterDirty", form.ChangedCount] : L["Design:PolFooterNoChanges"])
+            </span>
+            <div class="fo-pol-btns">
+                <button type="button" class="fo-ghost" disabled="@(!form.IsDirty || Busy)" @onclick="Discard">@L["Design:PolDiscard"]</button>
+                <button type="button" class="fo-outline" aria-disabled="@(Busy ? "true" : "false")" @onclick="Reload">
+                    <MoIcon Icon="@MoIcons.Refresh" Size="15px" />@L["Design:PolReload"]
+                </button>
+                <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@MoIcons.Check"
+                           Disabled="@(!form.IsDirty || !form.IsValid)" aria-disabled="@(Busy ? "true" : "false")" OnClick="Apply">
+                    @L["Design:PolApply"]
+                </MudButton>
+            </div>
+        </footer>
+    </section>
+    <p class="fo-foot-note">@L["Design:PolFooterScope"]</p>
+}
+
+@code {
+    [Parameter] public FileOpsPolicyDraft? Form { get; set; }
+    [Parameter, EditorRequired] public FileOpsWorkspaceController Controller { get; set; } = null!;
+    [Parameter] public FileOpsOutcome? ReadOutcome { get; set; }
+    [Parameter] public bool Busy { get; set; }
+    [Parameter] public EventCallback Apply { get; set; }
+    [Parameter] public EventCallback Reload { get; set; }
+    [Parameter] public EventCallback Changed { get; set; }
+    private bool _rawExtensions;
+    private string _extension = "";
+
+    private void Patch(Func<FileOpsPolicyFields, FileOpsPolicyFields> patch)
+    {
+        if (Form is not { } form) return;
+        form.Edit(patch(form.Fields));
+        _ = Changed.InvokeAsync();
+    }
+
+    private void Discard()
+    {
+        Form?.Discard();
+        _extension = "";
+        _ = Changed.InvokeAsync();
+    }
+
+    private void AddExtensions(IEnumerable<string> existing)
+    {
+        var added = FileOpsRuntimeConfig.ParseMultiValue(_extension).Select(FileOpsRuntimeConfig.NormalizeExtension);
+        SetExtensions(existing.Concat(added).Distinct());
+        _extension = "";
+    }
+
+    private void ResetExtensions() => SetExtensions(new FileOpsRuntimeConfig().EditableExtensions);
+
+    private void SetExtensions(IEnumerable<string> extensions) =>
+        Patch(f => f with { Extensions = FileOpsRuntimeConfig.ToMultilineText(extensions) });
+
+    private static string Text(ChangeEventArgs e) => e.Value?.ToString() ?? "";
+
+    private static MoVisualRole DeleteRole(FileOpsRuntimeConfig preview) => preview.AllowDeleteOperations ? MoVisualRole.Error : MoVisualRole.Neutral;
+    private static MoVisualRole HiddenRole(FileOpsRuntimeConfig preview) => preview.AllowHiddenEntries ? MoVisualRole.Info : MoVisualRole.Neutral;
+    private static bool SamePath(string left, string right) => string.Equals(left, right,
+        OperatingSystem.IsWindows() ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal);
+
+    private static RenderFragment Mark(string text, MoVisualRole role) => @<MoValueMark Role="role">@text</MoValueMark>;
+    private RenderFragment PolicyReadOnlyFinding(int count) =>
+        count == 0 ? static _ => { } : MoRichFinding.Compose(L["Design:PolicyReadOnly"], Mark(L["Design:PolicyReadOnlyCount", count], MoVisualRole.Warning));
+
+    private static RenderFragment Notice(MoVisualRole role, string text) => @<div class="fo-sheet-notice @role.ToCssClass()">
+        <MoIcon Icon="@(role == MoVisualRole.Warning ? MoIcons.Warning : MoIcons.Info)" Size="15px" /><span>@text</span>
+    </div>;
+
+    private static RenderFragment Reason(string label, MoVisualRole role, bool zero = false, int? count = null) => @<span>
+        <i class="mo-vl-swatch @role.ToCssClass() @(zero ? "mo-vl-swatch--empty" : null)" aria-hidden="true"></i>
+        @label
+        @if (count is { } value) { <b class="mo-vl-mono">@value</b> }
+    </span>;
+
+    private RenderFragment TextArea(string name, string value, string help, Action<string> change) => @<label class="fo-field">
+        <span class="fo-field-label">@name</span>
+        <textarea class="fo-textarea mo-vl-mono" rows="4" spellcheck="false" value="@value" @oninput="@((ChangeEventArgs e) => change(Text(e)))"></textarea>
+        <span class="fo-field-help">@help</span>
+    </label>;
+
+    private RenderFragment Gate(bool active, MoVisualRole role, string name, string help, Action<bool> change) => @<label class="fo-switch-row @(active ? "is-on" : null) @role.ToCssClass()">
+        <input type="checkbox" checked="@active" @onchange="@((ChangeEventArgs e) => change(e.Value is true))" />
+        <span><b>@name</b><small>@help</small></span>
+    </label>;
+
+    private RenderFragment LimitField(string id, string name, string value, long min, long? max, bool valid, string help, string error,
+        long[] presets, MoVisualRole role, Func<long, string> format, Action<string> change) => @<div class="fo-field">
+        <label for="@id" class="fo-field-label">@name</label>
+        <input type="number" id="@id" class="fo-input mo-vl-mono" min="@min" max="@max" step="1" aria-invalid="@(!valid ? "true" : null)"
+               aria-describedby="@(id + "-help")" value="@value" @oninput="@((ChangeEventArgs e) => change(Text(e)))" />
+        <div class="fo-preset-row">
+            @foreach (var preset in presets)
+            {
+                var raw = preset.ToString(CultureInfo.InvariantCulture);
+                <button type="button" class="mo-vl-capsule mo-vl-mono @(value == raw ? role.ToCssClass() : "mo-vl-capsule--outline")"
+                        aria-pressed="@(value == raw ? "true" : "false")" @onclick="@(() => change(raw))">@format(preset)</button>
+            }
+        </div>
+        <span id="@(id + "-help")" class="@(valid ? "fo-field-help" : "fo-field-err")">@(valid ? help : error)</span>
+    </div>;
+}

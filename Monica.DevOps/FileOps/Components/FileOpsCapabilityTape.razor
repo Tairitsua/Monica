@@ -1,0 +1,88 @@
+@using System.Globalization
+@using Microsoft.JSInterop
+@implements IAsyncDisposable
+@inject IJSRuntime JS
+@inject IStringLocalizer<FileOpsResource> L
+
+<div class="fo-tape">
+    <div class="fo-tape-head">
+        <div>
+            <h2>@L["Design:SigCapTitle"]</h2>
+            <p>@L["Design:SigCapDesc"]</p>
+        </div>
+        <div class="fo-tape-legend">
+            @foreach (var category in Visible)
+            {
+                <span><i class="mo-vl-swatch @FileOpsInventoryView.Role(category).ToCssClass()" aria-hidden="true"></i>
+                    @L.Capability(category) (@Inventory.Count(category))</span>
+            }
+            @if (Browse.IsTruncated)
+            {
+                <span><i class="fo-tape-hatch" aria-hidden="true"></i>@L["Design:SigUnobservedLegend"]</span>
+            }
+        </div>
+    </div>
+    <div class="fo-tape-bar" role="group" aria-label="@L["Design:SigCapTitle"]" @ref="_bar" @onpointerleave="@(() => _readout = null)">
+        @{
+            var index = 0;
+        }
+        @foreach (var category in Visible)
+        {
+            var count = Inventory.Count(category);
+            var share = count * 100d / Browse.Entries.Count;
+            var label = L["Design:SigCapReadout", L.Capability(category).Value, count, share.ToString("0.0")].Value;
+            var factor = Math.Max(2.5, share).ToString("0.###", CultureInfo.InvariantCulture);
+            var selected = Active == category;
+            <button @key="category" type="button" class="fo-tape-seg @FileOpsInventoryView.Role(category).ToCssClass() @(selected ? "is-selected" : Active == FileOpsCapability.All ? null : "is-dimmed")"
+                    style="--fo-share:@factor" tabindex="@(index++ == 0 ? 0 : -1)" aria-label="@label" aria-pressed="@(selected ? "true" : "false")"
+                    @onpointerenter="@(() => _readout = label)" @onfocus="@(() => _readout = label)" @onclick="@(() => Select.InvokeAsync(category))"></button>
+        }
+        @if (Browse.IsTruncated)
+        {
+            var label = L["Design:SigCapTruncatedReadout", Browse.EntryLimit].Value;
+            <button type="button" class="fo-tape-seg is-hatch" style="--fo-share:12" tabindex="-1" aria-label="@label"
+                    @onpointerenter="@(() => _readout = label)" @onfocus="@(() => _readout = label)" @onclick="@(() => _readout = label)"></button>
+        }
+        <button type="button" hidden data-fo-clear @onclick="ClearAsync"></button>
+    </div>
+    <p class="fo-tape-readout" aria-live="polite">@(_readout ?? L["Design:SigCapHint"].Value)</p>
+</div>
+
+@code {
+    [Parameter, EditorRequired] public FileOpsBrowseResult Browse { get; set; } = null!;
+    [Parameter, EditorRequired] public FileOpsInventoryView Inventory { get; set; } = null!;
+    [Parameter] public FileOpsCapability Active { get; set; }
+    [Parameter] public EventCallback<FileOpsCapability> Select { get; set; }
+
+    private IEnumerable<FileOpsCapability> Visible => FileOpsInventoryView.Categories.Where(category => Inventory.Count(category) > 0);
+    private ElementReference _bar;
+    private Task<IJSObjectReference>? _import;
+    private bool _retired;
+    private string? _readout;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (_retired || !firstRender) return;
+        try
+        {
+            _import = JS.InvokeAsync<IJSObjectReference>("import", "./_content/Monica.DevOps/FileOps/Components/FileOpsWorkspace.razor.js").AsTask();
+            var module = await _import;
+            if (!_retired) await module.InvokeVoidAsync("bindTape", _bar);
+        }
+        catch (JSDisconnectedException) { }
+    }
+
+    private async Task ClearAsync()
+    {
+        _readout = null;
+        if (Active != FileOpsCapability.All) await Select.InvokeAsync(FileOpsCapability.All);
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        _retired = true;
+        if (_import is null) return;
+        try { await (await _import).DisposeAsync(); }
+        catch (JSDisconnectedException) { }
+    }
+}

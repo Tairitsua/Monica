@@ -74,6 +74,9 @@ internal sealed class ControlledFileOpsServices : IFileOpsWorkspaceService, IFil
         return Browse(path, cancellationToken);
     }
 
+    public Task<FileOpsEntrySummary> ObserveFileAsync(string path, CancellationToken cancellationToken = default) =>
+        Task.FromException<FileOpsEntrySummary>(new FileNotFoundException());
+
     public Task<FileOpsFileTextContent> ReadTextFileAsync(string path, CancellationToken cancellationToken = default)
     {
         TextReads.Add((path, cancellationToken));

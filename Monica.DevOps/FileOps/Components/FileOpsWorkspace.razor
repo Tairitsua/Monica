@@ -1,53 +1,75 @@
 @using Microsoft.AspNetCore.Components.Routing
-@using Monica.DevOps.FileOps.Models
-@using Monica.DevOps.FileOps.State
-@using Monica.DevOps.Localization
 @implements IAsyncDisposable
 
-<NavigationLock OnBeforeInternalNavigation="BeforeNavigationAsync" />
-<div class="file-workspace" @ref="_root" data-visit="@_visit" data-focus-version="@_focusVersion" data-selected-path="@SelectedPath" data-directory-path="@_controller?.Browse?.CurrentPath" data-catalog-open="@(_catalogOpen ? "true" : "false")" data-split="@(_split ? "true" : "false")" data-has-inspector="@(HasInspector ? "true" : "false")">
-    @if (_controller is not null)
+<NavigationLock OnBeforeInternalNavigation="BeforeNavigationAsync" ConfirmExternalNavigation="@IsDirty" />
+<div class="mo-workbench-container">
+<div class="fo-page mo-page-shell mo-page-shell--workbench">
+    <FileOpsFamilyHeader Controller="_controller" Browse="_browse" Config="_config" IsPolicy="IsPolicy"
+                         FilesHref="@FilesHref" AccessDenied="_accessDenied" PolicyWorking="_policyWorking"
+                         PolicyDirty="@(PolicyDraft?.IsDirty == true)" Refresh="RefreshAsync" Upload="OpenUploadAsync" />
+    @if (_initializing || _legacyRedirect)
     {
-        <FileOpsFamilyHeader Busy="@_controller.IsBusy" PolicyOpen="@_policyOpen" OpenPolicy="OpenPolicyAsync" />
-        @if (_policyAccessDenied) { <MudAlert Severity="Severity.Warning" Variant="Variant.Outlined" role="status" Icon="@MoIcons.Warning">@L["Policy:AccessDenied"]</MudAlert> }
-        <div class="directory-command-region">
-            <div class="directory-command-row">
-                <FileOpsLocation Controller="_controller" Navigate="NavigateAsync" Up="UpAsync" Refresh="RefreshAsync" Changed="CancelFocus" />
-                <div class="directory-mutations"><FileOpsDirectoryActions Controller="_controller" Create="CreateAsync" CreateActive="@_createActive" Upload="UploadAsync" UploadName="@_uploadName" /></div>
-            </div>
-            @if (_controller.Browse is { } browse)
-            {
-                <p class="directory-capability" title="@L[browse.IsReadOnly ? "Location:ReadOnlyReason" : browse.CanCreateDirectory || browse.CanUpload ? "Location:WritableReason" : "Location:WriteReason"]">
-                    <MoIcon Size="1.25rem" Icon="@(browse.IsReadOnly ? MoIcons.Lock : MoIcons.FolderOpen)" />
-                    <span>@L[browse.IsReadOnly ? "Location:ReadOnly" : browse.CanCreateDirectory || browse.CanUpload ? "Location:Writable" : "Location:WritesUnavailable"]</span>
-                    <span class="sr-only">@L[browse.IsReadOnly ? "Location:ReadOnlyReason" : browse.CanCreateDirectory || browse.CanUpload ? "Location:WritableReason" : "Location:WriteReason"]</span>
-                </p>
-            }
-            @if (_controller.IsBusy && _controller.Browse is not null) { <div class="busy-status" role="status"><MudProgressLinear Color="Color.Primary" Indeterminate="true" aria-label="@(_uploadName is null ? L["Workspace:Working"] : L["Workspace:Uploading", _uploadName])" /><span>@(_uploadName is null ? L["Workspace:Working"] : L["Workspace:Uploading", _uploadName])</span></div> }
-        </div>
-        @if (_controller.NavigationNotice is { } notice)
-        { <MudAlert Severity="Severity.Warning" Variant="Variant.Outlined" Icon="@MoIcons.Warning">@L["Workspace:ReturnFallback"] @notice.Message</MudAlert> }
-        @if (DirectoryCommand is not null || _controller.LastRead is { Kind: FileOpsOperationKind.LoadPolicy, Succeeded: false })
-        {
-            <div class="workspace-outcomes">
-                <FileOpsOutcomeView Outcome="@DirectoryCommand" Target="@_commandTarget" ShowSuccess="true" />
-                @if (_controller.LastRead?.Kind == FileOpsOperationKind.LoadPolicy) { <FileOpsOutcomeView Outcome="@_controller.LastRead" /> }
-            </div>
-        }
-        <div class="work-area @(_split && HasInspector ? "work-area-split" : "")">
-            <div class="inventory-column">
-                @if (HasInspector && !_split)
-                {
-                    <MudButton Class="inventory-toggle" Variant="Variant.Outlined" Color="Color.Primary" OnClick="ToggleCatalog" aria-expanded="@(_catalogOpen ? "true" : "false")" aria-controls="file-inventory-body" EndIcon="@(_catalogOpen ? MoIcons.ChevronUp : MoIcons.ChevronDown)">@L["Workspace:Picker", DirectoryName, _controller.SortedEntries.Count]</MudButton>
-                }
-                <div id="file-inventory-body" class="inventory-body @((HasInspector && !_split && !_catalogOpen) ? "inventory-body-closed" : "")">
-                    <FileOpsInventory Controller="_controller" TableMode="_tableMode" Open="OpenAsync" Download="DownloadAsync" Delete="DeleteAsync" DownloadSelection="DownloadSelectionAsync" DeleteSelection="DeleteSelectionAsync" Changed="InventoryChanged" Cleared="SelectionCleared" OpenPolicy="OpenPolicyAsync" />
-                </div>
-            </div>
-            @if (HasInspector)
-            {
-                <FileOpsInspector Controller="_controller" CommandTarget="@_commandTarget" Save="SaveAsync" Reload="ReloadAsync" Close="CloseAsync" Download="DownloadAsync" Delete="DeleteAsync" DraftChanged="DraftChanged" />
-            }
-        </div>
+        <MoContentState Class="fo-loading" Loading="true">
+            <MudProgressCircular Indeterminate="true" Color="Color.Primary" Size="Size.Small" />
+            <strong>@L["Design:LoadingTitle"]</strong>
+        </MoContentState>
     }
+    else if (IsPolicy)
+    {
+        @if (_accessDenied)
+        {
+            <MoSemanticCallout Severity="MoVisualRole.Error" Icon="@MoIcons.Lock" Title="@L["Design:PolDeniedTitle"]">
+                <p>@L["Design:PolDeniedBody"]</p>
+                <MudButton Variant="Variant.Outlined" Href="@FilesHref" StartIcon="@MoIcons.ArrowLeft">@L["Design:BackToFiles"]</MudButton>
+            </MoSemanticCallout>
+        }
+        else
+        {
+            <FileOpsPolicyEditor Form="PolicyDraft" Controller="_controller" ReadOutcome="_policyRead" Changed="StateHasChanged"
+                                 Busy="@(_policyWorking || _controller.IsBusy)" Apply="ApplyPolicyAsync" Reload="ReloadPolicyAsync" />
+        }
+    }
+    else
+    {
+        @if (_accessDenied && FileOpsViewQuery.Read(new Uri(Navigation.Uri)).LegacyPolicy)
+        {
+            <MoSemanticCallout Severity="MoVisualRole.Error" Icon="@MoIcons.Lock" Title="@L["Design:PolDeniedTitle"]">
+                @L["Design:PolDeniedBody"]
+            </MoSemanticCallout>
+        }
+        @if (_browse is not null && (_controller.BrowseStale || _controller.LastRead is { Succeeded: false, Kind: FileOpsOperationKind.LoadPolicy }))
+        {
+            <MoSemanticCallout Severity="MoVisualRole.Warning" Title="@L["Design:InvRetainedTitle"]">
+                @L["Design:InvRetainedBody"] @_controller.LastRead?.Message
+            </MoSemanticCallout>
+        }
+        @if (_controller.NavigationNotice is { } notice)
+        {
+            <MoSemanticCallout Severity="MoVisualRole.Warning" Title="@L["Workspace:ReturnFallback"]">@notice.Message</MoSemanticCallout>
+        }
+        @if (_controller.LastCommand is { } command && command.Kind is not (FileOpsOperationKind.SaveText or FileOpsOperationKind.SavePolicy))
+        {
+            <FileOpsOutcomeView Outcome="command" Target="@_commandTarget" ShowSuccess="true" />
+        }
+        <FileOpsDirectorySignature Controller="_controller" Browse="_browse" Config="_config" Inventory="_inventory"
+                                   Query="_query" Filter="SetFiltersAsync" Navigate="NavigateAsync" Inspect="OpenFileAsync"
+                                   Create="CreateAsync" CreateActive="_createActive" />
+        @if (_browse is { IsTruncated: true } capped)
+        {
+            <MoSemanticCallout Severity="MoVisualRole.Warning" Title="@L["Design:InvTruncatedTitle", capped.EntryLimit]">
+                @L["Design:InvTruncatedBanner", capped.EntryLimit]
+                @if (!_accessDenied) { <a class="fo-inline-link" href="@UIFileOpsPolicyPage.PAGE_URL">@L["Design:InvAdjustCap"]</a> }
+            </MoSemanticCallout>
+        }
+        <FileOpsInventory Controller="_controller" Browse="_browse" View="_inventory" Query="_query" Filter="SetFiltersAsync"
+                          Open="OpenAsync" Download="DownloadAsync" Delete="DeleteAsync" DownloadSelection="DownloadSelectionAsync"
+                          DeleteSelection="DeleteSelectionAsync" Refresh="RefreshAsync" Create="CreateAsync" />
+        @if (SelectedPath is not null)
+        {
+            <FileOpsInspector @ref="_inspector" Controller="_controller" Inventory="_inventory" Command="_controller.LastCommand" CommandTarget="@_commandTarget" DraftChanged="EditDraft" Browse="_browse" Config="_config" InspectedPath="@SelectedPath"
+                              Save="SaveTextAsync" Reload="ReloadTextAsync" Close="CloseInspectorAsync" Inspect="OpenFileAsync"
+                              Download="DownloadAsync" Delete="DeleteAsync" PolicyAvailable="@(!_accessDenied)" />
+        }
+    }
+</div>
 </div>

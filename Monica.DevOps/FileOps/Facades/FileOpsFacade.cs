@@ -46,6 +46,15 @@ public class FileOpsFacade(
             $"Failed to browse FileOps path {path ?? "(default)"}.");
     }
 
+    /// <summary>Projects a current metadata observation for one exact file under the existing policy.</summary>
+    public Task<Result<FileOpsEntrySummary>> ObserveFileAsync(string path, CancellationToken cancellationToken = default)
+    {
+        return ExecuteAsync(
+            () => workspaceService.ObserveFileAsync(path, cancellationToken),
+            ex => localizer["ServiceMessages:ObserveFileFailed", path, messageLocalizer.TranslateExceptionMessage(ex)].Value,
+            $"Failed to observe FileOps file {path}.");
+    }
+
     public Task<Result<FileOpsFileTextContent>> ReadTextFileAsync(string path, CancellationToken cancellationToken = default)
     {
         return ExecuteAsync(

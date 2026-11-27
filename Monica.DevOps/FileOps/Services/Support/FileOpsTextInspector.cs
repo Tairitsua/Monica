@@ -1,5 +1,6 @@
 using System.Text;
 using Monica.DevOps.FileOps.Exceptions;
+using Monica.DevOps.FileOps.Models;
 using Monica.Tool.Text;
 
 namespace Monica.DevOps.FileOps.Services.Support;
@@ -16,6 +17,30 @@ public sealed class FileOpsTextReadResult
 public class FileOpsTextInspector
 {
     private static readonly UTF8Encoding Utf8NoBom = new(encoderShouldEmitUTF8Identifier: false);
+
+    private const int SAMPLE_SIZE = 4096;
+
+    internal FileOpsTextPreviewKind Classify(string fullPath, long size, long maxBytes)
+    {
+        if (size == 0) return FileOpsTextPreviewKind.Text;
+
+        try
+        {
+            using var stream = File.Open(fullPath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete);
+            Span<byte> sample = stackalloc byte[SAMPLE_SIZE];
+            var count = stream.ReadAtLeast(sample, SAMPLE_SIZE, false);
+            if (LooksBinary(sample[..count])) return FileOpsTextPreviewKind.Binary;
+            return size > maxBytes ? FileOpsTextPreviewKind.Oversized : FileOpsTextPreviewKind.Text;
+        }
+        catch (IOException)
+        {
+            return FileOpsTextPreviewKind.Unavailable;
+        }
+        catch (UnauthorizedAccessException)
+        {
+            return FileOpsTextPreviewKind.Unavailable;
+        }
+    }
 
     public async Task<FileOpsTextReadResult> ReadAsync(string fullPath, long maxBytes, CancellationToken cancellationToken = default)
     {
@@ -39,13 +64,13 @@ public class FileOpsTextInspector
             offset += read;
         }
 
-        if (LooksBinary(buffer))
+        if (LooksBinary(buffer.AsSpan(0, Math.Min(offset, SAMPLE_SIZE))))
         {
             throw FileOpsOperationException.BinaryFilePreviewUnsupported(fullPath);
         }
 
-        var encoding = ResolveDetectedEncoding(buffer, out var preambleLength);
-        var content = encoding.GetString(buffer, preambleLength, buffer.Length - preambleLength);
+        var encoding = ResolveDetectedEncoding(buffer.AsSpan(0, offset), out var preambleLength);
+        var content = encoding.GetString(buffer, preambleLength, offset - preambleLength);
         return new FileOpsTextReadResult
         {
             Content = content,
@@ -71,18 +96,15 @@ public class FileOpsTextInspector
         }
     }
 
-    private static bool LooksBinary(IReadOnlyList<byte> buffer)
+    private static bool LooksBinary(ReadOnlySpan<byte> buffer)
     {
-        if (buffer.Count == 0)
-        {
-            return false;
-        }
+        ResolveDetectedEncoding(buffer, out var preambleLength);
+        if (preambleLength == 2) return false;
+        buffer = buffer[preambleLength..];
 
-        var inspectLength = Math.Min(buffer.Count, 4096);
         var suspiciousBytes = 0;
-        for (var i = 0; i < inspectLength; i++)
+        foreach (var value in buffer)
         {
-            var value = buffer[i];
             if (value == 0)
             {
                 return true;
@@ -94,10 +116,10 @@ public class FileOpsTextInspector
             }
         }
 
-        return suspiciousBytes > inspectLength / 20;
+        return suspiciousBytes > buffer.Length / 20;
     }
 
-    private static Encoding ResolveDetectedEncoding(byte[] buffer, out int preambleLength)
+    private static Encoding ResolveDetectedEncoding(ReadOnlySpan<byte> buffer, out int preambleLength)
     {
         if (buffer.Length >= 3 &&
             buffer[0] == 0xEF &&

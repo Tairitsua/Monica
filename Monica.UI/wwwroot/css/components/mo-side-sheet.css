@@ -13,6 +13,9 @@
     box-shadow: 0 12px 32px -8px color-mix(in srgb, var(--mud-palette-text-primary) 18%, transparent), 0 4px 10px -4px color-mix(in srgb, var(--mud-palette-text-primary) 8%, transparent) !important;
     animation: mo-side-sheet-enter .18s ease-out;
 }
+.mud-dialog.mo-side-sheet:has(.mo-side-sheet-expanded) {
+    width: min(var(--mo-side-sheet-expanded-width, var(--mo-side-sheet-width)), 100vw);
+}
 .mo-side-sheet > .mud-dialog-title { flex: none; border-bottom: 1px solid var(--mud-palette-divider); }
 .mo-side-sheet-heading { display: flex; align-items: flex-start; gap: 14px; padding: 22px; min-width: 0; }
 .mo-side-sheet-identity { flex: 1; min-width: 0; overflow-wrap: anywhere; }

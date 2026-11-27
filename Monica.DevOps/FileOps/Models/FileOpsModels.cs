@@ -8,6 +8,21 @@ public enum FileOpsEntryKind
     File
 }
 
+/// <summary>Observed eligibility of a file for the bounded text preview.</summary>
+public enum FileOpsTextPreviewKind
+{
+    /// <summary>No text observation was taken, including entries supplied by an older provider.</summary>
+    Unknown,
+    /// <summary>The sampled prefix supports text preview and the file is within the preview limit.</summary>
+    Text,
+    /// <summary>The sampled prefix contains binary data.</summary>
+    Binary,
+    /// <summary>The file appears to be text and exceeds the configured text limit.</summary>
+    Oversized,
+    /// <summary>The prefix could not be read; the exact inspector can report the current cause.</summary>
+    Unavailable
+}
+
 public class FileOpsPathSegment
 {
     public string Name { get; set; } = string.Empty;
@@ -36,6 +51,9 @@ public class FileOpsEntrySummary
     public bool CanDownload { get; set; }
 
     public bool CanEditText { get; set; }
+
+    /// <summary>Gets or sets the preview observation from the bounded directory read.</summary>
+    public FileOpsTextPreviewKind TextPreview { get; set; }
 
     public bool CanDelete { get; set; }
 

@@ -275,6 +275,7 @@
     "Recovery": "Check the address or choose another destination."
   },
   "RouteAccess": {
+    "ReturnToWorkspace": "Back to workspace",
     "CheckingPageTitle": "Checking access",
     "Checking": "Checking whether this page is available to you.",
     "DeniedPageTitle": "Access denied",

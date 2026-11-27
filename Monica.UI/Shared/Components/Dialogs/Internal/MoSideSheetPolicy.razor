@@ -1,9 +1,21 @@
+@using Monica.UI.Shell.Support
 @attribute [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
+@implements IAsyncDisposable
+@inject IJSRuntime JS
+
+@if (DismissRequested.HasDelegate)
+{
+    <button type="button" @ref="_escape" hidden @onclick="DismissRequested"></button>
+}
 
 @code {
     [CascadingParameter] private IMudDialogInstance DialogInstance { get; set; } = default!;
     [Parameter, EditorRequired] public DialogOptions Options { get; set; } = default!;
+    [Parameter] public EventCallback DismissRequested { get; set; }
     private DialogOptions? _applied;
+    private ElementReference _escape;
+    private JsModuleSession? _interop;
+    private bool _retired;
 
     protected override async Task OnParametersSetAsync()
     {
@@ -11,5 +23,19 @@
         _applied = Options;
         // This runs inside the native portal, including when its inline owner changes dismissal policy.
         await DialogInstance.SetOptionsAsync(Options);
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (_retired || !DismissRequested.HasDelegate || _interop is not null) return;
+        _interop = new(JS, "./_content/Monica.UI/js/side-sheet.js");
+        try { await _interop.InvokeVoidAsync("bindEscape", _escape); }
+        catch (JSDisconnectedException) { }
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        _retired = true;
+        if (_interop is not null) await _interop.DisposeAsync();
     }
 }

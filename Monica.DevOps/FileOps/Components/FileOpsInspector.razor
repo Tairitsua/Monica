@@ -1,94 +1,250 @@
-@inject Monica.UI.Shared.Services.MoTimeFormatter UiTime
-@using Monica.DevOps.FileOps.Models
-@using Monica.DevOps.FileOps.State
-@using Monica.DevOps.Localization
-@using Monica.Tool.Text
+@using Monica.UI.Shared.Components.Dialogs
 @inject IStringLocalizer<FileOpsResource> L
-<section class="file-inspector" aria-label="@L["Inspector:Title"]">
-    <div class="inspector-header">
-    <p class="inspector-eyebrow">@L["Inspector:Title"]</p>
-    <header class="inspector-heading" data-entry-path="@PathValue">
-        <div class="inspector-identity">
-            <h2 tabindex="-1">@NameValue</h2>
-            <p class="draft-state @(Controller.IsDirty ? "draft-state-dirty" : "")">
-                <MoIcon Size="1.25rem" Icon="@(Controller.IsDirty ? MoIcons.Edit : File is null ? MoIcons.FileText : MoIcons.Check)" />
-                @L[File is null ? "Inspector:NoTextLoaded" : Controller.IsDirty ? "Inspector:Unsaved" : "Inspector:Clean"]
-            </p>
+@inject MoTimeFormatter UiTime
+
+<MoSideSheet Open="true" OpenChanged="VisibilityChangedAsync" DismissRequested="CloseAsync" Dismissible="@(!Controller.IsBusy)"
+             CloseLabel="@L["Design:InspClose"]" Width="720px" ExpandedWidth="1020px" Expanded="_wide" Compact="true">
+    <TitleContent>
+        <div class="fo-sheet-id">
+            <span class="mo-vl-tile @Role.ToCssClass()">
+                <MoIcon Icon="@(File is null ? MoIcons.FileSearch : File.CanSave ? MoIcons.FileCode : MoIcons.FileText)" Size="20px" />
+            </span>
+            <div class="fo-sheet-name">
+                <p class="mo-vl-crumb">@L["Design:InspEyebrow"]</p>
+                <h2>@(File?.Name ?? Attempt?.Name ?? System.IO.Path.GetFileName(InspectedPath))</h2>
+                <div class="fo-sheet-flags">
+                    <span class="mo-vl-status mo-vl-status--pill @Role.ToCssClass()">
+                        <i class="mo-vl-status-dot" aria-hidden="true"></i>@Status
+                    </span>
+                    @if ((File?.Extension ?? Entry?.Extension) is { Length: > 0 } extension)
+                    {
+                        <span class="mo-vl-capsule mo-vl-capsule--outline mo-vl-mono">@extension</span>
+                    }
+                    @if (File?.IsReadOnly == true || Entry?.IsReadOnly == true)
+                    {
+                        <span class="mo-vl-capsule mo-vl-role--warning"><MoIcon Icon="@MoIcons.Lock" Size="13px" />@L["Design:BadgeReadOnly"]</span>
+                    }
+                </div>
+            </div>
+            <div class="fo-sheet-win">
+                @if (_siblings.Length > 1)
+                {
+                    <div class="fo-sheet-pager">
+                        <button type="button" class="fo-icon" aria-label="@L["Design:InspPrevFile"]" title="@NeighborTitle(Previous, L["Design:InspPrevFile"])"
+                                disabled="@(Previous is null || Controller.IsBusy)" @onclick="@(() => InspectAsync(Previous!.FullPath))">
+                            <MoIcon Icon="@MoIcons.ChevronLeft" Size="17px" />
+                        </button>
+                        <button type="button" class="fo-icon" aria-label="@L["Design:InspNextFile"]" title="@NeighborTitle(Next, L["Design:InspNextFile"])"
+                                disabled="@(Next is null || Controller.IsBusy)" @onclick="@(() => InspectAsync(Next!.FullPath))">
+                            <MoIcon Icon="@MoIcons.ChevronRight" Size="17px" />
+                        </button>
+                    </div>
+                }
+                <button type="button" class="fo-icon fo-sheet-expand" aria-pressed="@(_wide ? "true" : "false")"
+                        aria-label="@L[_wide ? "Design:InspShrink" : "Design:InspExpand"]" title="@L[_wide ? "Design:InspShrink" : "Design:InspExpand"]"
+                        @onclick="@(() => _wide = !_wide)">
+                    <MoIcon Icon="@(_wide ? MoIcons.Minimize : MoIcons.Maximize)" Size="16px" />
+                </button>
+            </div>
         </div>
-        @if (Entry?.CanDelete == true)
-        {
-            <MudMenu Class="inspector-menu" Icon="@MoIcons.MoreVertical" AriaLabel="@L["Inspector:Actions"]" Disabled="@Busy">
-                <MudMenuItem OnClick="@(() => Delete.InvokeAsync(Entry))">@L["Actions:Delete"]</MudMenuItem>
-            </MudMenu>
-        }
-        @* Keep the native decision's return target focusable; the visit rejects busy Close requests. *@
-        <MudIconButton Class="inspector-close" Icon="@MoIcons.Close" aria-label="@L["Actions:CloseFile"]" aria-disabled="@(Busy ? "true" : "false")" OnClick="@(() => Close.InvokeAsync())" />
-    </header>
-    <div class="inspector-actions">
-        <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@MoIcons.Save" Disabled="@(Busy || File?.CanSave != true || !Controller.IsDirty)" OnClick="@(() => Save.InvokeAsync())">@L["Actions:Save"]</MudButton>
-        <MudButton Variant="Variant.Text" Disabled="@(Busy || File is null)" OnClick="@(() => Reload.InvokeAsync())">@L["Actions:Reload"]</MudButton>
-        @if (CanDownload)
-        {
-            <MudButton Variant="Variant.Text" StartIcon="@MoIcons.Download" Disabled="@Busy" OnClick="@(() => Download.InvokeAsync(PathValue))">@L["Actions:Download"]</MudButton>
-        }
-    </div>
-    <details class="exact-path">
-        <summary aria-label="@L["Inspector:FullPath"]">
-            <code title="@PathValue">@PathValue</code>
-            <span>@L["Inspector:FullPath"]</span>
-        </summary>
-        <code class="exact-path-value">@PathValue</code>
-    </details>
-    </div>
-    <div class="inspector-body">
-    @if (Controller.IsDirty && CanDownload) { <p class="evidence-note">@L["Inspector:DownloadDisk"]</p> }
-    @if (Controller.LastCommand?.Kind == FileOpsOperationKind.SaveText) { <FileOpsOutcomeView Outcome="@Controller.LastCommand" Target="@CommandTarget" ShowSuccess="true" /> }
-    @if (Controller.LastRead?.Kind == FileOpsOperationKind.ReadText) { <FileOpsOutcomeView Outcome="@Controller.LastRead" /> }
-    @if (Controller.InspectionAttempt is { } attempt && !Same(attempt.FullPath, PathValue))
-    { <div class="attempted-file"><p>@L["Inspector:RetainedAfterAttempt"]</p><code>@attempt.FullPath</code></div> }
-    @if (Controller.MetadataStale) { <MudAlert Severity="Severity.Warning" Variant="Variant.Outlined" Icon="@MoIcons.Warning">@L["Inspector:RetainedMetadata"]</MudAlert> }
-    @if (Controller.DiskContentDiffers) { <MudAlert Severity="Severity.Warning" Variant="Variant.Outlined" Icon="@MoIcons.Warning">@L["Inspector:DiskDiffers"]</MudAlert> }
-    @if (File is { } file)
-    {
-        <section class="disk-evidence" aria-label="@L[Controller.MetadataStale ? "Inspector:RetainedEvidence" : "Inspector:DiskEvidence"]"><dl>
-            <div><dt>@L["Labels:Encoding"]</dt><dd>@file.EncodingName</dd></div>
-            <div><dt>@L["Labels:Size"]</dt><dd title="@file.SizeBytes.ToString()">@file.SizeBytes.FormatByteSize()</dd></div>
-            <div><dt>@L["Labels:LineCount"]</dt><dd>@file.LineCount</dd></div>
-            <div><dt>@L["Inspector:DiskModified"]</dt><dd><time datetime="@file.LastModifiedAt.ToString("O")">@UiTime.Format(file.LastModifiedAt)</time></dd></div>
-        </dl></section>
-        @if (!file.CanSave) { <p class="read-only-note"><MoIcon Size="1.25rem" Icon="@MoIcons.Lock" />@ReadOnlyReason</p> }
-        <div class="text-editor"><MudTextField T="string" Value="@Controller.DraftText" ValueChanged="@((string value) => DraftChanged.InvokeAsync(value))" Label="@L["Inspector:Text"]" Variant="Variant.Outlined" Immediate="true" Lines="12" ReadOnly="@(!file.CanSave)" spellcheck="false" /></div>
-    }
-    else
-    {
-        <div class="preview-unavailable"><MoIcon Icon="@MoIcons.FileText" Size="1.5rem" /><h3>@L["Inspector:Unavailable"]</h3><p>@L["Inspector:UnavailableHint"]</p></div>
-        @if (Entry is { } entry) { <dl class="entry-evidence"><div><dt>@L["Columns:Type"]</dt><dd>@(string.IsNullOrEmpty(entry.Extension) ? L["Labels:File"] : entry.Extension)</dd></div><div><dt>@L["Labels:Size"]</dt><dd>@entry.SizeDisplay</dd></div><div><dt>@L["Labels:LastModified"]</dt><dd>@UiTime.Format(entry.LastModifiedAt)</dd></div></dl> }
-    }
-    </div>
-</section>
+    </TitleContent>
+    <HeaderContent>
+        <div class="fo-sheet-tools">
+            <div class="fo-sheet-path">
+                <code class="mo-vl-mono" title="@InspectedPath">@InspectedPath</code>
+                <MoCopyButton Value="@InspectedPath" Label="@L["Design:CopyFilePath"]" />
+            </div>
+            <div class="fo-sheet-actions">
+                @if (File is { })
+                {
+                    <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@MoIcons.Save" Disabled="@(!CanSave)" OnClick="SaveAsync">
+                        @L["Design:InspSave"]
+                    </MudButton>
+                    <button type="button" class="fo-outline" disabled="@Controller.IsBusy" @onclick="ReloadAsync"><MoIcon Icon="@MoIcons.Refresh" Size="15px" />@L["Design:InspReload"]</button>
+                }
+                @if (CanDownload)
+                {
+                    <button type="button" class="fo-outline" disabled="@Controller.IsBusy" @onclick="@(() => Download.InvokeAsync(InspectedPath))">
+                        <MoIcon Icon="@MoIcons.Download" Size="15px" />@L["Design:InspDownload"]
+                    </button>
+                }
+                @if (Entry is { CanDelete: true } deletable)
+                {
+                    <button type="button" class="mo-vl-soft-action mo-vl-role--error" disabled="@Controller.IsBusy" @onclick="@(() => DeleteAsync(deletable))">
+                        <MoIcon Icon="@MoIcons.Delete" Size="15px" />@L["Design:ActDelete"]
+                    </button>
+                }
+            </div>
+        </div>
+    </HeaderContent>
+    <ChildContent>
+        <div class="fo-sheet-body">
+            @if (Command is { Kind: FileOpsOperationKind.SaveText } saved && string.Equals(CommandTarget, InspectedPath, StringComparison.Ordinal))
+            {
+                <FileOpsOutcomeView Outcome="saved" Target="@InspectedPath" ShowSuccess="true" />
+            }
+            @if (Controller.MetadataStale && File is not null)
+            {
+                <MoSemanticCallout Severity="MoVisualRole.Warning" Title="@L["Design:InspRetainedMeta"]">@L["Design:InspStaleMeta"] @Controller.LastRead?.Message</MoSemanticCallout>
+            }
+            @if (Controller.DiskContentDiffers && File is not null)
+            {
+                <div class="fo-sheet-notice mo-vl-role--warning" role="status"><MoIcon Icon="@MoIcons.Warning" Size="15px" />@L["Design:InspDiskDiffers"]</div>
+            }
+            @if (Controller.IsDirty && CanDownload && File is not null)
+            {
+                <div class="fo-sheet-notice mo-vl-role--info"><MoIcon Icon="@MoIcons.Info" Size="15px" />@L["Design:InspDownloadDiskNote"]</div>
+            }
+
+            @if (File is not null || Entry is not null)
+            {
+                <section class="fo-sheet-sec">
+                    <h3>@L[Controller.MetadataStale && File is not null ? "Design:InspRetainedMeta" : "Design:InspDiskEvidence"]</h3>
+                    <dl class="fo-sheet-evidence">
+                        @if (File is { } file)
+                        {
+                            @Evidence(L["Design:InspEncoding"], file.EncodingName)
+                            @Evidence(L["Design:InspSize"], FileOpsLabels.Bytes(file.SizeBytes), file.SizeBytes.ToString("N0") + " B")
+                            @Evidence(L["Design:InspLines"], file.LineCount.ToString("N0"))
+                            @Evidence(L["Design:InspModified"], UiTime.Format(file.LastModifiedAt))
+                        }
+                        else if (Entry is { } entry)
+                        {
+                            @Evidence(L["Design:ColType"], entry.Extension.Length == 0 ? L["Design:TypeFile"].Value : entry.Extension)
+                            @Evidence(L["Design:InspSize"], entry.SizeBytes is { } bytes ? FileOpsLabels.Bytes(bytes) : "—")
+                            @Evidence(L["Design:InspModified"], UiTime.Format(entry.LastModifiedAt))
+                        }
+                    </dl>
+                </section>
+            }
+            @if (File is { } preview && Config is { } config)
+            {
+                @if (!preview.CanSave)
+                {
+                    <div class="fo-sheet-notice @(preview.IsReadOnly || !config.AllowWriteOperations ? "mo-vl-role--warning" : "mo-vl-role--info")">
+                        <MoIcon Icon="@MoIcons.Lock" Size="15px" />@PreviewOnlyReason(preview, config)
+                    </div>
+                }
+                <FileOpsTextEditor @key="InspectedPath" @ref="_editor" File="preview" Limit="config.MaxTextFileSizeBytes"
+                                   Draft="@Controller.DraftText" DraftChanged="DraftChanged" ReadOnly="@(!preview.CanSave)" />
+            }
+            else
+            {
+                <MoContentState Compact="true" Class="fo-unavail">
+                    <span class="mo-vl-tile @UnavailableRole.ToCssClass()"><MoIcon Icon="@MoIcons.FileSearch" Size="18px" /></span>
+                    <h3>@L["Design:InspUnavailableTitle"]</h3>
+                    <p>@UnavailableDescription</p>
+                    @if (Entry?.TextPreview == FileOpsTextPreviewKind.Oversized && PolicyAvailable)
+                    {
+                        <MudButton Variant="Variant.Outlined" Href="@UIFileOpsPolicyPage.PAGE_URL" StartIcon="@MoIcons.Sliders">@L["Design:InspAdjustTextLimit"]</MudButton>
+                    }
+                    @if (Controller.InspectedFile is { } retained && !SamePath(retained.FullPath, InspectedPath))
+                    {
+                        <button type="button" class="fo-outline" @onclick="@(() => InspectAsync(retained.FullPath))">@L["Design:ReturnToDraft", retained.Name]</button>
+                    }
+                </MoContentState>
+            }
+        </div>
+    </ChildContent>
+</MoSideSheet>
+
 @code {
-    /// <summary>The borrowed visit controller owning accepted disk evidence and exact draft revision.</summary>
     [Parameter, EditorRequired] public FileOpsWorkspaceController Controller { get; set; } = null!;
-    /// <summary>Saves the captured revision and performs the controller-owned real reread.</summary>
-    [Parameter] public EventCallback Save { get; set; }
-    /// <summary>Explicitly reloads disk text through the draft guard.</summary>
-    [Parameter] public EventCallback Reload { get; set; }
-    /// <summary>Closes this exact inspector through its draft guard.</summary>
-    [Parameter] public EventCallback Close { get; set; }
-    /// <summary>Downloads current disk bytes rather than unsaved editor text.</summary>
-    [Parameter] public EventCallback<string> Download { get; set; }
-    /// <summary>Confirms deletion of the inspected target.</summary>
-    [Parameter] public EventCallback<FileOpsEntrySummary> Delete { get; set; }
-    /// <summary>Updates only the controller's draft and revision.</summary>
-    [Parameter] public EventCallback<string> DraftChanged { get; set; }
-    /// <summary>The captured saved-file outcome target; later inspection does not relabel that result.</summary>
+    [Parameter, EditorRequired] public string InspectedPath { get; set; } = "";
+    [Parameter] public FileOpsBrowseResult? Browse { get; set; }
+    [Parameter, EditorRequired] public FileOpsInventoryView Inventory { get; set; } = null!;
+    [Parameter] public FileOpsRuntimeConfig? Config { get; set; }
+    [Parameter] public FileOpsOutcome? Command { get; set; }
     [Parameter] public string? CommandTarget { get; set; }
-    private FileOpsFileTextContent? File => Controller.InspectedFile;
-    private FileOpsEntrySummary? Entry => Controller.InspectedEntry;
-    private bool Busy => Controller.IsBusy;
-    private string PathValue => File?.FullPath ?? Entry?.FullPath ?? Controller.InspectionAttempt?.FullPath ?? "";
-    private string NameValue => File?.Name ?? Entry?.Name ?? Controller.InspectionAttempt?.Name ?? "";
-    private bool CanDownload => File?.CanDownload ?? Entry?.CanDownload == true;
-    private static bool Same(string? left, string? right) => string.Equals(left, right, OperatingSystem.IsWindows() ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal);
-    private string ReadOnlyReason => L[File?.IsReadOnly == true ? "Inspector:ReadOnlyPath" : Controller.RuntimeConfig?.AllowWriteOperations == false ? "Inspector:WritesDisabled" : Controller.RuntimeConfig?.CanEditExtension(File?.Extension) == false ? "Inspector:ExtensionDenied" : "Inspector:EditingUnavailable"];
+    [Parameter] public EventCallback Save { get; set; }
+    [Parameter] public EventCallback Reload { get; set; }
+    [Parameter] public EventCallback Close { get; set; }
+    [Parameter] public EventCallback<string> Inspect { get; set; }
+    [Parameter] public EventCallback<string> Download { get; set; }
+    [Parameter] public EventCallback<FileOpsEntrySummary> Delete { get; set; }
+    [Parameter] public EventCallback<string> DraftChanged { get; set; }
+    [Parameter] public bool PolicyAvailable { get; set; }
+
+    private FileOpsTextEditor? _editor;
+    private FileOpsFileTextContent? File { get; set; }
+    private FileOpsInspectionAttempt? Attempt { get; set; }
+    private FileOpsEntrySummary? Entry { get; set; }
+    private FileOpsEntrySummary[] _siblings = [];
+    private int _siblingIndex;
+    private bool _wide;
+    private FileOpsEntrySummary? Previous => _siblingIndex > 0 ? _siblings[_siblingIndex - 1] : null;
+    private FileOpsEntrySummary? Next => _siblingIndex >= 0 && _siblingIndex < _siblings.Length - 1 ? _siblings[_siblingIndex + 1] : null;
+
+    private bool CanDownload => File?.CanDownload ?? Entry?.CanDownload ?? false;
+    private bool CanSave => File is { CanSave: true } file && Config is { } config && Controller.IsDirty && !Controller.IsBusy &&
+        FileOpsTextEditor.ByteCount(file, Controller.DraftText) <= config.MaxTextFileSizeBytes;
+    private string Status => L[File is null ? "Design:InspUnavailableBadge" : Controller.IsDirty ? "Design:InspDirty" : File.CanSave ? "Design:InspClean" : "Design:InspPreviewOnly"];
+    private MoVisualRole Role => File is null || Controller.IsDirty ? MoVisualRole.Warning : File.CanSave ? MoVisualRole.Success : MoVisualRole.Info;
+    private MoVisualRole UnavailableRole => Entry?.TextPreview switch
+    {
+        FileOpsTextPreviewKind.Oversized => MoVisualRole.Warning,
+        FileOpsTextPreviewKind.Binary => MoVisualRole.Secondary,
+        _ => MoVisualRole.Error
+    };
+
+    private string UnavailableDescription => Entry?.TextPreview switch
+    {
+        FileOpsTextPreviewKind.Oversized when Entry.SizeBytes is { } size && Config is { } config =>
+            L["Design:InspUnavailableLarge", FileOpsLabels.Bytes(size), FileOpsLabels.Bytes(config.MaxTextFileSizeBytes)],
+        FileOpsTextPreviewKind.Binary => L["Design:InspUnavailableBinary"],
+        _ => Attempt?.Outcome.Message ?? L["Design:InspUnavailableMissing"].Value
+    };
+
+    protected override void OnParametersSet()
+    {
+        var file = Controller.InspectedFile;
+        File = file is not null && SamePath(file.FullPath, InspectedPath) ? file : null;
+        var attempt = Controller.InspectionAttempt;
+        Attempt = attempt is not null && SamePath(attempt.FullPath, InspectedPath) ? attempt : null;
+        _siblings = Inventory.Filtered.Where(e => !e.IsDirectory).ToArray();
+        _siblingIndex = Array.FindIndex(_siblings, e => SamePath(e.FullPath, InspectedPath));
+        Entry = Browse?.Entries.FirstOrDefault(e => SamePath(e.FullPath, InspectedPath)) ??
+            Attempt?.Entry ?? (File is not null ? Controller.InspectedEntry : null);
+    }
+
+    internal Task<bool> FlushAsync() => File is null || _editor is null ? Task.FromResult(true) : _editor.FlushAsync();
+
+    private async Task SaveAsync()
+    {
+        if (await FlushAsync() && CanSave) await Save.InvokeAsync();
+    }
+
+    private async Task ReloadAsync()
+    {
+        if (await FlushAsync()) await Reload.InvokeAsync();
+    }
+
+    private async Task CloseAsync()
+    {
+        if (await FlushAsync()) await Close.InvokeAsync();
+    }
+
+    private Task VisibilityChangedAsync(bool open) => open ? Task.CompletedTask : CloseAsync();
+
+    private async Task InspectAsync(string path)
+    {
+        if (await FlushAsync()) await Inspect.InvokeAsync(path);
+    }
+
+    private async Task DeleteAsync(FileOpsEntrySummary entry)
+    {
+        if (await FlushAsync()) await Delete.InvokeAsync(entry);
+    }
+
+    private string PreviewOnlyReason(FileOpsFileTextContent file, FileOpsRuntimeConfig config) =>
+        file.IsReadOnly ? L["Design:InspRoPathReason"] : !config.AllowWriteOperations ? L["Design:InspWritesOffReason"] : L["Design:InspExtDeniedReason", file.Extension];
+
+    private static RenderFragment Evidence(string label, string value, string? title = null) => @<div>
+        <dt>@label</dt>
+        <dd class="mo-vl-mono" title="@title">@value</dd>
+    </div>;
+
+    private static string NeighborTitle(FileOpsEntrySummary? entry, string label) => entry is null ? label : $"{label} · {entry.Name}";
+    private static bool SamePath(string? left, string? right) => string.Equals(left, right,
+        OperatingSystem.IsWindows() ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal);
 }

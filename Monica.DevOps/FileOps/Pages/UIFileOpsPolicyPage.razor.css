@@ -1,3 +1,0 @@
-.file-ops-policy-page { width: 100%; min-width: 0; padding: 24px; box-sizing: border-box; color: var(--mud-palette-text-primary); }
-@media(max-width:1000px) { .file-ops-policy-page { padding: 20px; } }
-@media(max-width:600px) { .file-ops-policy-page { padding: 12px; } }

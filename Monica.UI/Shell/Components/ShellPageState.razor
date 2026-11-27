@@ -22,7 +22,7 @@
         @if (!string.IsNullOrEmpty(HomeLabel))
         {
             <div class="shell-page-state__action">
-                <MudButton Href="/" Variant="Variant.Filled" Color="Color.Primary" StartIcon="@MoIcons.Home">
+                <MudButton Href="@HomeHref" Variant="Variant.Filled" Color="Color.Primary" StartIcon="@HomeIcon">
                     @HomeLabel
                 </MudButton>
             </div>
@@ -74,6 +74,12 @@
 
     /// <summary>Gets or sets the localized label for the host-owned root destination. A null or empty label omits the link.</summary>
     [Parameter] public string? HomeLabel { get; set; }
+
+    /// <summary>Gets or sets the local recovery destination. The default is the shell root.</summary>
+    [Parameter] public string HomeHref { get; set; } = "/";
+
+    /// <summary>Gets or sets the recovery action icon. The default is the home icon.</summary>
+    [Parameter] public string HomeIcon { get; set; } = MoIcons.Home;
 
     /// <summary>Gets or sets the localized label for optional request evidence.</summary>
     [Parameter] public string? EvidenceLabel { get; set; }

@@ -89,6 +89,12 @@ public sealed partial class FileOpsWorkspaceController : IAsyncDisposable
     public FileOpsOutcome? LastRead { get; private set; }
     /// <summary>Gets the remembered-directory failure retained when initialization falls back to startup.</summary>
     public FileOpsOutcome? NavigationNotice { get; private set; }
+
+    /// <summary>Gets when the accepted directory observation was taken.</summary>
+    public DateTimeOffset? DirectoryObservedAt { get; private set; }
+
+    /// <summary>Gets when the accepted host policy was read.</summary>
+    public DateTimeOffset? PolicyObservedAt { get; private set; }
     /// <summary>Gets a detached checked-path list using platform path identity.</summary>
     public IReadOnlyList<string> SelectedPaths => _selected.ToArray();
     /// <summary>Gets detached sorted accepted entries; directories always precede files.</summary>
@@ -111,6 +117,19 @@ public sealed partial class FileOpsWorkspaceController : IAsyncDisposable
     {
         if (IsRetired || IsBusy || _browse?.Entries.Any(value => PathsEqual(value.FullPath, entry.FullPath)) != true) return;
         if (selected) _selected.Add(entry.FullPath); else _selected.Remove(entry.FullPath);
+    }
+
+    /// <summary>Checks or unchecks only the supplied visible subset of the accepted directory.</summary>
+    public void SelectVisible(IEnumerable<FileOpsEntrySummary> entries, bool selected)
+    {
+        if (IsRetired || IsBusy || _browse is null) return;
+
+        var visible = entries.Select(entry => entry.FullPath).ToHashSet(PathComparer);
+        foreach (var entry in _browse.Entries.Where(entry => visible.Contains(entry.FullPath)))
+        {
+            if (selected) _selected.Add(entry.FullPath);
+            else _selected.Remove(entry.FullPath);
+        }
     }
 
     /// <summary>Checks or unchecks the displayed accepted subset, including a truncated directory's subset.</summary>
@@ -200,10 +219,20 @@ public sealed partial class FileOpsWorkspaceController : IAsyncDisposable
         var captured = known is null ? null : FileOpsWorkspaceSnapshots.Copy(known);
         return async () =>
         {
+            if (_file is not null && PathsEqual(_file.FullPath, target))
+            { _inspectionAttempt = null; return Disposition; }
             if (!await ConfirmDiscardAsync(stamp, FileOpsDiscardReason.OpenFile, target, discard)) return DispositionOrCancel;
-            if (!IsRetired && !await ReadInspectionAsync(target, replace: true, stamp, captured) && !Matches(stamp)) return DispositionOrCancel;
+            var entry = captured ?? (await _facade.ObserveFileAsync(target, _token)).Data;
+            if (!IsRetired && !await ReadInspectionAsync(target, replace: true, stamp, entry) && !Matches(stamp)) return DispositionOrCancel;
             return Disposition;
         };
+    });
+
+    /// <summary>Refreshes the inspected file's disk evidence without replacing a dirty draft.</summary>
+    public Task<FileOpsOperationDisposition> RefreshInspectionEvidenceAsync() => Admit(() => async () =>
+    {
+        await RefreshInspectionAsync();
+        return Disposition;
     });
 
     /// <summary>Explicitly rereads the captured file, requiring discard before replacing a dirty draft.</summary>
@@ -246,6 +275,7 @@ public sealed partial class FileOpsWorkspaceController : IAsyncDisposable
         if (IsRetired) return false;
         if (!RecordRead(FileOpsOutcome.From(FileOpsOperationKind.LoadPolicy, result, result.Data is not null))) return false;
         _config = result.Data!.Clone();
+        PolicyObservedAt = DateTimeOffset.UtcNow;
         return true;
     }
 
@@ -258,6 +288,7 @@ public sealed partial class FileOpsWorkspaceController : IAsyncDisposable
         { BrowseStale = _browse is not null; return false; }
         if (replaceInspection && stamp is not null && !Matches(stamp)) return false;
         _browse = FileOpsWorkspaceSnapshots.Copy(result.Data!);
+        DirectoryObservedAt = DateTimeOffset.UtcNow;
         _proposedPath = _browse.CurrentPath;
         BrowseStale = false;
         var accepted = _browse.Entries.Select(entry => entry.FullPath).ToHashSet(PathComparer);
@@ -308,10 +339,17 @@ public sealed partial class FileOpsWorkspaceController : IAsyncDisposable
         return true;
     }
 
+    /// <summary>Reads current host policy independently of the directory and its checked paths.</summary>
+    public Task<FileOpsOperationDisposition> RefreshPolicyAsync() => Admit(() => async () =>
+    {
+        await ReadPolicyAsync();
+        return Disposition;
+    });
+
     private async Task RefreshCoreAsync(string? origin)
     {
         await ReadPolicyAsync();
-        if (!IsRetired && origin is not null) await BrowseCoreAsync(origin);
+        if (!IsRetired && (origin ?? _config?.StartupPath) is { } path) await BrowseCoreAsync(path);
         if (!IsRetired) await RefreshInspectionAsync();
     }
 
