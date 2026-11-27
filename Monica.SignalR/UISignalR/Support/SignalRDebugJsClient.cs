@@ -207,14 +207,14 @@ public sealed class SignalRDebugJsClient(
                 return true;
             }
 
-            AddMessage("System", T("UISignalR:DebugClient:ConnectionFailed", result.Value.GetProperty("error").GetString() ?? string.Empty), MessageType.Error);
+            AddMessage("System", T("UISignalR:DebugClient:ConnectionFailed", result.Value.GetProperty("error").GetString() ?? string.Empty), MessageType.Error, ReadErrorDetails(result.Value));
             return false;
         }
         catch (Exception ex) when (ex is not ObjectDisposedException)
         {
             if (!_disposed)
             {
-                AddMessage("System", T("UISignalR:DebugClient:ConnectionFailed", ex.Message), MessageType.Error);
+                AddMessage("System", T("UISignalR:DebugClient:ConnectionFailed", ex.Message), MessageType.Error, ex.ToString());
             }
 
             return false;
@@ -265,14 +265,14 @@ public sealed class SignalRDebugJsClient(
                 return true;
             }
 
-            AddMessage("System", T("UISignalR:DebugClient:DisconnectFailed", result.Value.GetProperty("error").GetString() ?? string.Empty), MessageType.Error);
+            AddMessage("System", T("UISignalR:DebugClient:DisconnectFailed", result.Value.GetProperty("error").GetString() ?? string.Empty), MessageType.Error, ReadErrorDetails(result.Value));
             return false;
         }
         catch (Exception ex) when (ex is not ObjectDisposedException)
         {
             if (!_disposed)
             {
-                AddMessage("System", T("UISignalR:DebugClient:DisconnectFailed", ex.Message), MessageType.Error);
+                AddMessage("System", T("UISignalR:DebugClient:DisconnectFailed", ex.Message), MessageType.Error, ex.ToString());
             }
 
             return false;
@@ -308,14 +308,14 @@ public sealed class SignalRDebugJsClient(
                 return true;
             }
 
-            AddMessage("Error", T("UISignalR:DebugClient:SendFailed", result.Value.GetProperty("error").GetString() ?? string.Empty), MessageType.Error);
+            AddMessage("Error", T("UISignalR:DebugClient:SendFailed", result.Value.GetProperty("error").GetString() ?? string.Empty), MessageType.Error, ReadErrorDetails(result.Value));
             return false;
         }
         catch (Exception ex) when (ex is not ObjectDisposedException)
         {
             if (!_disposed)
             {
-                AddMessage("Error", T("UISignalR:DebugClient:SendFailed", ex.Message), MessageType.Error);
+                AddMessage("Error", T("UISignalR:DebugClient:SendFailed", ex.Message), MessageType.Error, ex.ToString());
             }
 
             return false;
@@ -388,14 +388,14 @@ public sealed class SignalRDebugJsClient(
                 return true;
             }
 
-            AddMessage("Error", T("UISignalR:DebugClient:MethodInvocationFailed", result.Value.GetProperty("error").GetString() ?? string.Empty), MessageType.Error);
+            AddMessage("Error", T("UISignalR:DebugClient:MethodInvocationFailed", result.Value.GetProperty("error").GetString() ?? string.Empty), MessageType.Error, ReadErrorDetails(result.Value));
             return false;
         }
         catch (Exception ex) when (ex is not ObjectDisposedException)
         {
             if (!_disposed)
             {
-                AddMessage("Error", T("UISignalR:DebugClient:MethodInvocationFailed", ex.Message), MessageType.Error);
+                AddMessage("Error", T("UISignalR:DebugClient:MethodInvocationFailed", ex.Message), MessageType.Error, ex.ToString());
             }
 
             return false;
@@ -452,7 +452,7 @@ public sealed class SignalRDebugJsClient(
         {
             if (!_disposed)
             {
-                AddMessage("Error", T("UISignalR:DebugClient:ListenerToggleFailed", ex.Message), MessageType.Error);
+                AddMessage("Error", T("UISignalR:DebugClient:ListenerToggleFailed", ex.Message), MessageType.Error, ex.ToString());
             }
 
             return false;
@@ -570,7 +570,7 @@ public sealed class SignalRDebugJsClient(
             }
         }
 
-        AddMessage(source, content, messageType);
+        AddMessage(source, content, messageType, messageType == MessageType.Sent && content.IndexOf(':') is var separator && separator >= 0 ? content[(separator + 1)..].Trim() : null);
     }
 
     /// <summary>
@@ -599,7 +599,7 @@ public sealed class SignalRDebugJsClient(
         _connectionState.TotalReceivedMessages++;
         method.ReceivedCount++;
         MethodListenerChanged?.Invoke(method);
-        AddMessage("Received", $"{method.DisplayName}: {argumentDisplay}", MessageType.Received);
+        AddMessage("Received", $"{method.DisplayName}: {argumentDisplay}", MessageType.Received, argumentDisplay);
     }
 
     /// <summary>
@@ -878,14 +878,15 @@ public sealed class SignalRDebugJsClient(
         }
     }
 
-    private void AddMessage(string source, string content, MessageType type)
+    private void AddMessage(string source, string content, MessageType type, string? details = null)
     {
         var message = new SignalRMessage
         {
             Source = source,
             Content = content,
+            Details = details ?? string.Empty,
             Type = type,
-            Timestamp = DateTime.Now,
+            Timestamp = DateTime.UtcNow,
             IsError = type == MessageType.Error
         };
 
@@ -897,6 +898,8 @@ public sealed class SignalRDebugJsClient(
 
         MessageReceived?.Invoke(message);
     }
+
+    private static string? ReadErrorDetails(JsonElement result) => result.TryGetProperty("details", out var details) ? details.GetString() : null;
 
     private string T(string key)
     {

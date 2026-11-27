@@ -77,6 +77,7 @@ public class ModuleSignalR : MonicaModule<ModuleSignalROption>, IWebHostRequired
 
         services.AddScoped<SignalRFacade>();
         services.AddScoped<SignalRInspectionService>();
+        services.AddScoped<SignalRDebugCallbackService>();
         services.AddSingleton<SignalRHubMetadataReader>();
         services.AddSingleton<ISignalRConnectionRegistry, SignalRConnectionRegistry>();
         services.TryAddSingleton<SignalRSendMetrics>();

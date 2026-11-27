@@ -215,7 +215,7 @@ export async function createSession(callback, localizedMessages) {
         } catch (error) {
             return isShuttingDown
                 ? closedResult()
-                : { success: false, error: error?.message || String(error) };
+                : { success: false, error: error?.message || String(error), details: error?.stack || error?.message || String(error) };
         }
     }
 
@@ -242,7 +242,7 @@ export async function createSession(callback, localizedMessages) {
         } catch (error) {
             return isShuttingDown
                 ? closedResult()
-                : { success: false, error: error?.message || String(error) };
+                : { success: false, error: error?.message || String(error), details: error?.stack || error?.message || String(error) };
         }
     }
 
@@ -271,7 +271,7 @@ export async function createSession(callback, localizedMessages) {
             log("System", text("RegisteredListener", methodDisplayName), "Info");
             return { success: true };
         } catch (error) {
-            return { success: false, error: error?.message || String(error) };
+            return { success: false, error: error?.message || String(error), details: error?.stack || error?.message || String(error) };
         }
     }
 
@@ -287,7 +287,7 @@ export async function createSession(callback, localizedMessages) {
             log("System", text("UnregisteredListener", methodDisplayName), "Info");
             return { success: true };
         } catch (error) {
-            return { success: false, error: error?.message || String(error) };
+            return { success: false, error: error?.message || String(error), details: error?.stack || error?.message || String(error) };
         }
     }
 

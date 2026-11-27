@@ -105,6 +105,7 @@ public sealed class SignalRSendMetrics
         return new SignalRSendDiagnosticsSnapshot
         {
             IsEnabled = IsEnabled,
+            IncludesTargetIdentifiers = IncludeTargetIdentifiers,
             PendingSendCount = metrics.Sum(metric => metric.PendingSendCount),
             TotalStartedCount = metrics.Sum(metric => metric.StartedCount),
             TotalCompletedCount = metrics.Sum(metric => metric.CompletedCount),

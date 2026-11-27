@@ -14,6 +14,35 @@ public sealed class SignalRFacade(
     ILogger<SignalRFacade> logger,
     IServiceProvider serviceProvider)
 {
+    /// <summary>Sends a diagnostic callback to one explicitly selected browser connection on a mapped hub.</summary>
+    /// <remarks>
+    /// This is a server-to-client probe, not a hub method invocation or a simulated receipt. The caller owns the
+    /// connection selection and argument values. Completion confirms only the server send task; the browser trace
+    /// separately proves receipt. The probe participates in enabled send metrics and identifier-redaction policy.
+    /// No HTTP endpoint is contributed for this operation.
+    /// </remarks>
+    /// <param name="hubRoute">A route mapped through the SignalR module.</param>
+    /// <param name="connectionId">The debug browser's current connection identifier.</param>
+    /// <param name="methodName">A declared hub method name with the supplied argument count.</param>
+    /// <param name="arguments">Callback arguments to serialize through the host's SignalR protocol.</param>
+    /// <param name="cancellationToken">Cancels the server send without claiming browser receipt.</param>
+    public async Task<Result> SendDebugCallbackAsync(string hubRoute, string connectionId, string methodName,
+        object?[] arguments, CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            await serviceProvider.GetRequiredService<SignalRDebugCallbackService>()
+                .SendAsync(hubRoute, connectionId, methodName, arguments, cancellationToken);
+            return Result.Success();
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) { throw; }
+        catch (Exception exception)
+        {
+            logger.LogError(exception, "Failed to send a diagnostic SignalR callback.");
+            return Result.Failure(exception.GetMessageRecursively(), ResultStatus.InternalError);
+        }
+    }
+
     /// <summary>
     /// Gets metadata for all registered SignalR hubs.
     /// </summary>

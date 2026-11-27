@@ -10,6 +10,10 @@ public sealed class SignalRSendDiagnosticsSnapshot
     /// </summary>
     public bool IsEnabled { get; init; }
 
+    /// <summary>Gets whether this capture includes explicit target identifiers; false means count-only privacy rendering.</summary>
+    /// <remarks>This reports the host's identifier-capture policy even when all retained rows target all clients.</remarks>
+    public bool IncludesTargetIdentifiers { get; init; }
+
     /// <summary>
     /// Gets or sets the UTC time when this snapshot was produced.
     /// </summary>

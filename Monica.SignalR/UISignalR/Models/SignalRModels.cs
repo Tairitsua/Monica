@@ -38,6 +38,9 @@ public sealed class HubMethodInfo
 /// </summary>
 public sealed class SignalRMessage
 {
+    /// <summary>Gets the stable session-local identity used by trace evidence links.</summary>
+    public string Id { get; init; } = Guid.NewGuid().ToString("N");
+
     /// <summary>
     /// Gets or sets the log source.
     /// </summary>

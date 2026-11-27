@@ -48,6 +48,9 @@ public sealed class SignalRDebugSessionTests
         refreshed.IsListening.Should().BeTrue();
         refreshed.ReceivedCount.Should().Be(2);
         client.GetMessages()[0].Content.Should().Be("Updated label (Echo): [2]");
+        client.GetMessages()[0].Details.Should().Be("[2]");
+        client.GetMessages()[0].Timestamp.Kind.Should().Be(DateTimeKind.Utc);
+        client.GetMessages().Select(message => message.Id).Should().OnlyHaveUniqueItems();
 
         client.SetHubMetadata([HubMetadata("/first", "First", "Updated label", "firstArgument"),
             HubMetadata("/second", "Second", "Second label", "secondArgument")], "/second");
