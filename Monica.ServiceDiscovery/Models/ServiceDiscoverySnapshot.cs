@@ -35,6 +35,11 @@ public static class ServiceDiscoverySnapshot
         Status = source.Status, IsLeader = source.IsLeader, BuildTime = source.BuildTime,
         AssemblyVersion = source.AssemblyVersion, ReleaseVersion = source.ReleaseVersion,
         RegistrationTime = source.RegistrationTime, LastHeartbeatTime = source.LastHeartbeatTime,
+        Diagnostics = source.Diagnostics is { } evidence ? evidence with
+        {
+            IncludedRoles = evidence.IncludedRoles?.ToArray(),
+            RoleHealth = evidence.RoleHealth?.ToArray()
+        } : null,
         Metadata = new Dictionary<string, string>(source.Metadata, source.Metadata.Comparer)
     };
 }

@@ -37,22 +37,15 @@ public class RegistrationStateManager(
             throw new InvalidOperationException("Service-discovery mutation is unavailable while Application:AutonomousWork is false.");
     }
 
-    /// <summary>
-    /// Get registration key
-    /// </summary>
-    private string GetRegistrationKey() =>
-        $"{(clientInfo.GetServiceStatus() is { } status ? $"{status.AppId}:{status.InstanceId}" : throw new InvalidOperationException("InstanceId is required"))}";
-
     public async Task<RegistrationResult> RegisterOrHeartbeatAsync(CancellationToken ct = default)
     {
         EnsureParticipation();
         try
         {
-            var regKey = GetRegistrationKey();
-            var now = DateTime.UtcNow;
-
-            // Every heartbeat replaces the complete registration, including its metadata.
+            // Every heartbeat replaces the complete registration, including its diagnostics and metadata.
             var instanceState = clientInfo.GetServiceStatus(isHeartbeatInfo: false);
+            var regKey = $"{instanceState.AppId}:{instanceState.InstanceId}";
+            var now = DateTime.UtcNow;
 
             // Use cached registration time to avoid Get operations for every heartbeat
             DateTime registrationTime;
@@ -93,14 +86,15 @@ public class RegistrationStateManager(
 
     public async Task<LeaderState?> GetLeaderStateAsync(CancellationToken ct = default)
     {
-        var appId = clientInfo.GetServiceStatus().AppId;
+        var appId = clientInfo.GetServiceStatus(isHeartbeatInfo: true).AppId;
         var resource = LeaderElectionService.Resource(_option, appId);
         var snapshot = await leases.GetSnapshotAsync(resource, ct);
         var leader = snapshot.Leases.SingleOrDefault(row => row.Resource == resource
             && row.ExpiresAtUtc > snapshot.ObservedAtUtc);
         return leader is null ? null : new LeaderState
         {
-            AppId = appId, InstanceId = leader.HolderId, BecomeLeaderTime = leader.AcquiredAtUtc.UtcDateTime
+            AppId = appId, InstanceId = leader.HolderId, BecomeLeaderTime = leader.AcquiredAtUtc.UtcDateTime,
+            ExpiresAt = leader.ExpiresAtUtc
         };
     }
 
@@ -111,7 +105,7 @@ public class RegistrationStateManager(
         if (leases is not ILeaseAdministration administration)
             throw new NotSupportedException("The selected lease authority does not support administrative revocation.");
         await administration.RevokeAsync(LeaderElectionService.Resource(_option, appId), ct);
-        if (appId == clientInfo.GetServiceStatus().AppId)
+        if (appId == clientInfo.GetServiceStatus(isHeartbeatInfo: true).AppId)
             leaderElectionService.TriggerLeaderLost(Monica.ServiceDiscovery.Events.LeaderLostReason.LeaderKeyExpired);
     }
 

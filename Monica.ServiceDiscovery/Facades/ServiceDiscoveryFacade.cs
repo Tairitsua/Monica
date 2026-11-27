@@ -111,6 +111,7 @@ public sealed class ServiceDiscoveryFacade(
         }
     }
 
+    /// <summary>Resigns this process's leadership and stops renewal. The provider grant expires naturally.</summary>
     public async Task<Result> ReleaseLeaderAsync()
     {
         try

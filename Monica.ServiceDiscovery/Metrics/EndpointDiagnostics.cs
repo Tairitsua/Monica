@@ -81,7 +81,11 @@ internal sealed class EndpointDiagnostics
             return new(Environment.MachineName, Environment.ProcessId, now, _options.Retention,
                 _options.MaxCallsPerTarget, _providers.ToArray(), _entries.Values.Select(e =>
                     new ServiceEndpointSnapshot(e.Target, e.AttemptedAt, e.ResolvedAt, e.Resolution,
-                        e.Candidates.ToArray(), e.Calls.ToArray())).ToArray());
+                        e.Candidates.ToArray(), e.Calls.ToArray())).ToArray())
+            {
+                ResolutionTimeout = _options.ResolutionTimeout,
+                EnablePassThrough = _options.EnablePassThrough
+            };
         }
     }
 

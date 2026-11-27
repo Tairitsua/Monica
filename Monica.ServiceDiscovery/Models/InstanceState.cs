@@ -79,6 +79,9 @@ public class InstanceState
     /// </summary>
     public DateTime LastHeartbeatTime { get; set; }
 
+    /// <summary>Gets or sets optional diagnostics from the sending instance. Older registrations may omit them.</summary>
+    public ServiceInstanceDiagnostics? Diagnostics { get; set; }
+
     /// <summary>
     /// Service instance metadata
     /// </summary>
