@@ -47,8 +47,8 @@ public sealed class RepositoryOutboxOptions
     /// Maximum simultaneous deliveries per dispatcher across all drain invocations; defaults to one. Timed-out
     /// sends retain capacity until they finish. Claims only free slots. Compatible distributed messages use their
     /// transport's batch capability within this message budget; each batch also obeys that transport's count/byte limits.
-    /// Local and non-batch deliveries keep independent scopes. Increasing this value does not guarantee ordering,
-    /// including messages with the same transport key. A native batch retains all its slots until it finishes.
+    /// Local and non-batch deliveries keep independent scopes. Only ordered outbox contracts serialize delivery
+    /// by stream. A native batch retains all its slots until it finishes.
     /// </summary>
     public int DeliveryConcurrency { get; set; } = 1;
 

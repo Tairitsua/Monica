@@ -16,6 +16,60 @@ namespace Test.Monica.JobScheduler.Stores.External;
 public sealed partial class ExternalOutboxLeaseTests
 {
     [Theory]
+    [InlineData(ExternalSchedulerDatabase.POSTGRES)]
+    [InlineData(ExternalSchedulerDatabase.VASTBASE)]
+    public async Task OrderedDelivery_TwoReplicasCannotOvertakeALeasedOrRetryingHead(string provider)
+    {
+        var token = TestContext.Current.CancellationToken;
+        var fixture = await ExternalSchedulerStoreFixture.CreateAsync(provider, token);
+        await ExternalSchedulerScenario.RunAsync(fixture, async () =>
+        {
+            var blocked = new DeliveryTransport(blockedSends: 1);
+            var observer = new DeliveryTransport();
+            using var first = CreateHost(fixture.Database, TimeProvider.System, new OutboxCommands(), false,
+                transport: blocked, configureOutbox: options => options.RetryBaseDelay = TimeSpan.FromMinutes(2));
+            using var second = CreateHost(fixture.Database, TimeProvider.System, new OutboxCommands(), false,
+                transport: observer, configureOutbox: options => options.DeliveryConcurrency = 4);
+            await CreateOutboxSchemaAsync(first, token);
+            await SeedDeliveryAsync(first, 3, token);
+            await using (var db = await Factory(first).CreateDbContextAsync(token))
+            {
+                var rows = await db.Set<OutboxMessage>().OrderBy(row => row.Sequence).ToArrayAsync(token);
+                rows[0].TransportKey = rows[1].TransportKey = "stream-a";
+                rows[0].OutboxPosition = 15;
+                rows[1].OutboxPosition = 14;
+                rows[2].TransportKey = "stream-b";
+                rows[2].OutboxPosition = 15;
+                await db.SaveChangesAsync(token);
+            }
+
+            var attempt = Dispatcher(first).DrainAsync(1, token);
+            try
+            {
+                await blocked.AllBlocked.Task.WaitAsync(TimeSpan.FromSeconds(10), token);
+                Assert.Equal("delivery-1", blocked.BlockedMessageId);
+                Assert.Equal(1, await Dispatcher(second).DrainAsync(8, token));
+                Assert.Equal(["delivery-2"], observer.MessageIds);
+            }
+            finally
+            {
+                blocked.AllowSends.TrySetException(new IOException("broker rejected head"));
+                await attempt;
+            }
+            Assert.Equal(0, await Dispatcher(second).DrainAsync(8, token));
+            await using (var db = await Factory(first).CreateDbContextAsync(token))
+            {
+                var head = await db.Set<OutboxMessage>().SingleAsync(row => row.MessageId == "delivery-1", token);
+                Assert.NotNull(head.NextAttemptAtUtc);
+                head.NextAttemptAtUtc = DateTime.UtcNow.AddMinutes(-1);
+                await db.SaveChangesAsync(token);
+            }
+            Assert.Equal(2, await Dispatcher(second).DrainAsync(8, token));
+            Assert.Equal(["delivery-2", "delivery-1", "delivery-0"], observer.MessageIds);
+        });
+    }
+
+    [Theory]
     [InlineData(ExternalSchedulerDatabase.POSTGRES, -7)]
     [InlineData(ExternalSchedulerDatabase.POSTGRES, 7)]
     [InlineData(ExternalSchedulerDatabase.VASTBASE, -7)]

@@ -35,7 +35,12 @@ public sealed partial class OutboxDispatcher<TDbContext>
         var now = time.GetUtcNow().UtcDateTime;
         var eligible = eligibleTargets is null ? rows.Where(x => x.DeliveryTarget == null)
             : rows.Where(x => x.DeliveryTarget != null && eligibleTargets.Contains(x.DeliveryTarget));
-        var keys = await eligible.Where(x => x.Sequence > afterSequence && x.DeliveredAtUtc == null
+        // A leased or backed-off predecessor still owns the head of its stream.
+        var heads = eligible.Where(x => x.OutboxPosition == null || !rows.Any(prior =>
+            prior.DeliveredAtUtc == null && prior.TransportKey == x.TransportKey &&
+            (prior.OutboxPosition < x.OutboxPosition ||
+             prior.OutboxPosition == x.OutboxPosition && prior.Sequence < x.Sequence)));
+        var keys = await heads.Where(x => x.Sequence > afterSequence && x.DeliveredAtUtc == null
                 && (x.NextAttemptAtUtc == null || x.NextAttemptAtUtc <= now)
                 && (x.LeaseUntilUtc == null || x.LeaseUntilUtc <= now))
             .OrderBy(x => x.DeliveredAtUtc).ThenBy(x => x.Sequence).Select(x => x.Sequence).Take(count).ToListAsync(cancellationToken);
@@ -44,7 +49,7 @@ public sealed partial class OutboxDispatcher<TDbContext>
         // Repository timestamps may have whole-second precision. Round up so storage cannot shorten a claim.
         var expiryTicks = now.Add(registration.Options.DeliveryLease).Ticks;
         var expiry = new DateTime(expiryTicks - expiryTicks % TimeSpan.TicksPerSecond + TimeSpan.TicksPerSecond, DateTimeKind.Utc);
-        var selected = eligible.Where(x => keys.Contains(x.Sequence));
+        var selected = heads.Where(x => keys.Contains(x.Sequence));
         await selected.Where(x => x.DeliveredAtUtc == null
                 && (x.NextAttemptAtUtc == null || x.NextAttemptAtUtc <= now)
                 && (x.LeaseUntilUtc == null || x.LeaseUntilUtc <= now))
@@ -71,6 +76,8 @@ public sealed partial class OutboxDispatcher<TDbContext>
         var sequence = Column(nameof(OutboxMessage.Sequence));
         var delivered = Column(nameof(OutboxMessage.DeliveredAtUtc));
         var retry = Column(nameof(OutboxMessage.NextAttemptAtUtc));
+        var position = Column(nameof(OutboxMessage.OutboxPosition));
+        var key = Column(nameof(OutboxMessage.TransportKey));
         var until = Column(nameof(OutboxMessage.LeaseUntilUtc));
         var token = Column(nameof(OutboxMessage.LeaseId));
         var attempts = Column(nameof(OutboxMessage.Attempts));
@@ -79,9 +86,15 @@ public sealed partial class OutboxDispatcher<TDbContext>
         // Including the constant-null delivery column in the order exposes the full index order to both planners.
         return $$"""
             WITH due AS (
-                SELECT {{sequence}} FROM {{name}}
+                SELECT candidate.{{sequence}} FROM {{name}} AS candidate
                 WHERE {{sequence}} > {0} AND {{delivered}} IS NULL
                   {{capability}}
+                  AND (candidate.{{position}} IS NULL OR NOT EXISTS (
+                      SELECT 1 FROM {{name}} AS predecessor
+                      WHERE predecessor.{{delivered}} IS NULL AND predecessor.{{key}} = candidate.{{key}}
+                        AND predecessor.{{position}} IS NOT NULL
+                        AND (predecessor.{{position}}, predecessor.{{sequence}}) < (candidate.{{position}}, candidate.{{sequence}})
+                  ))
                   AND ({{retry}} IS NULL OR {{retry}} <= (statement_timestamp() AT TIME ZONE 'UTC'))
                   AND ({{until}} IS NULL OR {{until}} <= (statement_timestamp() AT TIME ZONE 'UTC'))
                 ORDER BY {{delivered}}, {{sequence}} LIMIT {1} FOR UPDATE SKIP LOCKED

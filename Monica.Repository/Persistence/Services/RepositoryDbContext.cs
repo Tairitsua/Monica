@@ -268,6 +268,8 @@ public abstract class RepositoryDbContext<TDbContext>(DbContextOptions<TDbContex
             // Claims seek to the pending range and read in sequence order, even after a long delivered prefix.
             outbox.HasIndex(x => new { x.DeliveredAtUtc, x.Sequence });
             outbox.HasIndex(x => new { x.DeliveryTarget, x.DeliveredAtUtc, x.NextAttemptAtUtc, x.LeaseUntilUtc, x.Sequence });
+            outbox.HasIndex(x => new { x.TransportKey, x.OutboxPosition, x.Sequence })
+                .HasFilter("\"OutboxPosition\" IS NOT NULL AND \"DeliveredAtUtc\" IS NULL");
             outbox.Property(x => x.MessageId).HasMaxLength(200).IsRequired();
             outbox.Property(x => x.Source).HasMaxLength(200).IsRequired();
             outbox.Property(x => x.EventName).HasMaxLength(200).IsRequired();

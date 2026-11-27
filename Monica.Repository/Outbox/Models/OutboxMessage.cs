@@ -19,6 +19,8 @@ public sealed class OutboxMessage
     public string? ServiceKey { get; set; }
     /// <summary>Stable provider partition key captured with the event contract.</summary>
     public string? TransportKey { get; set; }
+    /// <summary>Optional business position within the transport key. Null selects independent delivery.</summary>
+    public long? OutboxPosition { get; set; }
     /// <summary>Original trace parent, when provided.</summary>
     public string? TraceState { get; set; }
     /// <summary>Original trace state, when provided.</summary>
@@ -50,7 +52,7 @@ public sealed class OutboxMessage
     internal EventMessage ToEventMessage() => new(
         new EventDeliveryMetadata(MessageId, Source, EventName, TopicName, ServiceKey, TraceParent, TraceState)
         { TransportKey = TransportKey },
-        Scope, Body);
+        Scope, Body) { OutboxPosition = OutboxPosition };
 
     internal static OutboxMessage Capture(EventMessage message, TimeProvider time)
     {
@@ -65,6 +67,7 @@ public sealed class OutboxMessage
             TopicName = message.Metadata.TopicName,
             ServiceKey = message.Metadata.ServiceKey,
             TransportKey = message.Metadata.TransportKey,
+            OutboxPosition = message.OutboxPosition,
             TraceParent = message.Metadata.TraceParent,
             TraceState = message.Metadata.TraceState,
             Scope = message.Scope,

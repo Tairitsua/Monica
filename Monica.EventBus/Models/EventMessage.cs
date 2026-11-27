@@ -10,4 +10,8 @@ namespace Monica.EventBus.Models;
 public sealed record EventMessage(
     EventDeliveryMetadata Metadata,
     EventSubscriptionScope Scope,
-    ReadOnlyMemory<byte> Body);
+    ReadOnlyMemory<byte> Body)
+{
+    /// <summary>Optional committed order within the transport key, used only by the Outbox dispatcher.</summary>
+    public long? OutboxPosition { get; init; }
+}

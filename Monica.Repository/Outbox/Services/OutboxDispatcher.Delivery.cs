@@ -40,6 +40,7 @@ public sealed partial class OutboxDispatcher<TDbContext>
         var active = new List<Task<int>>();
         var remaining = maximumMessages;
         var cursor = long.MinValue;
+        var sawOrdered = false;
         var delivered = 0;
         try
         {
@@ -57,11 +58,16 @@ public sealed partial class OutboxDispatcher<TDbContext>
                         // Include the claim round trip in the send budget. Reserve capacity before touching the rows.
                         var started = time.GetTimestamp();
                         var claimed = await ClaimAsync(db, cursor, available, eligibleTargets, stopping.Token);
-                        if (claimed.Count == 0) remaining = 0;
+                        if (claimed.Count == 0)
+                        {
+                            if (active.Count == 0) remaining = 0;
+                        }
                         else
                         {
                             remaining -= claimed.Count;
-                            cursor = claimed[^1].Sequence;
+                            // Settling a head may unlock an earlier storage row, including one passed by another batch.
+                            if (claimed.Any(row => row.OutboxPosition.HasValue)) sawOrdered = true;
+                            cursor = sawOrdered ? long.MinValue : claimed[^1].Sequence;
                             foreach (var batch in CreateDeliveryBatches(claimed, scope.ServiceProvider))
                             {
                                 reserved -= batch.Rows.Count;

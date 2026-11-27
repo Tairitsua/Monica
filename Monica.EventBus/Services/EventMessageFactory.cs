@@ -51,6 +51,17 @@ internal sealed class EventMessageFactory(
             throw new InvalidOperationException($"Event '{eventType}' has an empty name or topic.");
         }
 
+        OutboxOrder? order = null;
+        if (scope == EventSubscriptionScope.Distributed && eventData is IOrderedOutboxEvent ordered)
+        {
+            if (!eventType.IsDefined(typeof(OutboxAttribute), inherit: false))
+                throw new InvalidOperationException($"Ordered event '{eventType}' requires an Outbox contract.");
+            var value = ordered.GetOutboxOrder();
+            if (value.StreamId == Guid.Empty || value.Position <= 0)
+                throw new InvalidOperationException($"Ordered event '{eventType}' requires a nonempty stream identity and a positive position.");
+            order = value;
+        }
+
         var activity = Activity.Current;
         var metadata = new EventDeliveryMetadata(
             Guid.CreateVersion7().ToString("D"),
@@ -61,9 +72,9 @@ internal sealed class EventMessageFactory(
             activity?.Id,
             activity?.TraceStateString)
         {
-            TransportKey = eventType.FullName ?? eventType.Name
+            TransportKey = order is { } stream ? $"{eventName}:{stream.StreamId:D}" : eventType.FullName ?? eventType.Name
         };
         var bytes = JsonSerializer.SerializeToUtf8Bytes(eventData, eventType, jsonOptions.SerializerOptions);
-        return new EventMessage(metadata, scope, bytes);
+        return new EventMessage(metadata, scope, bytes) { OutboxPosition = order?.Position };
     }
 }

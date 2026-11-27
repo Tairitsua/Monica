@@ -175,6 +175,31 @@ public sealed class OutboxDeliveryTests
         Assert.Equal(3, await dispatcher.DrainAsync(3, Token));
     }
 
+    [Fact]
+    public async Task DrainAsync_OrdersCommittedPositionsAndWaitsForBackedOffPredecessors()
+    {
+        var time = new OutboxTestTimeProvider();
+        var probe = new SendProbe(blockFirst: false);
+        await using var app = await CreateAsync(time, probe);
+        await SeedAsync(app, time, 3);
+        await app.SeedAsync<TestRepositoryDbContext, int>(async (db, ct) =>
+        {
+            var rows = await db.Set<OutboxMessage>().OrderBy(row => row.Sequence).ToArrayAsync(ct);
+            rows[0].TransportKey = rows[1].TransportKey = "stream-a";
+            rows[0].OutboxPosition = 15;
+            rows[1].OutboxPosition = 14;
+            rows[1].NextAttemptAtUtc = time.GetUtcNow().AddMinutes(1).UtcDateTime;
+            return await db.SaveChangesAsync(ct);
+        }, Token);
+        var dispatcher = app.Services.GetRequiredService<OutboxDispatcher<TestRepositoryDbContext>>();
+        Assert.Equal(1, await dispatcher.DrainAsync(3, Token));
+        Assert.Equal("message-2", (await probe.Started.Reader.ReadAsync(Token)).MessageId);
+        time.Advance(TimeSpan.FromMinutes(2));
+        Assert.Equal(2, await dispatcher.DrainAsync(3, Token));
+        Assert.Equal("message-1", (await probe.Started.Reader.ReadAsync(Token)).MessageId);
+        Assert.Equal("message-0", (await probe.Started.Reader.ReadAsync(Token)).MessageId);
+    }
+
     private static async Task<int> DrainWhenAvailableAsync(OutboxDispatcher<TestRepositoryDbContext> dispatcher)
     {
         using var deadline = CancellationTokenSource.CreateLinkedTokenSource(Token);
@@ -214,17 +239,18 @@ public sealed class OutboxDeliveryTests
         public int Sends => Volatile.Read(ref _sends);
         public Channel<Attempt> Started { get; } = Channel.CreateUnbounded<Attempt>();
 
-        public Attempt Start()
+        public Attempt Start(EventMessage message)
         {
-            var attempt = new Attempt();
+            var attempt = new Attempt(message.Metadata.MessageId!);
             if (Interlocked.Increment(ref _sends) != 1 || !blockFirst) attempt.Completion.TrySetResult();
             Started.Writer.TryWrite(attempt);
             return attempt;
         }
     }
 
-    private sealed class Attempt
+    private sealed class Attempt(string messageId)
     {
+        public string MessageId { get; } = messageId;
         public TaskCompletionSource Completion { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
         public TaskCompletionSource Disposed { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
     }
@@ -233,7 +259,7 @@ public sealed class OutboxDeliveryTests
     {
         private Attempt? _attempt;
         public Task SendAsync(EventMessage message, CancellationToken cancellationToken) =>
-            (_attempt = probe.Start()).Completion.Task;
+            (_attempt = probe.Start(message)).Completion.Task;
 
         public ValueTask DisposeAsync()
         {

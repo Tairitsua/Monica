@@ -175,7 +175,7 @@ The producer enables idempotence and requests `Acks.All`; successful ordinary pu
 
 Automatic consumer offset commits and offset storage are disabled. The worker awaits all targeted handler operations, including their transaction completion, checks cancellation, and only then commits the record's next offset. Processing retries occur before acknowledgment within the current delivery. Single-record delivery defaults to logging and acknowledging exhausted processing failures. A transient commit failure rewinds the original record before transport redelivery. Lost partition ownership is handled without seeking a partition that moved elsewhere; the worker recreates an unsafe consumer and resumes from committed offsets. A crash after business commit but before Kafka acknowledgment can redeliver the same message. Inbox must cover the intended transactional effects; unprotected external side effects can repeat.
 
-The current message factory sets the transport key to the event contract's CLR name; a prepared message may supply its own `TransportKey`, and the native provider falls back to the declared event name when absent. Ordering is per Kafka partition. Do not infer an aggregate-ID partitioning policy from the business DTO.
+The message factory uses the event contract's CLR name for ordinary events. Distributed ordered outbox contracts use the stable event name and stream UUID as described in the `monica-infra-persistence` Skill, `references/transactional-events.md`. A prepared message may supply its own `TransportKey`; the native provider falls back to the declared event name when absent. Ordering is per Kafka partition. Do not infer an aggregate-ID partitioning policy from the business DTO.
 
 These defaults belong to `ModuleEventBusKafkaOption`:
 
