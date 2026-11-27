@@ -1,0 +1,161 @@
+@using System.Text.Json
+@using static Monica.Repository.UI.UIRepository.Support.RepositoryPresentation
+@inject IStringLocalizer<RepositoryUIResource> L
+@inject MoTimeFormatter UiTime
+
+<MoSideSheet Open="true" DismissRequested="Workbench.CloseActivityOverlayAsync" Width="560px" Compact="true" FocusCloseOnOpen="true">
+    <TitleContent>
+        <RepositoryEvidenceLayout>
+            <div class="rp-evidence-title">
+                <span class="mo-vl-tile @((_row is null ? MoVisualRole.Neutral : SessionRole(_row)).ToCssClass())"><MoIcon Icon="@MoIcons.ChartTrend" Size="18px" /></span>
+                <div><p>@L["Workbench:Activity:Inspector:Title"]</p><h2 class="mono">#@SessionId</h2></div>
+            </div>
+        </RepositoryEvidenceLayout>
+    </TitleContent>
+    <HeaderContent>
+        <RepositoryEvidenceLayout>
+            @if (_row is { } captured)
+            {
+                <div class="rp-evidence-marks">
+                    <span class="rp-evidence-pill @SessionRole(captured).ToCssClass()">@L[$"Persistence:SessionStates:{SessionState(captured)}"]</span>
+                    @if (captured.Waiting == true)
+                    {
+                        <span class="rp-evidence-pill mo-vl-role--error">@Waiting(captured.Waiting)</span>
+                    }
+                </div>
+            }
+        </RepositoryEvidenceLayout>
+    </HeaderContent>
+    <ChildContent>
+        <RepositoryEvidenceLayout>
+            <div class="rp-evidence-content">
+                @if (_row is { } row)
+                {
+                    <section class="rp-evidence-section">
+                        <h3>@L["Workbench:Activity:QueryAge"]</h3>
+                        <strong class="rp-evidence-display mono">@Duration(row.Runtime, L)</strong>
+                        <p>@L["Workbench:Activity:Inspector:RuntimeDescription"]</p>
+                    </section>
+                    @if (SessionState(row) == "idleTx")
+                    {
+                        <MoSemanticCallout Severity="MoVisualRole.Warning" Title="@L["Persistence:OpenTransaction"]">
+                            @L["Persistence:OpenTransactionNote"]
+                        </MoSemanticCallout>
+                    }
+                    <section class="rp-evidence-section">
+                        <div class="rp-evidence-heading">
+                            <h3>@L["Workbench:Activity:Inspector:QueryTitle"]</h3>
+                            <MudButton Size="Size.Small" Variant="Variant.Outlined" OnClick="@(() => _wrap = !_wrap)" aria-pressed="@(_wrap ? "true" : "false")">
+                                @L[_wrap ? "Persistence:Unwrap" : "Persistence:Wrap"]
+                            </MudButton>
+                            <MoCopyButton Label="@L["Workbench:Activity:Inspector:CopyQuery"]" Value="@row.Query">@L["Workbench:Activity:Inspector:CopyQuery"]</MoCopyButton>
+                        </div>
+                        <p>@L["Workbench:Activity:Inspector:QueryDescription"]</p>
+                        @if (string.IsNullOrWhiteSpace(row.Query))
+                        {
+                            <p>@L["Workbench:Activity:Inspector:NoQuery"]</p>
+                        }
+                        else
+                        {
+                            <pre class="rp-evidence-pre @(_wrap ? "is-wrapped" : null)">@row.Query</pre>
+                        }
+                    </section>
+                    <section class="rp-evidence-section">
+                        <h3>@L["Workbench:Activity:Inspector:ProvenanceTitle"]</h3>
+                        <p>@L["Workbench:Activity:Inspector:ScopeDescription"]</p>
+                        <RepositoryKeyValues Items="@Provenance" />
+                    </section>
+                    <section class="rp-evidence-section">
+                        <div class="rp-evidence-heading">
+                            <h3>@L["Persistence:NormalizedEvidence"]</h3>
+                            <MoCopyButton Label="@L["Persistence:CopyEvidenceJson"]" Value="@_evidence">@L["Persistence:CopyEvidenceJson"]</MoCopyButton>
+                        </div>
+                        <p>@L["Workbench:Activity:Inspector:TimestampDescription"]</p>
+                        @if (Postgres) { <p>@L["Workbench:Activity:PostgreSqlWaitNote"]</p> }
+                        <table class="rp-evidence-table">
+                            <thead><tr><th scope="col">@L["Workbench:Activity:Inspector:Field"]</th><th scope="col">@L["Workbench:Activity:Inspector:Value"]</th></tr></thead>
+                            <tbody>
+                                @foreach (var (label, value) in Fields(row))
+                                {
+                                    <tr><th scope="row">@label</th><td><code>@(string.IsNullOrWhiteSpace(value) ? L["Persistence:Unavailable"].Value : value)</code></td></tr>
+                                }
+                            </tbody>
+                        </table>
+                    </section>
+                }
+                else
+                {
+                    <MoContentState Compact="true"><h3>@L["Persistence:SessionMissing"]</h3><p>@L["Persistence:SessionMissingNote"]</p></MoContentState>
+                }
+            </div>
+        </RepositoryEvidenceLayout>
+    </ChildContent>
+</MoSideSheet>
+
+@code {
+    [Parameter, EditorRequired] public RepositoryWorkbench Workbench { get; set; } = null!;
+    [Parameter, EditorRequired] public string SessionId { get; set; } = "";
+    [Parameter, EditorRequired] public RepositoryDbContextSnapshot Context { get; set; } = null!;
+    [Parameter] public RepositoryActivityRow? Row { get; set; }
+    [Parameter] public DateTime? CapturedAt { get; set; }
+    [Parameter] public bool Postgres { get; set; }
+
+    private static readonly JsonSerializerOptions EVIDENCE_FORMAT = new() { WriteIndented = true };
+    private RepositoryActivityRow? _row;
+    private RepositoryDbContextSnapshot _context = null!;
+    private DateTime? _capturedAt;
+    private string? _evidence;
+    private bool _wrap;
+
+    protected override void OnInitialized()
+    {
+        _row = Row;
+        _context = Context;
+        _capturedAt = CapturedAt;
+        if (_row is null) return;
+        _evidence = JsonSerializer.Serialize(new
+        {
+            Scope = L["Workbench:Activity:Inspector:ScopeDescription"].Value,
+            ContextName = _context.Registration.DbContextName,
+            ContextFullName = _context.Registration.FullName,
+            ContextDatabase = _context.Connection?.Database,
+            _context.ProviderName,
+            CapturedAt = _capturedAt,
+            Session = _row
+        }, EVIDENCE_FORMAT);
+    }
+
+    private (string, string?, bool)[] Provenance =>
+    [
+        (L["Workbench:Activity:Inspector:ContextType"], _context.Registration.FullName, false),
+        (L["Workbench:Activity:Inspector:ContextDatabase"], _context.Connection?.Database, false),
+        (L["Workbench:Activity:Inspector:Provider"], _context.ProviderName, false),
+        (L["Workbench:Activity:Inspector:CapturedAt"], UiTime.Format(_capturedAt), false)
+    ];
+
+    private (string, string?)[] Fields(RepositoryActivityRow row) =>
+    [
+        (L["Workbench:Activity:Inspector:Fields:BackendId"], row.BackendId),
+        (L["Workbench:Activity:Inspector:Fields:DatabaseName"], row.DatabaseName),
+        (L["Workbench:Activity:Inspector:Fields:State"], row.State),
+        (L["Workbench:Activity:Inspector:Fields:UserName"], row.UserName),
+        (L["Workbench:Activity:Inspector:Fields:ApplicationName"], row.ApplicationName),
+        (L["Workbench:Activity:Inspector:Fields:ClientAddress"], row.ClientAddress),
+        (L["Workbench:Activity:Inspector:Fields:ClientHostname"], row.ClientHostname),
+        (L["Workbench:Activity:Inspector:Fields:ClientPort"], row.ClientPort?.ToString()),
+        (L[Postgres ? "Workbench:Activity:LockWait" : "Workbench:Activity:Inspector:Fields:Waiting"], Waiting(row.Waiting)),
+        (L["Workbench:Activity:Inspector:Fields:Runtime"], Duration(row.Runtime, L)),
+        (L["Workbench:Activity:Inspector:Fields:BackendStart"], UiTime.Format(row.BackendStart)),
+        (L["Workbench:Activity:Inspector:Fields:TransactionStart"], UiTime.Format(row.TransactionStart)),
+        (L["Workbench:Activity:Inspector:Fields:QueryStart"], UiTime.Format(row.QueryStart)),
+        (L["Workbench:Activity:Inspector:Fields:StateChange"], UiTime.Format(row.StateChange)),
+        (L["Workbench:Activity:Inspector:Fields:Detail"], row.Detail)
+    ];
+
+    private string Waiting(bool? value) => value switch
+    {
+        true => L[Postgres ? "Workbench:Activity:LockWait" : "Workbench:Activity:Waiting"],
+        false => L[Postgres ? "Workbench:Activity:NoLockWait" : "Workbench:Activity:NotWaiting"],
+        null => L[Postgres ? "Workbench:Activity:LockWaitUnknown" : "Workbench:Activity:WaitUnknown"]
+    };
+}

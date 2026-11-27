@@ -15,6 +15,43 @@ public sealed class RepositoryDashboardStateTests
     private static CancellationToken Token => TestContext.Current.CancellationToken;
 
     [Fact]
+    public async Task PrepareWorkspaceAsync_WhenActivityRefreshFails_ShouldRetainTheSampleAcrossRoutes()
+    {
+        var diagnostics = new ControlledRepositoryDiagnostics();
+        var id = diagnostics.First.ContextId;
+        var sample = diagnostics.Activity(id) with
+        {
+            Summary = new RepositoryActivitySummary { TotalSessions = 1 }
+        };
+        diagnostics.ActivityRead = (_, _) => Task.FromResult(sample);
+        await using var application = await CreateAsync(diagnostics);
+        await using var scope = application.CreateScope(Token);
+        var state = scope.Resolve<RepositoryDashboardState>();
+
+        await state.PrepareWorkspaceAsync(null, readActivity: false, refresh: false, revealConnectionStrings: null, Token);
+        diagnostics.DetailCalls.Should().BeEmpty();
+
+        await state.PrepareWorkspaceAsync(id, readActivity: true, refresh: false, revealConnectionStrings: null, Token);
+        var capturedAt = state.DetailsCapturedAt;
+        state.FindSampledActivity(id)!.TotalSessions.Should().Be(1);
+
+        diagnostics.ActivityRead = (_, _) => Task.FromResult(new RepositoryActivityResult
+        {
+            Registration = diagnostics.First,
+            Support = RepositoryActivitySupport.Failed,
+            Message = "The provider became unavailable."
+        });
+        await state.PrepareWorkspaceAsync(id, readActivity: true, refresh: true, revealConnectionStrings: null, Token);
+        await state.PrepareWorkspaceAsync(id, readActivity: false, refresh: false, revealConnectionStrings: null, Token);
+        await state.PrepareWorkspaceAsync(id, readActivity: true, refresh: false, revealConnectionStrings: null, Token);
+
+        state.RetainedActivityError.Should().Be("The provider became unavailable.");
+        state.Activity!.Rows.Should().Equal(sample.Rows);
+        state.DetailsCapturedAt.Should().Be(capturedAt);
+        diagnostics.DetailCalls.Should().Equal("activity:" + id, "activity:" + id);
+    }
+
+    [Fact]
     public async Task SelectContextAsync_WhenSelectionsOverlap_ShouldSerializeAndNeverPublishAnotherContextsEvidence()
     {
         var diagnostics = new ControlledRepositoryDiagnostics();

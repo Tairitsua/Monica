@@ -2,7 +2,7 @@
 @inject IStringLocalizer<SharedResource> L
 
 <MudDialog @ref="_dialog" VisibleChanged="OnVisibilityChangedAsync" Options="CurrentOptions"
-           DefaultFocus="@(DismissRequested.HasDelegate ? DefaultFocus.FirstChild : null)" OnBackdropClick="BackdropHandler"
+           DefaultFocus="@(FocusCloseOnOpen && Dismissible ? DefaultFocus.None : DismissRequested.HasDelegate ? DefaultFocus.FirstChild : null)" OnBackdropClick="BackdropHandler"
            Gutters="false" TitleClass="pa-0" ContentClass="mo-side-sheet-content" ActionsClass="mo-side-sheet-footer"
            Class="@(Compact ? "mo-side-sheet mo-side-sheet--compact" : "mo-side-sheet")" Style="@($"--mo-side-sheet-width: {Width}; --mo-side-sheet-expanded-width: {ExpandedWidth ?? Width};")"
            AriaLabelledBy="@_headingId">
@@ -13,7 +13,7 @@
                 @if (TitleContent is not null) { @TitleContent }
                 else { <h2>@Title</h2> }
             </div>
-            <MudIconButton Class="mo-side-sheet-close" Icon="@MoIcons.Close" Disabled="@(!Dismissible)"
+            <MudIconButton @ref="_closeButton" Class="mo-side-sheet-close" Icon="@MoIcons.Close" Disabled="@(!Dismissible)"
                            aria-label="@(CloseLabel ?? L["Common:Close"].Value)" OnClick="CloseAsync" />
         </div>
         @if (HeaderContent is not null)

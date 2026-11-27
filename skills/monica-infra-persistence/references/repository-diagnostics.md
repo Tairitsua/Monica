@@ -43,27 +43,29 @@ The `monica-entity-model/v1` export includes the selected CLR entity and its own
 
 ## Navigate by the exact context identity
 
-The UI contributes four localized Monitor destinations:
+The Persistence workbench has three Monitor destinations and retains the old options URL for bookmarks.
 
 | Route | Operator task |
 | --- | --- |
-| `/repository-dashboard` | Select a registered context and inspect connection evidence, provider identity, and configured pool limits. |
-| `/repository-dashboard/activity` | Search and compare provider-visible sessions, then inspect a session's complete captured query and metadata. |
-| `/repository-dashboard/migrations` | Compare the current migration assembly with database history and review or apply pending migrations. |
-| `/repository-dashboard/options` | Read captured Repository and DbContext option values; this view does not edit them. |
+| `/repository-dashboard` | Find registrations needing attention, compare physical targets and configured pool limits, inspect a registration, and read host and context options. |
+| `/repository-dashboard/activity` | Compare sessions by database, state and query age. Filter the ledger and open captured SQL and provider evidence. |
+| `/repository-dashboard/migrations` | Reconcile every registered migration assembly with database history, then review and apply pending migrations for the chosen scope. |
+| `/repository-dashboard/options` | Redirect to the options section on Overview. The redirect maps `context`, `q`, and `group` to the corresponding options selection and filters. |
 
-All four routes accept `?context=` containing `RepositoryDbContextRegistration.ContextId`. Treat this assembly-qualified identity as opaque and URI-escape the complete value:
+Pass `RepositoryDbContextRegistration.ContextId` as `context` on the Activity and Migrations routes and in single-context option links. Use `inspectContext` to open the Overview dossier. Treat this assembly-qualified identity as opaque and URI-escape the complete value.
 
 ```csharp
 var url = "/repository-dashboard/activity?context="
     + Uri.EscapeDataString(registration.ContextId);
 ```
 
-Match the decoded value exactly with `StringComparison.Ordinal`. Task links and context selection preserve it, including an explicit ID that is currently unavailable. An unavailable explicit ID produces a missing-context state; another route must not silently substitute the first registration. Without an explicit query, a successful initial capture selects the circuit's retained context when available, otherwise the first registered context. Use `GetCleanName()` or `GetCleanFullName()` for visible CLR type names, preserving generic arguments; readable labels and assembly names do not replace the exact navigation or command ID.
+The UI matches decoded identities with `StringComparison.Ordinal`. A missing explicit identity has its own state. Without an explicit selection, a successful initial capture selects the circuit's retained context when available, then the first registered context. The command and navigation identity is independent of its displayed name.
 
 While asynchronous selection is pending, task links still prioritize the incoming explicit query over the previously selected borrowed state. This keeps a second navigation from silently replacing the requested identity during capture or synchronization.
 
-Routed workspaces reuse an existing successful circuit snapshot and selected context; moving between tools does not automatically recapture the registry. Refresh explicitly, or reload into a new circuit, to read new evidence. These are manual snapshots, not polling or durable history. Registry and detail adoption have separate UTC capture times. Connection, migration, and activity reads run sequentially in independently owned scopes, so the captured page is not one atomic database observation. Connection strings begin masked and are revealed only on an explicit operator action.
+The three workspaces share the last successful registry snapshot in their circuit. Refresh re-reads the registry. Initial Activity visits and selection changes fetch a provider sample for that registration on demand. Returning to a sampled registration can reuse its capture until an explicit refresh. A topology session badge is available after a context on that physical target has returned activity. Registry and activity have separate capture times. Connection strings begin masked. Revealing requires an operator action, and masking clears revealed values from circuit evidence even when refreshing fails.
+
+Overview records use `q`, `standing`, `provider`, and `target`. The options section uses `section=options`, `optScope=one`, `context`, `optQ`, and `optGroup`. Host-wide flags are stated once above the context comparison. The single-context ledger includes the same host flags with captured registration and EF options. A failed snapshot exposes the context error separately from the host flags.
 
 ## Read provider activity
 
@@ -83,9 +85,9 @@ Database session counts include other clients. Never divide them by a configured
 
 `Waiting` is nullable provider evidence. PostgreSQL derives it specifically from `wait_event_type = 'Lock'`; false does not prove the absence of every other wait category. openGauss uses its native waiting field. Waiting can overlap active or idle-in-transaction states, so it is not another mutually exclusive session-state bucket.
 
-The ledger searches query text, state, user, application, client address/hostname/port, database, backend/session ID, provider detail, and waiting evidence. It retains six sort keys—query age, state, user, application, client, and query—in both directions, plus no grouping or grouping by state, client, user, or application. Native paging keeps every matching row reachable, including within groups. Filters change the ledger view rather than the underlying snapshot or database summary.
+The ledger searches query text, state, user, application, client address, hostname, port, database, backend or session ID, provider detail, and waiting evidence. The URL carries `scope`, `state`, `q`, `sort`, `dir`, and `group`. Scope includes all server-visible rows, the selected database, or other databases. Grouping supports state, database, client, user, and application. The logarithmic ruler exposes the same sampled sessions, with separate marks for lock waits and sessions from other databases. Filtering leaves the signature counts scoped to the capture.
 
-Opening a session freezes a detached normalized row with its originating context, database, provider, and capture metadata. Refresh must not replace evidence inside that open inspector. Full SQL remains available for inspection and copying even when the ledger preview is shortened. The guide preserves the actual provider SQL and its selected columns; additional openGauss SQL columns such as query or trace identifiers are not normalized row fields unless the mapper actually supplies them.
+Opening `inspectSession` freezes the normalized row with its originating context, database, provider, and capture time in a right-side sheet. The sheet provides full SQL, a wrap toggle, and copyable JSON. The troubleshooting sheet opens with `guide=1` and shows the provider's SQL and selected columns. The guide's projected columns and the normalized session evidence are separate contracts.
 
 Distinguish result states before reporting counts:
 
@@ -96,28 +98,28 @@ Distinguish result states before reporting counts:
 | `Failed` | The activity query failed. Missing rows or summary are not zero-session evidence. |
 | `Supported` with zero rows | The provider query completed successfully and returned no visible sessions. |
 | Nonempty snapshot with zero filtered rows | A search miss; clearing the native input restores the snapshot's rows. |
-| Refresh with an earlier capture | Retained evidence, explicitly presented as the previous snapshot until a new result is adopted. |
+| Refresh fails after a successful sample | The previous sample stays visible with its capture time and the read failure. |
 
 The facade returns `Result<T>`, but a successful envelope can still contain `Support.Failed`, a migration status with `HasError`, or a failed per-context command outcome. Inspect the model's diagnostic status as well as the envelope.
-
-The Options workspace also checks the selected registry snapshot's `HasError`. A failed context snapshot has no successfully captured options; surface its `ErrorMessage` rather than treating the default empty list as a successful empty configuration ledger.
 
 ## Inspect and apply migrations
 
 `AllMigrations` is the selected DbContext's current migration-assembly inventory. `AppliedMigrations` is the database history returned by EF Core. `AppliedCurrentAssemblyMigrations` intersects the two; `ExternalAppliedMigrations` contains database history IDs absent from the current assembly. External history is already recorded evidence, not pending work. Current-assembly entries can be Applied, Pending, or Unknown. A failed history read or unknown count must not become an empty inventory or zero pending migrations.
+
+`RepositoryDbContextSnapshot.MigrationStatus` provides assembly entries and applied history for every resolved registration in the registry capture. The fleet track draws one bead per compiled migration where history was readable and a hatch where it was unavailable. The pending total carries a `+` when readings are incomplete. The selected ledger keeps its search and state filter in `q` and `state`. Overview can open the selected registration's reconciliation through `inspectContext` and `tab=schema`.
 
 The UI's default migration policy and execution deadline are:
 
 | `ModuleRepositoryUIOption` | Default | Meaning |
 | --- | --- | --- |
 | `AllowMigrationUpdateInProduction` | `false` | The UI state denies migration commands in Production unless the host explicitly opts in. Other environments permit the UI actions. |
-| `MigrationCommandTimeout` | 60 minutes | Each context gets a fresh linked deadline and EF command timeout for pending discovery, migration execution, and commit; this is not one deadline for the entire batch. |
+| `MigrationCommandTimeout` | 60 minutes | Each context gets a fresh linked deadline and EF command timeout for pending discovery and migration execution. |
 
 The production gate belongs to the UI state. It does not prohibit an application's direct `RepositoryDiagnosticsFacade` calls or replace database permissions.
 
 Freeze the selected context's exact ID before opening a confirmation dialog and pass that same ID after approval. Do not reread mutable selection as the command target. Bulk confirmation means all registered contexts, independent of ledger filters or the selected detail view. Registration membership is captured by the backend registry; display its scope explicitly rather than presenting the bulk command as an update of visible or filtered rows.
 
-Bulk updates visit every registration sequentially and recheck each context's pending migrations. Each visit produces an applied, skipped, or failed outcome; an ordinary per-context failure does not make previous changes roll back or prevent later visits. The service attempts a transaction for an individual context when supported and restores the previous EF timeout afterward. There is no shared transaction across the batch. `AttemptedMigrations` records the pre-command pending inventory, not a separate per-migration proof of application.
+Bulk updates visit every registration sequentially and recheck each context's pending migrations. Each visit produces an applied, skipped, or failed outcome. Completed updates remain committed when a later context fails. The EF Core provider's migrator owns its transactions and can execute transaction-suppressed commands. The service restores the previous EF timeout afterward. `AttemptedMigrations` records the pending inventory found before the command.
 
 Store actual command outcomes before the follow-up evidence refresh. `RepositoryDashboardState.MigrationCommandError` identifies a failed command envelope; `ErrorMessage` can also describe a subsequent registry refresh failure. A refresh failure must not reclassify successful migration outcomes. A failed command envelope clears stale command results and is not a successful empty batch. Report the actual applied/skipped/failed counts when a command envelope succeeds.
 
@@ -125,8 +127,8 @@ Cancellation can interrupt observation after database changes committed. Provide
 
 ## Preserve UI lifetime ownership
 
-`RepositoryDashboardState` is a scoped, circuit-owned service borrowed by the four routed workbenches. It serializes selection, reads, and commands through one gate and rechecks the caller's token before adopting results. This coordination is local to the circuit, not a distributed or cross-user migration lock.
+`RepositoryDashboardState` is scoped to the circuit and borrowed by the three workbenches. It serializes selection, reads, and commands through one gate and rechecks the caller's token before adopting results. This coordination applies within one circuit.
 
 The consuming component owns its cancellation source and admitted operation, parameter synchronization, confirmation, and focus tasks. Retirement stops admission, cancels, closes or observes late native dialog references, drains all admitted tasks, and then disposes the component lifetime. A failure while draining one task does not excuse abandoning another. Session/guide dialogs own and drain their clipboard work. Do not dispose injected state during route retirement. The backend diagnostics service owns its separate async scopes and DbContexts; UI code does not retain or dispose those contexts. See page-state ownership in `$monica-architecture` (`references/page-state-pattern.md`) and Blazor lifecycle mechanics in `$monica-ui-development` (`references/blazor-best-practices.md`).
 
-Source: `Monica.Repository.UI/Modules/ModuleRepositoryUI.cs`, its four `Pages/UIRepository*Page.razor` wrappers, `UIRepository/Components/RepositoryWorkbench.razor`, `RepositoryActivityTable.razor`, `RepositoryActivityDetailDialog.razor`, `UIRepository/State/RepositoryDashboardState.cs`, `Monica.Repository/Facades/RepositoryDiagnosticsFacade.cs`, `Persistence/Models/RepositoryDiagnosticsModels.cs`, and `Persistence/Services/RepositoryDbContextDiagnosticsService.cs` with its `Support/` activity queries, registry, guide catalog, and pool parser.
+See `Monica.Repository.UI/Modules/ModuleRepositoryUI.cs`, its `Pages/UIRepository*Page.razor` wrappers, `UIRepository/Components/RepositoryWorkbench.razor`, `RepositorySessionEvidence.razor`, `UIRepository/State/RepositoryDashboardState.cs`, `Monica.Repository/Facades/RepositoryDiagnosticsFacade.cs`, and `Persistence/Services/RepositoryDbContextDiagnosticsService.cs` for implementation.

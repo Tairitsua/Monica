@@ -1,0 +1,67 @@
+@inject IStringLocalizer<RepositoryUIResource> L
+@using static Monica.Repository.UI.UIRepository.Support.RepositoryPresentation
+
+@{
+    var index = 0;
+    var contexts = Workbench.State.Contexts.OrderBy(context => context.PendingMigrationCount > 0 ? 0 : Incomplete(context) ? 1 : 2)
+        .ThenByDescending(context => context.PendingMigrationCount).ThenBy(context => context.Registration.DbContextName);
+}
+<div class="rp-mtrack" data-rp-keyboard>
+    <div class="rp-instrument-heading">
+        <div><h2>@L["Persistence:MigrationTrack"]</h2><p>@L["Persistence:MigrationTrackNote"]</p></div>
+        <div class="rp-legend">
+            <span class="mo-vl-role--success"><i class="rp-swatch"></i>@L["Persistence:AppliedInAssembly"]</span>
+            <span class="mo-vl-role--warning"><i class="rp-swatch"></i>@L["Migrations:States:Pending"]</span>
+            <span class="mo-vl-role--info"><i class="rp-swatch"></i>@L["Migrations:States:Unknown"]</span>
+            <span class="mo-vl-role--error"><i class="rp-swatch is-hatch"></i>@L["Persistence:Unreadable"]</span>
+        </div>
+    </div>
+    <div class="rp-mtrack-list">
+        @foreach (var context in contexts)
+        {
+            var id = context.Registration.ContextId;
+            var active = id == SelectedId;
+            var status = context.MigrationStatus;
+            var failed = status is null || status.HasError;
+            var slot = index++;
+            <a class="rp-mtrack-row @(active ? "is-selected" : null)" href="@Workbench.Url(("context", id))"
+               aria-current="@(active ? "true" : null)" tabindex="@(_focused is null ? slot == 0 ? 0 : -1 : _focused == id ? 0 : -1)"
+               data-rp-mark="@slot" @onfocus="@(() => _focused = id)" @key="id">
+                <span class="rp-mtrack-id"><b>@context.Registration.DbContextName</b><small class="mono">@context.Connection?.Database · @context.MigrationAssembly</small></span>
+                <span class="rp-mtrack-beads @(failed ? "is-unreadable" : null)">
+                    @if (!failed && status is not null)
+                    {
+                        @foreach (var item in status.CurrentAssemblyMigrations)
+                        {
+                            <i class="rp-mtrack-bead @MigrationRole(item.State).ToCssClass()" title="@($"{item.MigrationId} · {L[$"Migrations:States:{item.State}"]}")"></i>
+                        }
+                    }
+                </span>
+                <span class="rp-mtrack-stats">
+                    <b class="mono">@(failed ? "—" : $"{status!.AppliedCurrentAssemblyMigrations.Count}/{status.AllMigrations.Count}")</b>
+                    <span class="rp-pill rp-pill-xs @((failed ? MoVisualRole.Error : status!.PendingMigrations.Count > 0 ? MoVisualRole.Warning : MoVisualRole.Success).ToCssClass())">
+                        @(failed ? L["Persistence:Unreadable"] : status!.PendingMigrations.Count > 0 ? L["Persistence:PendingCount", status.PendingMigrations.Count] : L["Persistence:Aligned"])
+                    </span>
+                    @if (!failed && status is not null && status.ExternalAppliedMigrations.Count > 0)
+                    {
+                        <span class="rp-pill rp-pill-xs mo-vl-role--third">@L["Persistence:ExternalCount", status.ExternalAppliedMigrations.Count]</span>
+                    }
+                </span>
+            </a>
+        }
+    </div>
+    <div class="rp-readout" aria-live="polite">
+        <MoIcon Icon="@MoIcons.Info" Size="14px" />
+        @if (_focused is { } focus && Workbench.State.Contexts.FirstOrDefault(context => context.Registration.ContextId == focus) is { } current)
+        {
+            <b>@current.Registration.DbContextName</b><span>@L["Persistence:TrackReadout", current.MigrationCount?.ToString() ?? "—", current.PendingMigrationCount?.ToString() ?? "—"]</span>
+        }
+        else { <span>@L["Persistence:MigrationKeyboard"]</span> }
+    </div>
+</div>
+
+@code {
+    [Parameter, EditorRequired] public RepositoryWorkbench Workbench { get; set; } = null!;
+    [Parameter, EditorRequired] public string SelectedId { get; set; } = "";
+    private string? _focused;
+}

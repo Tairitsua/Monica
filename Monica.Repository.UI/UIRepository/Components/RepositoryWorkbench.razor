@@ -1,288 +1,120 @@
-@inject Monica.UI.Shared.Services.MoTimeFormatter UiTime
-@using Monica.Repository.UI.UIRepository.State
-@using Monica.Tool.Extensions
-@using Monica.UI.Shared.Components.Dialogs
-@inject RepositoryDashboardState State
-@inject NavigationManager Navigation
-@inject IDialogService DialogService
-@inject ISnackbar Snackbar
-@inject IStringLocalizer<RepositoryUIResource> L
-@implements IAsyncDisposable
+@using static Monica.Repository.UI.UIRepository.Support.RepositoryPresentation
 
-<div class="repository-workbench" data-view="@View" aria-busy="@(_busy ? "true" : "false")">
-    <header class="repository-heading">
-        <div>
-            <span class="repository-eyebrow"><MoIcon Icon="@MoIcons.Database" Size="1.25rem" />@L["Workbench:Eyebrow"]</span>
-            <h1>@L[$"Workbench:Views:{View}:Title"]</h1>
-            <p>@L[$"Workbench:Views:{View}:Description"]</p>
-        </div>
-        <div class="repository-refresh">
-            <span>@L["Workbench:CapturedAt"]</span>
-            <time>@(UiTime.FormatTime(State.ContextsCapturedAt))</time>
-            <MudButton Variant="Variant.Outlined" StartIcon="@MoIcons.Refresh" Disabled="_busy" OnClick="RefreshAsync">@L["Common:Actions:Refresh"]</MudButton>
-        </div>
-    </header>
-    <nav class="repository-routes" aria-label="@L["Workbench:Navigation"]">
-        @foreach (var route in Routes)
-        {
-            <a href="@RouteUrl(route.Path)" aria-current="@(View == route.View ? "page" : null)"><MoIcon Icon="@route.Icon" Size="1.25rem" />@L[$"Workbench:Views:{route.View}:Label"]</a>
-        }
-    </nav>
-    <div class="repository-scope">
-        <div><span>@L["Workbench:RegistryScope"]</span><strong>@RegistrySummary</strong></div>
-        <div><span>@L["Workbench:Connected"]</span><strong>@CountOrUnknown(State.Contexts.Count(context => context.CanConnect))</strong></div>
-        <div><span>@L["Workbench:Pending"]</span><strong>@PendingSummary</strong></div>
-        <div><span>@L["Workbench:Incomplete"]</span><strong>@CountOrUnknown(State.Contexts.Count(context => context.HasError || context.MigrationCount is null || context.PendingMigrationCount is null))</strong></div>
-    </div>
-    @if (!string.IsNullOrWhiteSpace(State.ErrorMessage))
+<div class="rp-page" @ref="_root" aria-busy="@(_busy ? "true" : "false")">
+    <MoPageMasthead Icon="@ViewIcon" Title="@L[TitleKey]" Crumb="@L["Workbench:Eyebrow"]" Class="rp-mh">
+        <Meta>
+            <span class="mo-vl-status mo-vl-status--pill @((State.ErrorMessage is null ? MoVisualRole.Neutral : MoVisualRole.Warning).ToCssClass())"
+                  title="@L["Persistence:ManualTip"]" tabindex="0">
+                <i class="mo-vl-status-dot" aria-hidden="true"></i>@L["Workbench:ManualSnapshot"]
+            </span>
+            <span class="rp-tag mono">@Host.ApplicationName</span>
+            <span class="rp-tag">@Host.EnvironmentName</span>
+            <span class="rp-tag mono">@UiTime.FormatZoneLabel(State.ContextsCapturedAt)</span>
+        </Meta>
+        <Actions>
+            <div class="rp-stamp">
+                <span>@L["Workbench:CapturedAt"]</span>
+                <b class="mono">@UiTime.FormatTime(State.ContextsCapturedAt)</b>
+            </div>
+            <MudButton Variant="Variant.Filled" Color="Color.Primary" Size="Size.Small" StartIcon="@MoIcons.Refresh" Disabled="_busy" OnClick="RefreshAsync">
+                @L[_busy ? "Persistence:Refreshing" : "Common:Actions:Refresh"]
+            </MudButton>
+        </Actions>
+    </MoPageMasthead>
+    <MoWorkbenchNavigation Label="@L["Workbench:Navigation"]" Compact="true">
+        <a href="@RepositoryRoute.Overview()" aria-current="@Current("Overview")"><MoIcon Icon="@MoIcons.Database" Size="15px" />@L["Workbench:Views:Overview:Label"]
+            @if (State.Contexts.Count > 0)
+            {
+                <span class="rp-nav-badge @RailStandingRole.ToCssClass()">@Attention/@State.Contexts.Count</span>
+            }
+        </a>
+        <a href="@RepositoryRoute.Activity(RouteContext)" aria-current="@Current("Activity")"><MoIcon Icon="@MoIcons.ChartTrend" Size="15px" />@L["Workbench:Views:Activity:Label"]
+            @if (RouteContext is { } id && State.FindSampledActivity(id) is { } sample)
+            {
+                <span class="rp-nav-badge @((sample.WaitingSessions > 0 ? MoVisualRole.Error : sample.IdleInTransactionSessions > 0 ? MoVisualRole.Warning : MoVisualRole.Info).ToCssClass())">@sample.TotalSessions</span>
+            }
+        </a>
+        <a href="@RepositoryRoute.Migrations(RouteContext)" aria-current="@Current("Migrations")"><MoIcon Icon="@MoIcons.Workflow" Size="15px" />@L["Workbench:Views:Migrations:Label"]
+            @if (State.Contexts.Count > 0)
+            {
+                <span class="rp-nav-badge @((KnownPending > 0 || IncompleteCount > 0 ? MoVisualRole.Warning : MoVisualRole.Success).ToCssClass())">@PendingDisplay</span>
+            }
+        </a>
+    </MoWorkbenchNavigation>
+
+    @if (State.ContextsCapturedAt is { } previous && State.ErrorMessage is not null)
     {
-        <MudAlert Severity="Severity.Error" Variant="Variant.Outlined" Icon="@MoIcons.Error">@State.ErrorMessage</MudAlert>
+        <MoSemanticCallout Severity="MoVisualRole.Warning" Title="@L["Persistence:StaleTitle"]">
+            @L["Persistence:StaleBody", UiTime.Format(previous)]
+            <code class="rp-read-error">@State.ErrorMessage</code>
+        </MoSemanticCallout>
     }
-    @if (_busy && State.ContextsCapturedAt is null)
+
+    @if (State.ContextsCapturedAt is null)
     {
-        <section class="repository-empty"><MudProgressCircular Indeterminate="true" Size="Size.Small" /><h2>@L["Dashboard:Messages:LoadingContexts"]</h2><p>@L["Dashboard:Messages:LoadingContextsDescription"]</p></section>
-    }
-    else if (State.ContextsCapturedAt is null)
-    {
-        <section class="repository-empty"><h2>@L["Workbench:Messages:NoCapture"]</h2><p>@L["Workbench:Messages:Retry"]</p></section>
+        <section class="mo-vl-surface">
+            @if (_busy)
+            {
+                <MoContentState Loading="true">
+                    <MudProgressCircular Indeterminate="true" Color="Color.Primary" Size="Size.Small" />
+                    <h2>@L["Dashboard:Messages:LoadingContexts"]</h2>
+                    <p>@L["Dashboard:Messages:LoadingContextsDescription"]</p>
+                </MoContentState>
+            }
+            else
+            {
+                <MoContentState>
+                    <MoIcon Icon="@MoIcons.Error" Size="24px" />
+                    <h2>@L["Persistence:LoadFailedTitle"]</h2>
+                    <p>@L["Persistence:LoadFailedBody"]</p>
+                    @if (State.ErrorMessage is not null)
+                    {
+                        <code class="rp-read-error">@State.ErrorMessage</code>
+                    }
+                    <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@MoIcons.Refresh" OnClick="RefreshAsync">@L["Common:Actions:Refresh"]</MudButton>
+                </MoContentState>
+            }
+        </section>
     }
     else if (State.Contexts.Count == 0)
     {
-        <section class="repository-empty"><MoIcon Icon="@MoIcons.Database" Size="1.5rem" /><h2>@L["Dashboard:Messages:NoContexts"]</h2><p>@L["Dashboard:Messages:NoContextsDescription"]</p></section>
+        <section class="mo-vl-surface">
+            <MoContentState>
+                <MoIcon Icon="@MoIcons.Database" Size="24px" />
+                <h2>@L["Dashboard:Messages:NoContexts"]</h2>
+                <p>@L["Dashboard:Messages:NoContextsDescription"]</p>
+            </MoContentState>
+        </section>
+    }
+    else if (View == "Overview")
+    {
+        <RepositoryContextOverview Workbench="this" />
+    }
+    else if (State.SelectedContext is not { } selected)
+    {
+        <section class="mo-vl-surface">
+            <MoContentState>
+                <MoIcon Icon="@MoIcons.SearchOff" Size="24px" />
+                <h2>@L["Workbench:Messages:ContextMissing"]</h2>
+                <p>@L["Workbench:Messages:ChooseAvailable"]</p>
+                <code class="rp-read-error">@Get("context")</code>
+                <div class="rp-actions">
+                    @foreach (var context in State.Contexts.Take(5))
+                    {
+                        <MudButton Variant="Variant.Outlined" Href="@Url(("context", context.Registration.ContextId))" StartIcon="@MoIcons.Database">
+                            @context.Registration.DbContextName
+                        </MudButton>
+                    }
+                </div>
+            </MoContentState>
+        </section>
+    }
+    else if (View == "Activity")
+    {
+        <RepositoryActivityTable Workbench="this" Context="selected" @key="selected.Registration.ContextId" />
     }
     else
     {
-        <section class="repository-context" aria-label="@L["Workbench:ContextScope"]">
-            <div>
-                <span class="repository-eyebrow">@L["Dashboard:Detail:SelectedContext"]</span>
-                <h2 @ref="_contextHeading" tabindex="-1">@(State.SelectedContext?.Registration.DbContextType.GetCleanName() ?? L["Workbench:Messages:ContextMissing"].Value)</h2>
-                <code>@State.SelectedContext?.Registration.DbContextType.GetCleanFullName()</code>
-            </div>
-            <div class="repository-context-control">
-                <MudSelect T="string" Value="@(State.SelectedContext?.Registration.ContextId)" ValueChanged="SelectContextAsync" Label="@L["Workbench:ChooseContext"]" Variant="Variant.Outlined" Margin="Margin.Dense" Disabled="_busy" OpenIcon="@MoIcons.ChevronDown" CloseIcon="@MoIcons.ChevronUp">
-                    @foreach (var context in State.Contexts)
-                    {
-                        <MudSelectItem T="string" Value="@context.Registration.ContextId">@context.Registration.DbContextType.GetCleanFullName() · @context.Registration.AssemblyName</MudSelectItem>
-                    }
-                </MudSelect>
-                <span>@L["Workbench:ManualSnapshot"]</span>
-            </div>
-        </section>
-        @if (State.SelectedContext is null)
-        {
-            <section class="repository-empty"><h2>@L["Workbench:Messages:ContextMissing"]</h2><p>@L["Workbench:Messages:ChooseAvailable"]</p><code>@ContextId</code></section>
-        }
-        else if (View == "Overview")
-        {
-            <div class="repository-overview-workspace">
-                <RepositoryContextRail Contexts="State.Contexts" SelectedContextId="@State.SelectedContext.Registration.ContextId" IsLoading="_busy" OnRefresh="RefreshAsync" OnSelected="SelectContextAsync" />
-                <RepositoryContextOverview Snapshot="State.SelectedContext" MigrationStatus="State.MigrationStatus" Activity="State.Activity" RevealConnectionStrings="State.RevealConnectionStrings" OnToggleReveal="ToggleRevealAsync" IsBusy="_busy" MigrationsUrl="@RouteUrl("/migrations")" ActivityUrl="@RouteUrl("/activity")" />
-            </div>
-        }
-        else if (View == "Activity")
-        {
-            <RepositoryActivityTable @key="State.SelectedContext.Registration.ContextId" Activity="State.Activity" ProviderName="@State.SelectedContext.ProviderName" ContextDatabase="@State.SelectedContext.Connection?.Database" CapturedAt="State.DetailsCapturedAt" IsLoading="_busy" />
-        }
-        else if (View == "Migrations")
-        {
-            <RepositoryMigrationPanel Status="State.MigrationStatus" UpdateResults="State.UpdateResults" MigrationUpdatesEnabled="State.MigrationUpdatesEnabled" HasAnyPendingMigration="State.Contexts.Any(context => context.PendingMigrationCount > 0)" IsUpdating="_updating" IsBusy="_busy" OnUpdateSelected="UpdateSelectedAsync" OnUpdateAll="UpdateAllAsync" />
-        }
-        else
-        {
-            @if (State.SelectedContext.HasError)
-            {
-                <MudAlert Severity="Severity.Error" Variant="Variant.Outlined" Class="repository-read-failure" Icon="@MoIcons.Error">
-                    <h3>@L["Workbench:Options:ReadFailed"]</h3>
-                    <p>@State.SelectedContext.ErrorMessage</p>
-                </MudAlert>
-            }
-            else
-            {
-                <OptionsTable @key="State.SelectedContext.Registration.ContextId" Options="State.SelectedContext.Options" />
-            }
-        }
+        <RepositoryMigrationPanel Workbench="this" Context="selected" />
     }
 </div>
-
-@code {
-    [Parameter] public string View { get; set; } = "Overview";
-    [Parameter] public string? ContextId { get; set; }
-    private readonly CancellationTokenSource _lifetime = new();
-    private readonly CancellationToken _token;
-    private Task? _operation;
-    private Task? _parameters;
-    private Task? _focus;
-    private Task? _dispose;
-    private Task<IDialogReference>? _opening;
-    private IDialogReference? _confirmation;
-    private ElementReference _contextHeading;
-    private bool _initialized;
-    private bool _busy;
-    private bool _updating;
-    private bool _retired;
-    private bool _restoreFocus;
-    public RepositoryWorkbench() => _token = _lifetime.Token;
-    private static readonly (string View, string Path, string Icon)[] Routes =
-    [
-        ("Overview", "", MoIcons.Database),
-        ("Activity", "/activity", MoIcons.ChartTrend),
-        ("Migrations", "/migrations", MoIcons.Workflow),
-        ("Options", "/options", MoIcons.Sliders)
-    ];
-    private string RegistrySummary => State.ContextsCapturedAt is null ? L["Common:Values:Unavailable"].Value : L["Workbench:ContextCount", State.Contexts.Count].Value;
-    private string CountOrUnknown(int value) => State.ContextsCapturedAt is null ? L["Common:Values:Unavailable"].Value : value.ToString();
-    private string PendingSummary => State.ContextsCapturedAt is null ? L["Common:Values:Unavailable"].Value
-        : State.Contexts.Any(context => context.PendingMigrationCount is null) ? L["Workbench:PartialPending", State.Contexts.Sum(context => context.PendingMigrationCount ?? 0)].Value
-        : State.Contexts.Sum(context => context.PendingMigrationCount ?? 0).ToString();
-    private string RouteUrl(string suffix)
-    {
-        var id = string.IsNullOrEmpty(ContextId) ? State.SelectedContext?.Registration.ContextId : ContextId;
-        return "/repository-dashboard" + suffix + (string.IsNullOrEmpty(id) ? string.Empty : "?context=" + Uri.EscapeDataString(id));
-    }
-
-    protected override Task OnParametersSetAsync() => _parameters = SynchronizeAsync(_parameters);
-    private async Task SynchronizeAsync(Task? previous)
-    {
-        if (previous is not null) await previous;
-        if (_operation is not null) await _operation;
-        if (_retired) return;
-        if (!_initialized)
-        {
-            _initialized = true;
-            if (State.ContextsCapturedAt is null) await RunAsync(State.InitializeAsync);
-        }
-        if (!_retired && !string.IsNullOrEmpty(ContextId) && State.SelectedContext?.Registration.ContextId != ContextId)
-            await RunAsync(token => State.SelectContextAsync(ContextId, token));
-    }
-    private Task RefreshAsync() => RunAsync(async token =>
-    {
-        await State.RefreshContextsAsync(cancellationToken: token);
-        if (!string.IsNullOrEmpty(ContextId) && State.SelectedContext?.Registration.ContextId != ContextId)
-            await State.SelectContextAsync(ContextId, token);
-    });
-    private Task SelectContextAsync(string id) => RunAsync(async token =>
-    {
-        await State.SelectContextAsync(id, token);
-        if (!_retired) Navigation.NavigateTo(Navigation.GetUriWithQueryParameter("context", id), replace: true);
-    });
-    private Task ToggleRevealAsync() => RunAsync(State.ToggleConnectionStringRevealAsync);
-    private Task UpdateSelectedAsync() => RunAsync(token => ConfirmUpdateAsync(false, token));
-    private Task UpdateAllAsync() => RunAsync(token => ConfirmUpdateAsync(true, token));
-    private Task RunAsync(Func<CancellationToken, Task> work)
-    {
-        if (_retired || _busy) return Task.CompletedTask;
-        _busy = true;
-        return _operation = RunCoreAsync(work);
-    }
-    private async Task RunCoreAsync(Func<CancellationToken, Task> work)
-    {
-        try { await work(_token); }
-        catch (OperationCanceledException) when (_token.IsCancellationRequested) { }
-        finally { if (!_retired) _busy = false; }
-    }
-    private async Task ConfirmUpdateAsync(bool all, CancellationToken token)
-    {
-        var context = State.SelectedContext;
-        if (context is null || !State.MigrationUpdatesEnabled) return;
-        var title = L[all ? "Migrations:Confirm:AllTitle" : "Migrations:Confirm:SelectedTitle"].Value;
-        RenderFragment heading = builder =>
-        {
-            builder.OpenComponent<MoDialogHeading>(0);
-            builder.AddAttribute(1, nameof(MoDialogHeading.Text), title);
-            builder.CloseComponent();
-        };
-        var parameters = new DialogParameters
-        {
-            [nameof(MudMessageBox.Title)] = title,
-            [nameof(MudMessageBox.TitleContent)] = heading,
-            [nameof(MudMessageBox.Message)] = all ? L["Workbench:ConfirmAll", State.Contexts.Count].Value : L["Workbench:ConfirmContext", context.Registration.DbContextType.GetCleanFullName(), context.Registration.AssemblyName].Value,
-            [nameof(MudMessageBox.YesText)] = L[all ? "Migrations:Actions:UpdateAll" : "Migrations:Actions:UpdateSelected"].Value,
-            [nameof(MudMessageBox.CancelText)] = L["Common:Actions:Cancel"].Value
-        };
-        try
-        {
-            _opening = DialogService.ShowAsync<MudMessageBox>(title, parameters, new DialogOptions { CloseOnEscapeKey = true, FullWidth = true, MaxWidth = MaxWidth.Small });
-            var dialog = await _opening;
-            _opening = null;
-            if (_retired) { Cancel(dialog); return; }
-            _confirmation = dialog;
-            var answer = await dialog.Result;
-            _confirmation = null;
-            if (_retired || answer is null || answer.Canceled || answer.Data is not true) return;
-            _updating = true;
-            await InvokeAsync(StateHasChanged);
-            if (all)
-            {
-                var results = await State.UpdateAllPendingMigrationsAsync(token);
-                if (_retired) return;
-                if (State.MigrationCommandError is not null) { Snackbar.Add(L["Migrations:Messages:UpdateFailed"], Severity.Error); return; }
-                var failures = results.Count(result => !result.Succeeded);
-                var applied = results.Count(result => result.Succeeded && !result.Skipped);
-                var skipped = results.Count(result => result.Succeeded && result.Skipped);
-                Snackbar.Add(L["Workbench:BulkOutcome", applied, skipped, failures], failures > 0 ? Severity.Warning : applied > 0 ? Severity.Success : Severity.Info);
-            }
-            else
-            {
-                var result = await State.UpdateMigrationAsync(context.Registration.ContextId, token);
-                if (_retired) return;
-                if (result is null || !result.Succeeded) Snackbar.Add(L["Migrations:Messages:UpdateFailed"], Severity.Error);
-                else Snackbar.Add(result.Skipped ? L["Migrations:Messages:NoPending"] : L["Migrations:Messages:UpdateSucceeded", result.Registration.DbContextType.GetCleanName()], result.Skipped ? Severity.Info : Severity.Success);
-            }
-        }
-        finally { if (!_retired) { _updating = false; _restoreFocus = true; } }
-    }
-    protected override Task OnAfterRenderAsync(bool firstRender)
-    {
-        if (_retired || !_restoreFocus) return Task.CompletedTask;
-        _restoreFocus = false;
-        return _focus = RestoreFocusAsync(_focus);
-    }
-    private async Task RestoreFocusAsync(Task? previous)
-    {
-        if (previous is not null) await previous;
-        if (_retired || _busy) return;
-        try { await _contextHeading.FocusAsync(preventScroll: true); }
-        catch (JSDisconnectedException) { }
-    }
-    private static void Cancel(IDialogReference dialog)
-    {
-        var result = DialogResult.Cancel();
-        dialog.Close(result);
-        dialog.Dismiss(result);
-    }
-    public ValueTask DisposeAsync() => new(_dispose ??= DisposeCoreAsync());
-    private async Task DisposeCoreAsync()
-    {
-        _retired = true;
-        var failures = new HashSet<Exception>(ReferenceEqualityComparer.Instance);
-        try
-        {
-            await ObserveAsync(_lifetime.CancelAsync());
-            if (_confirmation is { } dialog) TryCancel(dialog);
-            if (_opening is { } opening)
-            {
-                try { TryCancel(await opening); }
-                catch (Exception exception) { failures.Add(exception); }
-            }
-            await ObserveAsync(_operation);
-            await ObserveAsync(_parameters);
-            await ObserveAsync(_focus);
-        }
-        finally { _lifetime.Dispose(); }
-
-        if (failures.Count > 0) throw new AggregateException("Repository workbench retirement failed.", failures);
-
-        async Task ObserveAsync(Task? task)
-        {
-            if (task is null) return;
-            try { await task; }
-            catch (OperationCanceledException) when (_token.IsCancellationRequested) { }
-            catch (Exception exception) { failures.Add(exception); }
-        }
-        void TryCancel(IDialogReference reference)
-        {
-            try { Cancel(reference); }
-            catch (Exception exception) { failures.Add(exception); }
-        }
-    }
-}

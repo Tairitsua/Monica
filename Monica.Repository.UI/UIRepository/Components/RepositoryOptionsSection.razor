@@ -1,0 +1,157 @@
+@inject IStringLocalizer<RepositoryUIResource> L
+@inject IOptions<ModuleRepositoryOption> RepositoryOptions
+@inject Microsoft.Extensions.Hosting.IHostEnvironment Host
+@using static Monica.Repository.UI.UIRepository.Support.RepositoryPresentation
+
+@{
+    var oneContext = Workbench.Get("optScope") == "one";
+    var contexts = Workbench.State.Contexts;
+    var requested = Workbench.Get("context");
+    var selected = requested is null ? Workbench.State.SelectedContext ?? contexts.FirstOrDefault()
+        : contexts.FirstOrDefault(context => context.Registration.ContextId == requested);
+    var group = Workbench.Get("optGroup");
+    var search = Workbench.Get("optQ");
+    var hostFlags = GetHostFlags();
+    var rows = oneContext
+        ? Entries(selected, hostFlags).Select(entry => (Context: selected, Entry: entry))
+        : group == "ModuleRepository"
+            ? hostFlags.Select(entry => (Context: (RepositoryDbContextSnapshot?)null, Entry: entry))
+            : contexts.SelectMany(context => Entries(context, []).Select(entry => (Context: (RepositoryDbContextSnapshot?)context, Entry: entry)));
+    var filtered = rows.Where(row => (group is null || Group(row.Entry) == group) &&
+        Search(search, row.Context?.Registration.DbContextName, row.Entry.Path, OptionLabel(row.Entry, L), OptionValue(row.Entry.Value, L))).ToArray();
+}
+<section id="repo-options" class="mo-vl-surface rp-opts @(Workbench.Get("section") == "options" ? "is-highlighted" : null)">
+    <header class="mo-vl-surface-heading rp-surface-heading">
+        <span class="mo-vl-tile mo-vl-role--third"><MoIcon Icon="@MoIcons.Sliders" Size="16px" /></span>
+        <div class="rp-heading-copy"><h2>@L["Persistence:OptionsTitle"]</h2><p>@L["Persistence:OptionsDescription"]</p></div>
+        <span class="rp-pill mo-vl-role--third">@L["Persistence:ReadOnly"]</span>
+    </header>
+    <div class="mo-vl-surface-body">
+        @if (Workbench.Get("section") == "options")
+        {
+            <p class="rp-inline-info"><MoIcon Icon="@MoIcons.Info" Size="15px" />@L["Persistence:OptionsRedirect"]</p>
+        }
+        <div class="rp-instrument-heading">
+            <div><h3>@L["Persistence:HostPolicy"]</h3><p>@L["Persistence:HostPolicyDescription"]</p></div>
+        </div>
+        <div class="rp-host-flags">
+            @foreach (var flag in hostFlags)
+            {
+                var role = flag.Value == "Environment default" ? MoVisualRole.Warning
+                    : string.Equals(flag.Value, bool.TrueString, StringComparison.OrdinalIgnoreCase) ? MoVisualRole.Success : MoVisualRole.Neutral;
+                <article class="rp-host-flag">
+                    <b>@OptionLabel(flag, L)</b><small class="mono">@flag.Path</small>
+                    <span class="rp-pill rp-pill-xs @role.ToCssClass()">@OptionValue(flag.Value, L)</span>
+                </article>
+            }
+        </div>
+        @if (Host.EnvironmentName == "Development" && RepositoryOptions.Value.EnableSensitiveDataLogging is null)
+        {
+            <p class="rp-scope-note rp-warn-note"><MoIcon Icon="@MoIcons.Warning" Size="14px" />@L["Persistence:SensitiveLoggingNote"]</p>
+        }
+        <div class="rp-toolbar">
+            <div class="rp-option-switch" role="group" aria-label="@L["Persistence:OptionsTitle"]">
+                <MoFilterChip Label="@L["Persistence:CompareContexts"]" Role="MoVisualRole.Third" Selected="@(!oneContext)" SelectedChanged="@(_ => Scope(false))" />
+                <MoFilterChip Label="@L["Persistence:OneContext"]" Role="MoVisualRole.Third" Selected="@oneContext" SelectedChanged="@(_ => Scope(true))" />
+            </div>
+            @if (oneContext)
+            {
+                <div class="rp-select">
+                    <MudSelect T="string" Value="@selected?.Registration.ContextId" ValueChanged="Select" aria-label="@L["Workbench:ChooseContext"]"
+                               Variant="Variant.Outlined" Margin="Margin.Dense" OpenIcon="@MoIcons.ChevronDown" CloseIcon="@MoIcons.ChevronUp">
+                        @foreach (var context in contexts)
+                        {
+                            <MudSelectItem T="string" Value="@context.Registration.ContextId">@context.Registration.DbContextName</MudSelectItem>
+                        }
+                    </MudSelect>
+                </div>
+            }
+            <RepositorySearch Value="@search" Label="@L["Workbench:Options:Search"]" Changed="@((string? value) => Workbench.Replace(("optQ", value)))" />
+            <div class="rp-chips" role="group" aria-label="@L["Workbench:Options:Group"]">
+                <MoFilterChip Label="@L["Workbench:Options:All"]" Role="MoVisualRole.Third" Pill="true" Selected="@(group is null)"
+                              SelectedChanged="@(_ => Workbench.Replace(("optGroup", null)))" />
+                @foreach (var optionGroup in GROUPS)
+                {
+                    <MoFilterChip Role="MoVisualRole.Third" Label="@optionGroup" Pill="true" Selected="@(group == optionGroup)"
+                                  SelectedChanged="@(_ => Workbench.Toggle("optGroup", optionGroup))" />
+                }
+            </div>
+        </div>
+        @if (oneContext && selected is null)
+        {
+            <MoContentState Compact="true"><h3>@L["Workbench:Messages:ContextMissing"]</h3><code>@requested</code></MoContentState>
+        }
+        else if (filtered.Length == 0)
+        {
+            <MoContentState Compact="true">
+                <p>@L["Workbench:Options:NoMatches"]</p>
+                <MudButton Variant="Variant.Outlined" Size="Size.Small" OnClick="Clear">@L["Persistence:ClearFilters"]</MudButton>
+            </MoContentState>
+        }
+        else
+        {
+            @if (oneContext && selected?.ErrorMessage is { } problem)
+            {
+                <MoSemanticCallout Severity="MoVisualRole.Error" Title="@L["Workbench:Options:ReadFailed"]"><code>@problem</code></MoSemanticCallout>
+            }
+            <div class="rp-table-wrap">
+                <table class="rp-table rp-options-table">
+                    <thead><tr>
+                        @if (!oneContext) { <th scope="col">@L["Persistence:Context"]</th> }
+                        <th scope="col">@L["Options:Columns:Name"]</th><th scope="col">@L["Options:Columns:Path"]</th>
+                        <th scope="col">@L["Options:Columns:Value"]</th>
+                    </tr></thead>
+                    <tbody>
+                        @foreach (var row in filtered)
+                        {
+                            <tr>
+                                @if (!oneContext)
+                                {
+                                    <td data-label="@L["Persistence:Context"]">
+                                        @if (row.Context is { } context)
+                                        {
+                                            <a class="rp-row-link" href="@Workbench.Url(("inspectContext", context.Registration.ContextId), ("tab", "options"))">@context.Registration.DbContextName</a>
+                                        }
+                                        else { @L["Persistence:HostPolicy"] }
+                                    </td>
+                                }
+                                <td data-label="@L["Options:Columns:Name"]"><b>@OptionLabel(row.Entry, L)</b></td>
+                                <td data-label="@L["Options:Columns:Path"]"><code>@row.Entry.Path</code></td>
+                                <td data-label="@L["Options:Columns:Value"]"><code class="rp-tag">@OptionValue(row.Entry.Value, L)</code></td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        }
+    </div>
+</section>
+
+@code {
+    [Parameter, EditorRequired] public RepositoryWorkbench Workbench { get; set; } = null!;
+    private static readonly string[] GROUPS = ["Registration", "DbContext", "ModuleRepository"];
+    private void Scope(bool single) => Workbench.Replace(("optScope", single ? "one" : null), ("optGroup", null), ("optQ", null));
+    private void Select(string? id) => Workbench.Replace(("context", id));
+    private void Clear() => Workbench.Replace(("optQ", null), ("optGroup", null));
+
+    private RepositoryOptionEntry[] GetHostFlags()
+    {
+        var options = RepositoryOptions.Value;
+        return [
+            Flag(nameof(options.EnableEfCoreConnectionMetrics), options.EnableEfCoreConnectionMetrics),
+            Flag(nameof(options.EnableSensitiveDataLogging), options.EnableSensitiveDataLogging),
+            Flag(nameof(options.UseDbFunction), options.UseDbFunction),
+            Flag(nameof(options.DisableEntitySelfConfiguration), options.DisableEntitySelfConfiguration),
+            Flag(nameof(options.DisableEntitySeparateConfiguration), options.DisableEntitySeparateConfiguration)
+        ];
+    }
+
+    private static RepositoryOptionEntry Flag(string name, bool? value) =>
+        new() { Path = $"ModuleRepository.{name}", Label = name, Value = value?.ToString() ?? "Environment default" };
+
+    private static IEnumerable<RepositoryOptionEntry> Entries(RepositoryDbContextSnapshot? context, IReadOnlyList<RepositoryOptionEntry> hostFlags)
+    {
+        if (context is null) return [];
+        return context.Options.Where(entry => Group(entry) != "ModuleRepository").Concat(hostFlags);
+    }
+}

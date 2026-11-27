@@ -1,0 +1,70 @@
+@inject IStringLocalizer<RepositoryUIResource> L
+
+<MoSideSheet Open="true" DismissRequested="Workbench.CloseActivityOverlayAsync" Width="760px" Compact="true" FocusCloseOnOpen="true">
+    <TitleContent>
+        <RepositoryEvidenceLayout>
+            <div class="rp-evidence-title">
+                <span class="mo-vl-tile mo-vl-role--warning"><MoIcon Icon="@MoIcons.FileText" Size="18px" /></span>
+                <div><h2>@L["Activity:Guide:Title"]</h2><p class="mono">@(Guide.ProviderName ?? L["Persistence:Unavailable"].Value)</p></div>
+            </div>
+        </RepositoryEvidenceLayout>
+    </TitleContent>
+    <HeaderContent>
+        <RepositoryEvidenceLayout>
+            <span class="rp-evidence-pill @(Guide.IsSupported ? "mo-vl-role--success" : "mo-vl-role--warning")">
+                @L[Guide.IsSupported ? "Activity:Guide:Supported" : "Activity:Guide:Unsupported"]
+            </span>
+        </RepositoryEvidenceLayout>
+    </HeaderContent>
+    <ChildContent>
+        <RepositoryEvidenceLayout>
+            <div class="rp-evidence-content">
+                @if (Guide.IsSupported)
+                {
+                    <MoSemanticCallout Severity="MoVisualRole.Info" Title="@L["Activity:Guide:UsageTitle"]">
+                        <p>@L["Activity:Guide:UsageDescription"]</p>
+                        <p>@L["Workbench:Activity:Guide:ScopeDescription"]</p>
+                    </MoSemanticCallout>
+                    <section class="rp-evidence-section">
+                        <div class="rp-evidence-heading">
+                            <div><h3>@L["Activity:Guide:SqlTitle"]</h3><p>@L["Activity:Guide:SourceDescription", Guide.SourceObject ?? "—"]</p></div>
+                            <MoCopyButton Value="@Guide.Sql" Label="@L["Persistence:CopySql"]">@L["Persistence:CopySql"]</MoCopyButton>
+                        </div>
+                        <pre class="rp-evidence-pre">@Guide.Sql</pre>
+                    </section>
+                    <section class="rp-evidence-section">
+                        <h3>@L["Activity:Guide:ColumnsTitle"] <span class="rp-evidence-pill mo-vl-role--info">@Guide.SelectedColumns.Count</span></h3>
+                        <table class="rp-evidence-table">
+                            <thead><tr><th scope="col">@L["Workbench:Activity:Guide:ColumnName"]</th><th scope="col">@L["Workbench:Activity:Guide:ColumnMeaning"]</th></tr></thead>
+                            <tbody>
+                                @foreach (var column in Guide.SelectedColumns)
+                                {
+                                    <tr><th scope="row"><code>@column</code></th><td>@Describe(column)</td></tr>
+                                }
+                            </tbody>
+                        </table>
+                    </section>
+                }
+                else
+                {
+                    <MoSemanticCallout Severity="MoVisualRole.Warning" Title="@L["Activity:Guide:Unsupported"]">
+                        @L["Activity:Guide:UnsupportedDescription"]
+                    </MoSemanticCallout>
+                }
+            </div>
+        </RepositoryEvidenceLayout>
+    </ChildContent>
+</MoSideSheet>
+
+@code {
+    [Parameter, EditorRequired] public RepositoryWorkbench Workbench { get; set; } = null!;
+    [Parameter, EditorRequired] public RepositoryActivityProviderGuide Guide { get; set; } = null!;
+
+    private string Describe(string column) => column switch
+    {
+        "Runtime" => L["Workbench:Activity:Guide:RuntimeDescription"],
+        "QueryStart" => L["Workbench:Activity:Guide:QueryStartDescription"],
+        "Waiting" when Guide.ProviderKind == RepositoryActivityProviderKind.PostgreSql => L["Workbench:Activity:PostgreSqlWaitDescription"],
+        _ => L[$"Activity:Guide:Columns:{column}"] is { ResourceNotFound: false } label ? label.Value : L["Persistence:Unavailable"]
+    };
+}

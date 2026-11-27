@@ -1,0 +1,52 @@
+@inject IStringLocalizer<RepositoryUIResource> L
+@using static Monica.Repository.UI.UIRepository.Support.RepositoryPresentation
+
+<MudDialog DefaultFocus="DefaultFocus.FirstChild">
+    <TitleContent>
+        <MoDialogHeading Text="@L[All ? "Migrations:Confirm:AllTitle" : "Migrations:Confirm:SelectedTitle"]" />
+    </TitleContent>
+    <DialogContent>
+        <RepositoryEvidenceLayout>
+            <div class="rp-evidence-content">
+                <p>@(All ? L["Workbench:ConfirmAll", Targets.Count] : L["Workbench:ConfirmContext", Targets[0].Registration.FullName, Targets[0].Registration.AssemblyName])</p>
+                <MoSemanticCallout Title="@L[All ? "Persistence:Sequential" : "Persistence:CommandTimeout"]" Severity="MoVisualRole.Warning">
+                    @if (All) { <p>@L["Persistence:SequentialNote"]</p> }
+                    <p>@L["Persistence:CommandScope", Duration(Timeout, L)]</p>
+                </MoSemanticCallout>
+                <div class="rp-confirm-targets">
+                    @foreach (var context in Targets)
+                    {
+                        <section class="rp-evidence-section">
+                            <h3>@context.Registration.DbContextName <span class="rp-evidence-pill mo-vl-role--neutral mono">@context.Connection?.Database</span></h3>
+                            @if (context.MigrationStatus is { HasError: false } status)
+                            {
+                                @if (status.PendingMigrations.Count == 0) { <p>@L["Migrations:Messages:NoPending"]</p> }
+                                @foreach (var id in status.PendingMigrations)
+                                {
+                                    <code class="rp-evidence-code">@id</code>
+                                }
+                            }
+                            else
+                            {
+                                <p>@L["Persistence:RecheckUnreadable"]</p>
+                            }
+                        </section>
+                    }
+                </div>
+            </div>
+        </RepositoryEvidenceLayout>
+    </DialogContent>
+    <DialogActions>
+        <MudButton Variant="Variant.Outlined" OnClick="@(() => Dialog.Cancel())">@L["Common:Actions:Cancel"]</MudButton>
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="@(() => Dialog.Close(DialogResult.Ok(true)))">
+            @L[All ? "Migrations:Actions:UpdateAll" : "Migrations:Actions:UpdateSelected"]
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] private IMudDialogInstance Dialog { get; set; } = null!;
+    [Parameter] public bool All { get; set; }
+    [Parameter, EditorRequired] public IReadOnlyList<RepositoryDbContextSnapshot> Targets { get; set; } = [];
+    [Parameter] public TimeSpan Timeout { get; set; }
+}

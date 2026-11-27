@@ -1,49 +1,164 @@
-@using Monica.UI.Shared.Components.States
-@using Monica.Tool.Extensions
 @inject IStringLocalizer<RepositoryUIResource> L
+@using static Monica.Repository.UI.UIRepository.Support.RepositoryPresentation
 
-<div class="repository-migrations">
-    <section class="migration-command">
-        <div><span>@L["Workbench:Migrations:Eyebrow"]</span><h3>@L["Migrations:Title"]</h3><p>@(MigrationUpdatesEnabled ? L["Workbench:Migrations:CommandScope"] : L["Migrations:DisabledInProduction"])</p></div>
-        <div class="migration-actions"><MudButton Variant="Variant.Outlined" Color="Color.Primary" StartIcon="@MoIcons.Download" Disabled="@(!CanUpdateSelected)" OnClick="OnUpdateSelected">@L["Migrations:Actions:UpdateSelected"]</MudButton><MudButton Variant="Variant.Outlined" StartIcon="@MoIcons.CheckCheck" Disabled="@(!CanUpdateAll)" OnClick="OnUpdateAll">@L["Migrations:Actions:UpdateAll"]</MudButton></div>
+@{
+    var state = Workbench.State;
+    var registry = state.Contexts;
+    var pending = registry.Where(context => !Incomplete(context) && context.PendingMigrationCount > 0).ToArray();
+    var unreadable = registry.Where(Incomplete).ToArray();
+    var aligned = registry.Count - unreadable.Length - pending.Length;
+    var applied = registry.Sum(context => context.MigrationStatus?.AppliedCurrentAssemblyMigrations.Count ?? 0);
+    var status = Context.MigrationStatus;
+    var external = status is { HasError: false } ? status.ExternalAppliedMigrations : [];
+    var timeout = state.MigrationCommandTimeout.TotalMinutes >= 1
+        ? L["Persistence:CommandMinutes", state.MigrationCommandTimeout.TotalMinutes.ToString("0.##")].Value
+        : Duration(state.MigrationCommandTimeout, L);
+}
+@if (!state.MigrationUpdatesEnabled)
+{
+    <MoSemanticCallout Severity="MoVisualRole.Warning" Icon="@MoIcons.Lock" Title="@L["Persistence:ProductionLock"]">
+        @L["Migrations:DisabledInProduction"]
+    </MoSemanticCallout>
+}
+<section class="mo-vl-surface rp-mig-sig">
+    <RepositoryDecision Label="@L["Persistence:KnownPending"]" Value="@Workbench.PendingDisplay"
+                        Population="@L["Persistence:MigrationPopulation", pending.Length, registry.Count]"
+                        Annotation="@(unreadable.Length > 0 ? L["Persistence:PartialMigrationBadge", unreadable.Length].Value : null)"
+                        Reasons="@(new (string, MoVisualRole, string)[] {
+                            (L["Persistence:ContextsPending"], MoVisualRole.Warning, pending.Length.ToString()),
+                            (L["Persistence:ContextsAligned"], MoVisualRole.Success, aligned.ToString()),
+                            (L["Persistence:Unreadable"], MoVisualRole.Error, unreadable.Length.ToString()),
+                            (L["Persistence:SelectedExternal"], MoVisualRole.Third, status is { HasError: false } ? external.Count.ToString() : "—")
+                        })">
+        @if (pending.Length == 0 && unreadable.Length == 0)
+        {
+            <MoRichFinding Template="@L["Persistence:MigrationsCalm"]" Values="@(new RenderFragment[] { Mark(registry.Count, MoVisualRole.Success) })" />
+        }
+        else
+        {
+            @if (pending.Length > 0)
+            {
+                <MoRichFinding Template="@L["Persistence:MigrationFinding"]" Values="@(new RenderFragment[] { ContextLinks(pending, MoVisualRole.Warning), Mark(Workbench.KnownPending, MoVisualRole.Warning) })" />
+                @(" ")
+            }
+            @if (unreadable.Length > 0)
+            {
+                <MoRichFinding Template="@L["Persistence:UnreadableFinding"]" Values="@(new RenderFragment[] { ContextLinks(unreadable, MoVisualRole.Error) })" />
+            }
+        }
+        @if (!state.MigrationUpdatesEnabled) { @(" ")@L["Persistence:ProductionFinding"] }
+    </RepositoryDecision>
+    <RepositoryFacts Label="@L["Persistence:KnownPending"]" Items="@(
+        new (string, string, string, MoVisualRole)[] {
+            (L["Persistence:ContextsPending"], $"{pending.Length}/{registry.Count}", L["Persistence:PendingContextsFact"], MoVisualRole.Warning),
+            (L["Persistence:KnownPending"], Workbench.PendingDisplay, unreadable.Length == 0 ? L["Persistence:KnownPendingFact"] : L["Persistence:IncompleteCount", unreadable.Length], MoVisualRole.Warning),
+            (L["Persistence:AppliedInAssembly"], applied.ToString(), L["Persistence:AssemblyAppliedFact"], MoVisualRole.Success),
+            (L["Persistence:CommandTimeout"], timeout, L["Persistence:CommandTimeoutFact"], MoVisualRole.Third)
+        })" />
+    <RepositoryMigrationTrack Workbench="Workbench" SelectedId="@Context.Registration.ContextId" />
+</section>
+
+<section class="mo-vl-surface rp-mig-detail">
+    <header class="mo-vl-surface-heading rp-surface-heading">
+        <span class="mo-vl-tile @StandingRole(Standing(Context)).ToCssClass()"><MoIcon Icon="@MoIcons.Workflow" Size="16px" /></span>
+        <div class="rp-heading-copy"><h2>@Context.Registration.DbContextName</h2><p>@L["Persistence:CommandScope", timeout]</p></div>
+        <div class="rp-actions">
+            <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@MoIcons.Download" Size="Size.Small"
+                       Disabled="@(!state.MigrationUpdatesEnabled || Workbench.Busy || state.ErrorMessage is not null || Context.PendingMigrationCount is not > 0)"
+                       OnClick="@(() => Workbench.ConfirmUpdateAsync(Context, false))">@L["Migrations:Actions:UpdateSelected"]</MudButton>
+            <MudButton Variant="Variant.Outlined" StartIcon="@MoIcons.CheckCheck" Size="Size.Small"
+                       Disabled="@(!state.MigrationUpdatesEnabled || Workbench.Busy || state.ErrorMessage is not null || pending.Length == 0)"
+                       OnClick="@(() => Workbench.ConfirmUpdateAsync(Context, true))">@L["Persistence:UpdateAll", Workbench.KnownPending]</MudButton>
+        </div>
+    </header>
+    <div class="mo-vl-surface-body">
+        <div class="rp-chips rp-mig-meta">
+            <span class="rp-tag mono">@L["Persistence:AssemblyName"] · @(Context.MigrationAssembly ?? Context.Registration.AssemblyName)</span>
+            <span class="rp-tag mono">@(Context.Connection?.Database ?? L["Persistence:Unavailable"].Value)</span>
+            <span class="rp-tag mono">@(Context.ProviderName ?? L["Persistence:Unavailable"].Value)</span>
+        </div>
+        @if (status is null || status.HasError)
+        {
+            <MoSemanticCallout Severity="MoVisualRole.Error" Title="@L["Persistence:MigrationReadFailed"]">
+                <code class="rp-read-error">@(status?.ErrorMessage ?? Context.ErrorMessage ?? L["Persistence:Unavailable"].Value)</code>
+            </MoSemanticCallout>
+        }
+        else
+        {
+            <RepositoryFacts Label="@L["Persistence:MigrationReconciliation"]" Items="@(
+                new (string, string, string, MoVisualRole)[] {
+                    (L["Persistence:CurrentAssembly"], status.AllMigrations.Count.ToString(), "", MoVisualRole.Neutral),
+                    (L["Persistence:AppliedInAssembly"], status.AppliedCurrentAssemblyMigrations.Count.ToString(), "", MoVisualRole.Success),
+                    (L["Migrations:States:Pending"], status.PendingMigrations.Count.ToString(), "", MoVisualRole.Warning),
+                    (L["Persistence:ExternalHistory"], external.Count.ToString(), "", MoVisualRole.Third)
+                })" />
+            <RepositoryMigrationInventory Workbench="Workbench" Status="status" External="external" />
+        }
+    </div>
+</section>
+
+@if (state.MigrationCommandError is { } failure)
+{
+    <MoSemanticCallout Severity="MoVisualRole.Error" Title="@L["Migrations:Messages:UpdateFailed"]"><code class="rp-read-error">@failure</code></MoSemanticCallout>
+}
+@if (state.UpdateResults.Count > 0)
+{
+    <section class="mo-vl-surface rp-mig-results">
+        <header class="mo-vl-surface-heading rp-surface-heading">
+            <span class="mo-vl-tile mo-vl-role--primary"><MoIcon Icon="@MoIcons.ClipboardCheck" Size="16px" /></span>
+            <div class="rp-heading-copy"><h2>@L["Persistence:LastOutcomes"]</h2><p>@L["Persistence:OutcomesNote"]</p></div>
+            <span class="rp-pill mo-vl-role--primary mono">@state.UpdateResults.Count</span>
+        </header>
+        <div class="mo-vl-surface-body rp-table-wrap">
+            <table class="rp-table rp-results-table">
+                <thead><tr>
+                    <th scope="col">@L["Migrations:Results:Columns:Context"]</th><th scope="col">@L["Migrations:Results:Columns:Status"]</th>
+                    <th scope="col">@L["Migrations:Results:Columns:Attempted"]</th><th scope="col">@L["Migrations:Results:Columns:Duration"]</th>
+                    <th scope="col">@L["Migrations:Results:Columns:Message"]</th>
+                </tr></thead>
+                <tbody>
+                    @foreach (var result in state.UpdateResults)
+                    {
+                        var tone = !result.Succeeded ? MoVisualRole.Error : result.Skipped ? MoVisualRole.Neutral : MoVisualRole.Success;
+                        <tr>
+                            <td data-label="@L["Migrations:Results:Columns:Context"]"><b>@result.Registration.DbContextName</b><small class="mono">@result.Registration.AssemblyName</small></td>
+                            <td data-label="@L["Migrations:Results:Columns:Status"]">
+                                <span class="rp-pill @tone.ToCssClass()"><i class="rp-swatch"></i>@L[!result.Succeeded ? "Migrations:Results:Status:Failed" : result.Skipped ? "Migrations:Results:Status:Skipped" : "Migrations:Results:Status:Succeeded"]</span>
+                            </td>
+                            <td data-label="@L["Migrations:Results:Columns:Attempted"]">
+                                @if (result.AttemptedMigrations.Count > 0)
+                                {
+                                    <details class="rp-attempted"><summary class="mono">@L["Persistence:AttemptedCount", result.AttemptedMigrations.Count]</summary>
+                                        <ul>@foreach (var id in result.AttemptedMigrations) { <li><code>@id</code></li> }</ul>
+                                    </details>
+                                }
+                                else { <span class="mono">0</span> }
+                            </td>
+                            <td data-label="@L["Migrations:Results:Columns:Duration"]"><code>@Duration(result.Duration, L)</code></td>
+                            <td data-label="@L["Migrations:Results:Columns:Message"]">
+                                @(result.Succeeded
+                                    ? result.Skipped ? L["Migrations:Messages:NoPending"].Value : L["Migrations:Messages:UpdateSucceeded", result.Registration.DbContextName].Value
+                                    : result.ErrorMessage ?? L["Migrations:Messages:UpdateFailed"].Value)
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
     </section>
-    @if (IsUpdating) { <MudProgressLinear Indeterminate="true" Color="Color.Primary" /> }
-    @if (Status is null) { <section><MoContentState Compact="true">@L["Migrations:Empty"]</MoContentState></section> }
-    else if (Status.HasError) { <MudAlert Severity="Severity.Error" Variant="Variant.Outlined" Icon="@MoIcons.Error">@Status.ErrorMessage</MudAlert> }
-    else
-    {
-        <div class="migration-summary"><div><span>@L["Workbench:Migrations:AssemblyCount"]</span><strong>@Status.AllMigrations.Count</strong></div><div data-tone="success"><span>@L["Workbench:Migrations:AppliedCount"]</span><strong>@Status.AppliedCurrentAssemblyMigrations.Count</strong></div><div data-tone="warning"><span>@L["Workbench:Migrations:PendingCount"]</span><strong>@Status.PendingMigrations.Count</strong></div><div data-tone="info"><span>@L["Workbench:Migrations:ExternalCount"]</span><strong>@Status.ExternalAppliedMigrations.Count</strong></div></div>
-        <section class="migration-assembly">
-            <header><span>@L["Workbench:Migrations:AssemblyEyebrow"]</span><h3>@L["Migrations:Lists:CurrentAssembly"]</h3><p>@L["Migrations:ContextNote", string.IsNullOrWhiteSpace(Status.MigrationAssembly) ? L["Common:Values:Unavailable"].Value : Status.MigrationAssembly]</p></header>
-            <div class="migration-filters"><MudTextField T="string" @bind-Value="_search" Immediate="true" Clearable="true" Variant="Variant.Outlined" Margin="Margin.Dense" Label="@L["Workbench:Migrations:Search"]" Adornment="Adornment.Start" AdornmentIcon="@MoIcons.Search" ClearIcon="@MoIcons.Close" /><MudChipSet T="RepositoryMigrationApplicationState" @bind-SelectedValues="_states" SelectionMode="SelectionMode.MultiSelection" CheckMark="true">@foreach (var state in Enum.GetValues<RepositoryMigrationApplicationState>()) { <MudChip T="RepositoryMigrationApplicationState" Value="state" Color="@StateColor(state)" Variant="Variant.Outlined" Class="@("migration-status-" + state.ToString().ToLowerInvariant())" CheckedIcon="@MoIcons.Check" CloseIcon="@MoIcons.Close">@L[$"Migrations:States:{state}"] <span class="migration-filter-count">@Status.CurrentAssemblyMigrations.Count(item => item.State == state)</span></MudChip> }</MudChipSet></div>
-            <div class="migration-table-frame"><MudTable T="RepositoryMigrationAssemblyItem" Items="FilteredMigrations" Dense="true" Hover="true" Square="true" Elevation="0" Breakpoint="Breakpoint.Xs" RowsPerPage="10"><HeaderContent><MudTh><MudTableSortLabel T="RepositoryMigrationAssemblyItem" SortBy="@(item => item.MigrationId)" InitialDirection="SortDirection.Ascending" SortIcon="@MoIcons.ArrowUp">@L["Workbench:Migrations:Identifier"]</MudTableSortLabel></MudTh><MudTh><MudTableSortLabel T="RepositoryMigrationAssemblyItem" SortBy="@(item => item.State)" SortIcon="@MoIcons.ArrowUp">@L["Workbench:Migrations:State"]</MudTableSortLabel></MudTh></HeaderContent><RowTemplate><MudTd DataLabel="@L["Workbench:Migrations:Identifier"].Value"><code>@context.MigrationId</code></MudTd><MudTd DataLabel="@L["Workbench:Migrations:State"].Value"><span class="migration-state" data-tone="@context.State.ToString().ToLowerInvariant()">@L[$"Migrations:States:{context.State}"]</span></MudTd></RowTemplate><NoRecordsContent><MoContentState Compact="true">@L[Status.AllMigrations.Count == 0 ? "Migrations:Lists:NoMigrations" : "Workbench:Migrations:NoMatches"]</MoContentState></NoRecordsContent><PagerContent><MudTablePager PageSizeOptions="@(new[] { 10, 25, 50 })" RowsPerPageString="@L["Workbench:RowsPerPage"]" InfoFormat="@L["Workbench:PageInfo"]" FirstIcon="@MoIcons.FirstPage" BeforeIcon="@MoIcons.ChevronLeft" NextIcon="@MoIcons.ChevronRight" LastIcon="@MoIcons.LastPage" /></PagerContent></MudTable></div>
-        </section>
-        <section class="migration-history">
-            <header><span>@L["Workbench:Migrations:HistoryEyebrow"]</span><h3>@L["Migrations:Lists:ExternalApplied"]</h3><p>@L["Migrations:Lists:ExternalAppliedDescription"]</p></header>
-            @if (Status.ExternalAppliedMigrations.Count == 0) { <MoContentState Compact="true">@L["Migrations:Lists:NoExternalApplied"]</MoContentState> }
-            else { <div class="migration-table-frame"><MudTable T="string" Items="Status.ExternalAppliedMigrations" Dense="true" Square="true" Elevation="0" Breakpoint="Breakpoint.Xs" RowsPerPage="10"><HeaderContent><MudTh>@L["Workbench:Migrations:Identifier"]</MudTh><MudTh>@L["Workbench:Migrations:State"]</MudTh></HeaderContent><RowTemplate><MudTd DataLabel="@L["Workbench:Migrations:Identifier"].Value"><code>@context</code></MudTd><MudTd DataLabel="@L["Workbench:Migrations:State"].Value"><span class="migration-state" data-tone="external">@L["Migrations:States:Applied"]</span></MudTd></RowTemplate><PagerContent><MudTablePager PageSizeOptions="@(new[] { 10, 25, 50 })" RowsPerPageString="@L["Workbench:RowsPerPage"]" InfoFormat="@L["Workbench:PageInfo"]" FirstIcon="@MoIcons.FirstPage" BeforeIcon="@MoIcons.ChevronLeft" NextIcon="@MoIcons.ChevronRight" LastIcon="@MoIcons.LastPage" /></PagerContent></MudTable></div> }
-            <footer>@L["Migrations:Summary:HistoryRows", Status.AppliedMigrations.Count]</footer>
-        </section>
-    }
-    @if (UpdateResults.Count > 0)
-    {
-        <section class="migration-results"><header><span>@L["Workbench:Migrations:ResultsEyebrow"]</span><h3>@L["Migrations:Results:Title"]</h3><p>@L["Workbench:Migrations:ResultsScope"]</p></header><div class="migration-table-frame"><MudTable T="RepositoryMigrationUpdateResult" Items="UpdateResults" Dense="true" Hover="true" Square="true" Elevation="0" Breakpoint="Breakpoint.Xs" RowsPerPage="10"><HeaderContent><MudTh>@L["Migrations:Results:Columns:Context"]</MudTh><MudTh>@L["Migrations:Results:Columns:Status"]</MudTh><MudTh>@L["Migrations:Results:Columns:Attempted"]</MudTh><MudTh>@L["Migrations:Results:Columns:Duration"]</MudTh><MudTh>@L["Migrations:Results:Columns:Message"]</MudTh></HeaderContent><RowTemplate><MudTd DataLabel="@L["Migrations:Results:Columns:Context"].Value"><strong>@context.Registration.DbContextType.GetCleanFullName()</strong><span class="migration-result-assembly">@context.Registration.AssemblyName</span></MudTd><MudTd DataLabel="@L["Migrations:Results:Columns:Status"].Value"><span class="migration-state" data-tone="@(!context.Succeeded ? "failed" : context.Skipped ? "external" : "applied")">@L[!context.Succeeded ? "Migrations:Results:Status:Failed" : context.Skipped ? "Migrations:Results:Status:Skipped" : "Migrations:Results:Status:Succeeded"]</span></MudTd><MudTd DataLabel="@L["Migrations:Results:Columns:Attempted"].Value"><details><summary>@context.AttemptedMigrations.Count</summary><ul>@foreach (var migration in context.AttemptedMigrations) { <li><code>@migration</code></li> }</ul></details></MudTd><MudTd DataLabel="@L["Migrations:Results:Columns:Duration"].Value"><code>@context.Duration.ToString("c")</code></MudTd><MudTd DataLabel="@L["Migrations:Results:Columns:Message"].Value">@(context.ErrorMessage ?? context.Message ?? L["Common:Values:Unavailable"].Value)</MudTd></RowTemplate><PagerContent><MudTablePager PageSizeOptions="@(new[] { 10, 25, 50 })" RowsPerPageString="@L["Workbench:RowsPerPage"]" InfoFormat="@L["Workbench:PageInfo"]" FirstIcon="@MoIcons.FirstPage" BeforeIcon="@MoIcons.ChevronLeft" NextIcon="@MoIcons.ChevronRight" LastIcon="@MoIcons.LastPage" /></PagerContent></MudTable></div></section>
-    }
-</div>
+}
 
 @code {
-    [Parameter] public RepositoryMigrationStatus? Status { get; set; }
-    [Parameter] public IReadOnlyList<RepositoryMigrationUpdateResult> UpdateResults { get; set; } = [];
-    [Parameter] public bool MigrationUpdatesEnabled { get; set; }
-    [Parameter] public bool HasAnyPendingMigration { get; set; }
-    [Parameter] public bool IsUpdating { get; set; }
-    [Parameter] public bool IsBusy { get; set; }
-    [Parameter] public EventCallback OnUpdateSelected { get; set; }
-    [Parameter] public EventCallback OnUpdateAll { get; set; }
-    private string? _search;
-    private IReadOnlyCollection<RepositoryMigrationApplicationState>? _states = Enum.GetValues<RepositoryMigrationApplicationState>();
-    private bool CanUpdateSelected => MigrationUpdatesEnabled && Status?.HasPendingMigrations == true && !IsUpdating && !IsBusy;
-    private bool CanUpdateAll => MigrationUpdatesEnabled && HasAnyPendingMigration && !IsUpdating && !IsBusy;
-    private IEnumerable<RepositoryMigrationAssemblyItem> FilteredMigrations => (Status?.CurrentAssemblyMigrations ?? []).Where(item => _states?.Contains(item.State) == true && (string.IsNullOrWhiteSpace(_search) || item.MigrationId.Contains(_search.Trim(), StringComparison.OrdinalIgnoreCase)));
-    private static Color StateColor(RepositoryMigrationApplicationState state) => state switch { RepositoryMigrationApplicationState.Applied => Color.Success, RepositoryMigrationApplicationState.Pending => Color.Warning, _ => Color.Info };
+    [Parameter, EditorRequired] public RepositoryWorkbench Workbench { get; set; } = null!;
+    [Parameter, EditorRequired] public RepositoryDbContextSnapshot Context { get; set; } = null!;
+
+    private static RenderFragment Mark(int value, MoVisualRole role) => @<MoValueMark Role="role">@value</MoValueMark>;
+    private RenderFragment ContextLinks(IReadOnlyList<RepositoryDbContextSnapshot> contexts, MoVisualRole role) => @<text>
+        @for (var i = 0; i < contexts.Count; i++)
+        {
+            var context = contexts[i];
+            if (i > 0) { @L["Persistence:ListSeparator"] }
+            <MoValueMark Role="role" Href="@Workbench.Url(("context", context.Registration.ContextId))">@context.Registration.DbContextName</MoValueMark>
+        }
+    </text>;
 }

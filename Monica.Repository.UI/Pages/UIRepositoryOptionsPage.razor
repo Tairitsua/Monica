@@ -1,13 +1,19 @@
 @attribute [Route(PAGE_URL)]
-@using Monica.Repository.UI.UIRepository.Components
+@using Monica.Repository.UI.UIRepository.Support
+@inject NavigationManager Navigation
 @inject IStringLocalizer<RepositoryUIResource> L
 
 <PageTitle>@L["Workbench:Views:Options:Title"]</PageTitle>
-<RepositoryWorkbench View="Options" ContextId="@ContextId" />
 
 @code {
     public const string PAGE_URL = "/repository-dashboard/options";
 
-    [SupplyParameterFromQuery(Name = "context")]
-    public string? ContextId { get; set; }
+    [SupplyParameterFromQuery(Name = "context")] public string? ContextId { get; set; }
+    [SupplyParameterFromQuery(Name = "q")] public string? Search { get; set; }
+    [SupplyParameterFromQuery(Name = "group")] public string? Group { get; set; }
+
+    protected override void OnParametersSet() => Navigation.NavigateTo(
+        RepositoryRoute.Overview(("section", "options"), ("optScope", ContextId is null ? null : "one"),
+            ("context", ContextId), ("optQ", Search), ("optGroup", Group)),
+        replace: true);
 }

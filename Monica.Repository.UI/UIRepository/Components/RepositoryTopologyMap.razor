@@ -1,0 +1,116 @@
+@inject IStringLocalizer<RepositoryUIResource> L
+@using static Monica.Repository.UI.UIRepository.Support.RepositoryPresentation
+
+@{
+    var registry = Workbench.State.Contexts;
+    var targets = registry.GroupBy(Target).OrderByDescending(group => group.Any(context => !context.CanConnect || context.HasError))
+        .ThenByDescending(group => group.Count()).ThenBy(group => group.First().Connection?.Database).ToArray();
+    var ceiling = Math.Max(100, registry.Max(context => Pool(context).Max ?? 0));
+    var position = 0;
+}
+<div class="rp-topo" data-rp-keyboard>
+    <div class="rp-instrument-heading">
+        <div>
+            <h2>@L["Persistence:TopologyTitle"]</h2>
+            <p>@L["Persistence:TopologyDescription"]</p>
+        </div>
+        <div class="rp-legend">
+            <span class="mo-vl-role--primary"><i class="rp-swatch"></i>UnitOfWork</span>
+            <span class="mo-vl-role--info"><i class="rp-swatch"></i>@L["Persistence:Standalone"]</span>
+            <span class="mo-vl-role--third"><i class="rp-swatch"></i>@L["Persistence:PoolDefault", 0, 100]</span>
+            <span class="mo-vl-role--neutral"><i class="rp-swatch is-hatch"></i>@L["Persistence:Unavailable"]</span>
+        </div>
+    </div>
+    <div class="rp-topo-grid">
+        @foreach (var target in targets)
+        {
+            var first = target.First();
+            var failed = target.Any(context => !context.CanConnect || context.HasError);
+            var resolved = target.Key != "unresolved";
+            var count = target.Count();
+            var sample = target.Select(context => (Context: context, Activity: Workbench.State.FindSampledActivity(context.Registration.ContextId)))
+                .FirstOrDefault(item => item.Activity is not null);
+            var selected = Workbench.Get("target") == target.Key;
+            <section class="rp-target @(selected ? "is-filtered" : null)" @key="target.Key">
+                <div class="rp-target-head">
+                    <button type="button" class="rp-target-filter" aria-pressed="@(selected ? "true" : "false")"
+                            title="@L["Persistence:FilterTarget"]" @onclick="@(() => Workbench.Toggle("target", target.Key))">
+                        <span class="mo-vl-tile @((failed ? MoVisualRole.Error : MoVisualRole.Primary).ToCssClass())"><MoIcon Icon="@MoIcons.Database" Size="16px" /></span>
+                        <span class="rp-target-copy">
+                            <span class="rp-target-name-line">
+                                <b>@(resolved ? first.Connection!.Database : L["Persistence:UnresolvedTarget"].Value)</b>
+                                @if (resolved)
+                                {
+                                    <span class="rp-pill rp-pill-xs @(count > 1 ? "mo-vl-role--primary" : "mo-vl-role--neutral")">@(count > 1 ? L["Persistence:Shared", count] : L["Persistence:Dedicated"])</span>
+                                }
+                                @foreach (var provider in target.Select(context => Provider(context.ProviderName)).Distinct())
+                                {
+                                    <span class="rp-pill rp-pill-xs mo-vl-role--info">@L[$"Persistence:Providers:{provider}"]</span>
+                                }
+                            </span>
+                            <code>@first.Connection?.DataSource</code>
+                        </span>
+                    </button>
+                    @if (sample.Activity is { } activity)
+                    {
+                        <a class="rp-pill rp-pill-xs mo-vl-role--third is-link" href="@RepositoryRoute.Activity(sample.Context.Registration.ContextId)">
+                            <MoIcon Icon="@MoIcons.ChartTrend" Size="12px" />@L["Persistence:ActivitySample", activity.DatabaseSessions]
+                        </a>
+                    }
+                </div>
+                <div class="rp-conduits">
+                    @foreach (var context in target.OrderBy(context => Array.IndexOf(Standings, Standing(context))).ThenBy(context => context.Registration.DbContextName))
+                    {
+                        var id = context.Registration.ContextId;
+                        var pool = Pool(context);
+                        var standing = Standing(context);
+                        var tabIndex = position++ == 0 ? 0 : -1;
+                        <a class="rp-conduit @(Workbench.Get("inspectContext") == id ? "is-selected" : null)"
+                           href="@Workbench.Url(("inspectContext", id), ("tab", null))" data-rp-mark="@position"
+                           tabindex="@(_focused is null ? tabIndex : _focused == id ? 0 : -1)" @onfocus="@(() => _focused = id)" @key="id">
+                            <span class="rp-conduit-id">
+                                <b><i class="rp-swatch @StandingRole(standing).ToCssClass()"></i>@context.Registration.DbContextName</b>
+                                <small><span class="rp-pill rp-pill-xs @(context.Registration.ProviderType == DbContextProviderType.UnitOfWork ? "mo-vl-role--primary" : "mo-vl-role--info")">@context.Registration.ProviderType</span> <code>@context.Registration.AssemblyName</code></small>
+                            </span>
+                            <span class="rp-pool-slot @pool.Role.ToCssClass()">
+                                <span class="mono">@PoolLabel(context, L)</span>
+                                <span class="rp-pool-track @(pool.Max is null && pool.Mode != "disabled" ? "is-hatch" : null)">
+                                    @if (pool.Max is { } maximum)
+                                    {
+                                        <i style="width:@CssPercent(100d * maximum / ceiling)"></i>
+                                    }
+                                </span>
+                            </span>
+                            <span class="rp-pill rp-pill-xs @StandingRole(standing).ToCssClass()">
+                                @(context.PendingMigrationCount switch
+                                {
+                                    null => L["Persistence:Unreadable"],
+                                    0 => L["Persistence:Aligned"],
+                                    int pending => L["Persistence:PendingCount", pending]
+                                })
+                            </span>
+                            <MoIcon Icon="@MoIcons.ChevronRight" Size="12px" />
+                        </a>
+                    }
+                </div>
+            </section>
+        }
+    </div>
+    <div class="rp-readout" aria-live="polite">
+        <MoIcon Icon="@MoIcons.Info" Size="14px" />
+        @if (registry.FirstOrDefault(context => context.Registration.ContextId == _focused) is { } active)
+        {
+            <strong>@active.Registration.DbContextName</strong><span>@active.Connection?.Database · @L[$"Persistence:Standing:{Standing(active)}"] · @PoolLabel(active, L)</span>
+        }
+        else
+        {
+            <span>@L["Persistence:TopologyKeyboard"]</span>
+        }
+    </div>
+    <p class="rp-scope-note">@L["Persistence:PoolHonesty"]</p>
+</div>
+
+@code {
+    [Parameter, EditorRequired] public RepositoryWorkbench Workbench { get; set; } = null!;
+    private string? _focused;
+}

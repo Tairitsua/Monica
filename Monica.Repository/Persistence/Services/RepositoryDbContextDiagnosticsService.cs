@@ -91,7 +91,7 @@ internal sealed class RepositoryDbContextDiagnosticsService(
                 Summary = RepositoryActivitySummary.Create(rows, dbContext.Database.GetDbConnection().Database)
             };
         }
-        catch (Exception ex)
+        catch (Exception ex) when (!cancellationToken.IsCancellationRequested)
         {
             logger.LogWarning(ex, "Failed to query Repository DbContext activity for {DbContext}.", registration.FullName);
             return new RepositoryActivityResult
@@ -110,7 +110,9 @@ internal sealed class RepositoryDbContextDiagnosticsService(
         CancellationToken cancellationToken = default)
     {
         var registration = registry.GetRequiredRegistration(contextId);
-        return await CreateMigrationStatusAsync(registration, cancellationToken);
+        await using var scope = scopeFactory.CreateAsyncScope();
+        return await CreateMigrationStatusAsync(
+            registration, ResolveDbContext(scope.ServiceProvider, registration), cancellationToken);
     }
 
     public async Task<RepositoryMigrationUpdateResult> UpdateMigrationAsync(
@@ -146,21 +148,25 @@ internal sealed class RepositoryDbContextDiagnosticsService(
         {
             await using var scope = scopeFactory.CreateAsyncScope();
             var dbContext = ResolveDbContext(scope.ServiceProvider, registration);
-            var migrationStatus = await CreateMigrationStatusAsync(registration, cancellationToken);
+            var connection = CreateConnectionInfo(dbContext, revealConnectionString);
+            var canConnect = await dbContext.Database.CanConnectAsync(cancellationToken);
+            var migrationStatus = await CreateMigrationStatusAsync(registration, dbContext, cancellationToken);
+            cancellationToken.ThrowIfCancellationRequested();
 
             return new RepositoryDbContextSnapshot
             {
                 Registration = registration,
                 ProviderName = dbContext.Database.ProviderName,
-                MigrationAssembly = GetMigrationAssemblyName(dbContext),
-                Connection = CreateConnectionInfo(dbContext, revealConnectionString),
-                CanConnect = await dbContext.Database.CanConnectAsync(cancellationToken),
+                MigrationAssembly = migrationStatus.MigrationAssembly,
+                Connection = connection,
+                CanConnect = canConnect,
                 MigrationCount = migrationStatus.HasError ? null : migrationStatus.AllMigrations.Count,
                 PendingMigrationCount = migrationStatus.HasError ? null : migrationStatus.PendingMigrations.Count,
+                MigrationStatus = migrationStatus,
                 Options = CreateOptionEntries(registration, dbContext)
             };
         }
-        catch (Exception ex)
+        catch (Exception ex) when (!cancellationToken.IsCancellationRequested)
         {
             logger.LogWarning(ex, "Failed to build Repository DbContext snapshot for {DbContext}.", registration.FullName);
             return new RepositoryDbContextSnapshot
@@ -173,31 +179,32 @@ internal sealed class RepositoryDbContextDiagnosticsService(
 
     private async Task<RepositoryMigrationStatus> CreateMigrationStatusAsync(
         RepositoryDbContextRegistration registration,
+        DbContext dbContext,
         CancellationToken cancellationToken)
     {
+        var status = new RepositoryMigrationStatus
+        {
+            Registration = registration,
+            ProviderName = dbContext.Database.ProviderName
+        };
         try
         {
-            await using var scope = scopeFactory.CreateAsyncScope();
-            var dbContext = ResolveDbContext(scope.ServiceProvider, registration);
-
-            return new RepositoryMigrationStatus
+            status = status with
             {
-                Registration = registration,
-                ProviderName = dbContext.Database.ProviderName,
                 MigrationAssembly = GetMigrationAssemblyName(dbContext),
-                AllMigrations = dbContext.Database.GetMigrations().ToList(),
-                AppliedMigrations = (await dbContext.Database.GetAppliedMigrationsAsync(cancellationToken)).ToList(),
-                PendingMigrations = (await dbContext.Database.GetPendingMigrationsAsync(cancellationToken)).ToList()
+                AllMigrations = dbContext.Database.GetMigrations().ToArray()
+            };
+            var applied = (await dbContext.Database.GetAppliedMigrationsAsync(cancellationToken)).ToArray();
+            return status with
+            {
+                AppliedMigrations = applied,
+                PendingMigrations = status.AllMigrations.Except(applied, StringComparer.Ordinal).ToArray()
             };
         }
-        catch (Exception ex)
+        catch (Exception ex) when (!cancellationToken.IsCancellationRequested)
         {
             logger.LogWarning(ex, "Failed to read Repository migration status for {DbContext}.", registration.FullName);
-            return new RepositoryMigrationStatus
-            {
-                Registration = registration,
-                ErrorMessage = ex.GetMessageRecursively()
-            };
+            return status with { ErrorMessage = ex.GetMessageRecursively() };
         }
     }
 
@@ -235,13 +242,8 @@ internal sealed class RepositoryDbContextDiagnosticsService(
                     };
                 }
 
-                await using var transaction = await TryBeginTransactionAsync(dbContext, timeoutSource.Token);
+                // The provider migrator owns its transactions and may issue commands outside them.
                 await dbContext.Database.MigrateAsync(timeoutSource.Token);
-
-                if (transaction is not null)
-                {
-                    await transaction.CommitAsync(timeoutSource.Token);
-                }
 
                 return new RepositoryMigrationUpdateResult
                 {
@@ -274,24 +276,6 @@ internal sealed class RepositoryDbContextDiagnosticsService(
     private static DbContext ResolveDbContext(IServiceProvider serviceProvider, RepositoryDbContextRegistration registration)
     {
         return (DbContext)serviceProvider.GetRequiredService(registration.DbContextType);
-    }
-
-    private static async Task<IDbContextTransaction?> TryBeginTransactionAsync(
-        DbContext dbContext,
-        CancellationToken cancellationToken)
-    {
-        try
-        {
-            return await dbContext.Database.BeginTransactionAsync(cancellationToken);
-        }
-        catch (InvalidOperationException)
-        {
-            return null;
-        }
-        catch (NotSupportedException)
-        {
-            return null;
-        }
     }
 
     private static RepositoryConnectionInfo CreateConnectionInfo(DbContext dbContext, bool revealConnectionString)

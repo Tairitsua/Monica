@@ -1,77 +1,215 @@
-@using System.Globalization
-@using Monica.Tool.Extensions
-@using Monica.Repository.Persistence.Services.Support
+@using static Monica.Repository.UI.UIRepository.Support.RepositoryPresentation
 @inject IStringLocalizer<RepositoryUIResource> L
 
-@if (Snapshot is null)
-{
-    <MudAlert Severity="Severity.Info" Icon="@MoIcons.Info">@L["Overview:Empty"]</MudAlert>
+@{
+    var registry = Workbench.State.Contexts;
+    var connected = registry.Count(context => context.CanConnect);
+    var pending = registry.Count(context => context.PendingMigrationCount > 0);
+    var targets = registry.Where(context => Target(context) != "unresolved").GroupBy(Target).ToArray();
+    var shared = targets.Count(target => target.Count() > 1);
+    var largest = targets.Where(target => target.Count() > 1).MaxBy(target => target.Count());
+    var rows = registry.Where(context => MatchesFilters(context)).ToArray();
 }
-else if (ShowOptionsOnly)
-{
-    <OptionsTable Options="Snapshot.Options" />
-}
-else
-{
-    <div class="repository-connection-workspace">
-        <section class="connection-decision" data-state="@(Snapshot.CanConnect ? "connected" : Snapshot.HasError ? "unknown" : "disconnected")">
-            <div class="connection-decision__title"><MoIcon Icon="@(Snapshot.CanConnect ? MoIcons.Success : MoIcons.Error)" Size="1.5rem" /><span>@L["Workbench:Overview:Probe"]</span></div>
-            <h3>@(Snapshot.CanConnect ? L["Overview:Values:Connected"] : Snapshot.HasError ? L["Workbench:Overview:Incomplete"] : L["Overview:Values:Disconnected"])</h3>
-            <p>@L["Workbench:Overview:ProbeNote"]</p>
-            <div class="connection-address"><span>@L["Overview:Connection:Database"]</span><strong>@Value(Snapshot.Connection?.Database)</strong><span>@L["Overview:Connection:DataSource"]</span><code>@Value(Snapshot.Connection?.DataSource)</code></div>
-            <div class="connection-string-heading"><h4>@L["Overview:Connection:ConnectionString"]</h4><MudButton Size="Size.Small" Variant="Variant.Outlined" Disabled="IsBusy" StartIcon="@(RevealConnectionStrings ? MoIcons.EyeOff : MoIcons.Eye)" OnClick="OnToggleReveal">@(RevealConnectionStrings ? L["Overview:Connection:Hide"] : L["Overview:Connection:Reveal"])</MudButton></div>
-            <pre class="connection-string">@Value(RevealConnectionStrings ? Snapshot.Connection?.RevealedConnectionString ?? Snapshot.Connection?.MaskedConnectionString : Snapshot.Connection?.MaskedConnectionString)</pre>
-        </section>
-        <section class="connection-facts">
-            <header><span class="connection-eyebrow">@L["Workbench:Overview:Resolution"]</span><h3>@L["Overview:Provider:Title"]</h3></header>
-            <dl><dt>@L["Overview:Provider:ProviderName"]</dt><dd>@Value(Snapshot.ProviderName)</dd><dt>@L["Overview:Metrics:ProviderType"]</dt><dd>@Snapshot.Registration.ProviderType</dd><dt>@L["Overview:Provider:ContextType"]</dt><dd><code>@Snapshot.Registration.DbContextType.GetCleanFullName()</code></dd><dt>@L["Overview:Provider:Assembly"]</dt><dd>@Snapshot.Registration.AssemblyName</dd><dt>@L["Overview:Metrics:MigrationAssembly"]</dt><dd>@Value(Snapshot.MigrationAssembly)</dd></dl>
-        </section>
-        <section class="connection-facts">
-            <header><span class="connection-eyebrow">@L["Workbench:Overview:Configuration"]</span><h3>@L["Overview:Pool:Title"]</h3></header>
-            <p>@L["Workbench:Overview:PoolNote"]</p>
-            <dl><dt>@L["Overview:Pool:Pooling"]</dt><dd>@(Pool?.Pooling is { } enabled ? enabled ? L["Overview:Pool:Enabled"] : L["Overview:Pool:Disabled"] : L["Workbench:Overview:ProviderDefault"])</dd><dt>@L["Overview:Pool:MaxPoolSize"]</dt><dd>@PoolSize(Pool?.MaxPoolSize, RepositoryConnectionPoolInfo.DefaultMaxPoolSize)</dd><dt>@L["Overview:Pool:MinPoolSize"]</dt><dd>@PoolSize(Pool?.MinPoolSize, RepositoryConnectionPoolInfo.DefaultMinPoolSize)</dd></dl>
-        </section>
-        <section class="connection-facts connection-sessions">
-            <header><span class="connection-eyebrow">@L["Workbench:Overview:DatabaseScope"]</span><h3>@L[DatabaseScopeKnown ? "Overview:Pool:DatabaseSessions" : "Workbench:Activity:DatabaseScopeUnknown"]</h3></header>
-            @if (Activity?.Support == RepositoryActivitySupport.Supported && Activity.Summary is { } summary)
-            {
-                <div class="connection-session-count"><strong>@summary.DatabaseSessions</strong><span>@Value(Snapshot.Connection?.Database)</span></div>
-                <dl><dt>@L["Overview:Pool:ActiveSessions"]</dt><dd>@summary.ActiveSessions</dd><dt>@L["Overview:Pool:IdleSessions"]</dt><dd>@summary.IdleSessions</dd><dt>@L["Overview:Pool:IdleInTransactionSessions"]</dt><dd>@summary.IdleInTransactionSessions</dd><dt>@L[IsPostgreSql ? "Workbench:Activity:LockWaitCount" : "Overview:Pool:WaitingSessions"]</dt><dd>@summary.WaitingSessions</dd></dl>
-                <p>@L[DatabaseScopeKnown ? "Overview:Pool:SessionsNote" : "Workbench:Activity:DatabaseScopeUnknownDescription"]</p>
-                @if (IsPostgreSql) { <p>@L["Workbench:Activity:PostgreSqlWaitNote"]</p> }
-            }
-            else
-            {
-                <p>@L[Activity?.Support == RepositoryActivitySupport.Failed ? "Workbench:Overview:SessionsFailed" : "Overview:Pool:SessionsUnavailable"]</p>
-            }
-            <a href="@ActivityUrl">@L["Workbench:Overview:InspectActivity"] <MoIcon Icon="@MoIcons.ArrowRight" Size="1.25rem" /></a>
-        </section>
-        <section class="connection-migrations">
-            <div><span class="connection-eyebrow">@L["Workbench:Overview:Schema"]</span><h3>@L["Migrations:Title"]</h3><p>@L["Migrations:ContextNote", Value(Snapshot.MigrationAssembly)]</p></div>
-            <div class="connection-migration-count"><span>@L["Overview:Metrics:Pending"]</span><strong>@(Snapshot.PendingMigrationCount?.ToString() ?? L["Overview:Values:Unknown"].Value)</strong></div>
-            <a href="@MigrationsUrl">@L["Workbench:Overview:InspectMigrations"] <MoIcon Icon="@MoIcons.ArrowRight" Size="1.25rem" /></a>
-        </section>
-        @if (Snapshot.HasError)
+<section class="mo-vl-surface rp-sig">
+    <RepositoryDecision Label="@L["Persistence:ContextAttention"]" Value="@Workbench.Attention.ToString()"
+                        Population="@L["Persistence:RegisteredPopulation", registry.Count]" Reasons="@Reasons(registry)">
+        @if (Workbench.Attention == 0)
         {
-            <div class="connection-error"><MudAlert Severity="Severity.Error" Variant="Variant.Outlined" Icon="@MoIcons.Error">@Snapshot.ErrorMessage</MudAlert></div>
+            <MoRichFinding Template="@L["Persistence:ConnectionsCalm"]" Values="@(
+                new RenderFragment[] { CountMark(registry.Count, MoVisualRole.Success), CountMark(targets.Length, MoVisualRole.Info) })" />
         }
+        else
+        {
+            @foreach (var standing in Standings.Take(3))
+            {
+                var affected = registry.Where(context => Standing(context) == standing).ToArray();
+                if (affected.Length == 0) continue;
+                <MoRichFinding Template="@Finding(standing)" Values="@(
+                    new RenderFragment[] { ContextLinks(affected, StandingRole(standing)), CountMark(Workbench.KnownPending, MoVisualRole.Warning) })" />
+                @(" ")
+            }
+            @if (largest is not null)
+            {
+                <MoRichFinding Template="@L["Persistence:SharedFinding"]" Values="@(
+                    new RenderFragment[] { CountMark(largest.Count(), MoVisualRole.Third), DatabaseMark(largest.First()) })" />
+            }
+        }
+    </RepositoryDecision>
+    <RepositoryFacts Label="@L["Persistence:ContextAttention"]" Items="@(
+        new (string, string, string, MoVisualRole)[] {
+            (L["Persistence:Probes"], $"{connected}/{registry.Count}", L["Persistence:ProbeFact"], MoVisualRole.Success),
+            (L["Persistence:KnownPending"], Workbench.PendingDisplay,
+                Workbench.IncompleteCount > 0 ? L["Persistence:IncompleteCount", Workbench.IncompleteCount] : L["Persistence:AcrossContexts", pending], MoVisualRole.Warning),
+            (L["Persistence:PhysicalTargets"], targets.Length.ToString(), L["Persistence:SharedTargetCount", shared], MoVisualRole.Info),
+            (L["Persistence:Incomplete"], Workbench.IncompleteCount.ToString(), L["Persistence:IncompleteFact"], Workbench.IncompleteCount > 0 ? MoVisualRole.Error : MoVisualRole.Neutral)
+        })" />
+    <RepositoryTopologyMap Workbench="Workbench" />
+</section>
+
+<section class="mo-vl-surface rp-inv">
+    <header class="mo-vl-surface-heading rp-surface-heading">
+        <span class="mo-vl-tile mo-vl-role--primary"><MoIcon Icon="@MoIcons.Database" Size="16px" /></span>
+        <div class="rp-heading-copy"><h2>@L["Persistence:RegistryTitle"]</h2><p>@L["Persistence:RegistryDescription"]</p></div>
+        <span class="rp-pill mo-vl-role--primary mono">@rows.Length / @registry.Count</span>
+        <div class="rp-actions">
+            <MudButton Href="@Workbench.Url(("section", "options"))" Variant="Variant.Outlined" StartIcon="@MoIcons.Sliders" Size="Size.Small">@L["Persistence:JumpOptions"]</MudButton>
+            <MudButton Variant="Variant.Outlined" Size="Size.Small" StartIcon="@(Workbench.State.RevealConnectionStrings ? MoIcons.EyeOff : MoIcons.Eye)"
+                       Disabled="Workbench.Busy" OnClick="Workbench.ToggleRevealAsync" aria-pressed="@(Workbench.State.RevealConnectionStrings ? "true" : "false")">
+                @L[Workbench.State.RevealConnectionStrings ? "Persistence:Mask" : "Persistence:Reveal"]
+            </MudButton>
+        </div>
+    </header>
+    <div class="mo-vl-surface-body">
+        <div class="rp-toolbar">
+            <RepositorySearch Label="@L["Persistence:RegistrySearch"]" Value="@Workbench.Get("q")" Changed="SearchChanged" />
+            <div class="rp-chips" role="group" aria-label="@L["Persistence:Probe"]">
+                @foreach (var standing in Standings)
+                {
+                    var count = registry.Count(context => MatchesFilters(context, skip: "standing") && Standing(context) == standing);
+                    <MoFilterChip Label="@StandingLabel(standing)" Role="@StandingRole(standing)" ShowDot="true" Pill="true" Count="count"
+                                  Selected="@(Workbench.Get("standing") == standing)" SelectedChanged="@(_ => Workbench.Toggle("standing", standing))" />
+                }
+            </div>
+            <div class="rp-chips" role="group" aria-label="@L["Persistence:Provider"]">
+                @foreach (var provider in Providers.Where(provider => provider is "PostgreSql" or "OpenGauss" or "Sqlite" ||
+                             registry.Any(context => Provider(context.ProviderName) == provider)))
+                {
+                    var count = registry.Count(context => MatchesFilters(context, skip: "provider") && Provider(context.ProviderName) == provider);
+                    <MoFilterChip Label="@ProviderLabel(provider)" Role="MoVisualRole.Info" Pill="true" Count="count"
+                                  Selected="@(Workbench.Get("provider") == provider)" SelectedChanged="@(_ => Workbench.Toggle("provider", provider))" />
+                }
+            </div>
+            @if (Workbench.Get("target") is { } targetKey)
+            {
+                var db = registry.FirstOrDefault(context => Target(context) == targetKey)?.Connection?.Database ?? L["Persistence:Unavailable"].Value;
+                <MoFilterChip Role="MoVisualRole.Primary" Pill="true" Selected="true" Icon="@MoIcons.Close"
+                              Label="@L["Persistence:TargetChip", db]" SelectedChanged="@(_ => Workbench.Replace(("target", null)))" />
+            }
+        </div>
+        @if (rows.Length == 0)
+        {
+            <MoContentState Compact="true">
+                <MoIcon Icon="@MoIcons.SearchOff" Size="18px" />
+                <p>@L["Persistence:RegistryNoMatch"]</p>
+                <MudButton Variant="Variant.Outlined" Size="Size.Small" OnClick="Clear">@L["Persistence:ClearFilters"]</MudButton>
+            </MoContentState>
+        }
+        else
+        {
+            <div class="rp-table-wrap">
+                <table class="rp-table rp-ctx-table">
+                    <thead><tr>
+                        <th scope="col">@L["Persistence:Context"]</th><th scope="col">@L["Persistence:Target"]</th>
+                        <th scope="col">@L["Persistence:Probe"]</th><th scope="col">@L["Persistence:Pool"]</th>
+                        <th scope="col">@L["Workbench:Views:Migrations:Label"]</th><th scope="col">@L["Persistence:Actions"]</th>
+                    </tr></thead>
+                    <tbody>
+                        @foreach (var context in rows)
+                        {
+                            var id = context.Registration.ContextId;
+                            var standing = Standing(context);
+                            var pool = Pool(context);
+                            <tr class="@(id == Workbench.Get("inspectContext") ? "is-selected" : null)" @key="id">
+                                <td data-label="@L["Persistence:Context"]">
+                                    <div class="rp-row-title">
+                                        <a class="rp-row-link" href="@Inspect(id)">@context.Registration.DbContextName</a>
+                                        <span class="rp-pill rp-pill-xs @(context.Registration.ProviderType == DbContextProviderType.UnitOfWork ? "mo-vl-role--primary" : "mo-vl-role--info")">@context.Registration.ProviderType</span>
+                                    </div>
+                                    <small class="mono" title="@context.Registration.FullName">@context.Registration.AssemblyName</small>
+                                    @if (context.Options.FirstOrDefault(option => option.Path == "DbContext.QueryTrackingBehavior") is { } tracking)
+                                    {
+                                        <small class="mono">@tracking.Value</small>
+                                    }
+                                </td>
+                                <td data-label="@L["Persistence:Target"]">
+                                    <b class="mono">@Available(context.Connection?.Database)</b>
+                                    <small class="mono">@Available(context.Connection?.DataSource)</small>
+                                    <span class="rp-pill rp-pill-xs mo-vl-role--info">@ProviderLabel(Provider(context.ProviderName))</span>
+                                    @if ((Workbench.State.RevealConnectionStrings ? context.Connection?.RevealedConnectionString : context.Connection?.MaskedConnectionString) is { } connection)
+                                    {
+                                        <code class="rp-connection-preview" title="@connection">@connection</code>
+                                    }
+                                </td>
+                                <td data-label="@L["Persistence:Probe"]">
+                                    <span class="rp-pill @StandingRole(standing).ToCssClass()"><i class="rp-swatch"></i>@StandingLabel(standing)</span>
+                                    @if (context.ErrorMessage is { } error)
+                                    {
+                                        <small class="rp-row-error" title="@error">@error</small>
+                                    }
+                                </td>
+                                <td data-label="@L["Persistence:Pool"]">
+                                    <span class="rp-pill rp-pill-xs @pool.Role.ToCssClass() @(pool.Mode is "unknown" or "unspecified" ? "is-hatch" : null)">@PoolLabel(context, L)</span>
+                                </td>
+                                <td data-label="@L["Workbench:Views:Migrations:Label"]">
+                                    <span class="rp-pill rp-pill-xs @MigrationSummaryRole(context).ToCssClass()">@MigrationSummary(context)</span>
+                                    <small class="mono">@context.MigrationAssembly</small>
+                                </td>
+                                <td data-label="@L["Persistence:Actions"]" class="rp-row-actions">
+                                    <MudIconButton Icon="@MoIcons.Search" Size="Size.Small" Href="@Inspect(id)" title="@L["Persistence:Inspect"]" aria-label="@L["Persistence:Inspect"]" />
+                                    <MudIconButton Icon="@MoIcons.ChartTrend" Size="Size.Small" Href="@RepositoryRoute.Activity(id)" title="@L["Workbench:Views:Activity:Label"]" aria-label="@L["Workbench:Views:Activity:Label"]" />
+                                    <MudIconButton Icon="@MoIcons.Workflow" Size="Size.Small" Href="@RepositoryRoute.Migrations(id)" title="@L["Workbench:Views:Migrations:Label"]" aria-label="@L["Workbench:Views:Migrations:Label"]" />
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        }
+        <p class="rp-scope-note"><MoIcon Icon="@MoIcons.Info" Size="14px" />@L["Persistence:RevealNote"]</p>
     </div>
-}
+</section>
+
+<RepositoryOptionsSection Workbench="Workbench" />
+<RepositoryContextEvidence Workbench="Workbench" />
 
 @code {
-    [Parameter] public RepositoryDbContextSnapshot? Snapshot { get; set; }
-    [Parameter] public RepositoryMigrationStatus? MigrationStatus { get; set; }
-    [Parameter] public RepositoryActivityResult? Activity { get; set; }
-    [Parameter] public bool RevealConnectionStrings { get; set; }
-    [Parameter] public bool ShowOptionsOnly { get; set; }
-    [Parameter] public bool IsBusy { get; set; }
-    [Parameter] public string MigrationsUrl { get; set; } = "/repository-dashboard/migrations";
-    [Parameter] public string ActivityUrl { get; set; } = "/repository-dashboard/activity";
-    [Parameter] public EventCallback OnToggleReveal { get; set; }
-    private bool IsPostgreSql => (Activity?.ProviderGuide ?? RepositoryActivityProviderGuideCatalog.Resolve(Activity?.ProviderName ?? Snapshot?.ProviderName)).ProviderKind == RepositoryActivityProviderKind.PostgreSql;
-    private bool DatabaseScopeKnown => !string.IsNullOrWhiteSpace(Snapshot?.Connection?.Database);
-    private RepositoryConnectionPoolInfo? Pool => Snapshot?.Connection?.Pool;
-    private bool CommonPoolDefaults => Snapshot?.ProviderName is { } provider && (provider.Contains("Npgsql", StringComparison.OrdinalIgnoreCase) || provider.Contains("SqlServer", StringComparison.OrdinalIgnoreCase) || provider.Contains("MySql", StringComparison.OrdinalIgnoreCase));
-    private string PoolSize(int? value, int fallback) => Pool is not { PoolingEnabled: true } ? Value(null) : value is { } explicitValue ? explicitValue.ToString(CultureInfo.InvariantCulture) : CommonPoolDefaults ? $"{fallback} {L["Overview:Pool:DefaultSuffix"]}" : L["Workbench:Overview:ProviderDefault"].Value;
-    private string Value(string? value) => string.IsNullOrWhiteSpace(value) ? L["Common:Values:Unavailable"].Value : value;
+    [Parameter, EditorRequired] public RepositoryWorkbench Workbench { get; set; } = null!;
+
+    private string Inspect(string id) => Workbench.Url(("inspectContext", id), ("tab", null));
+    private string Available(string? value) => string.IsNullOrWhiteSpace(value) ? L["Persistence:Unavailable"] : value;
+    private void SearchChanged(string? value) => Workbench.Replace(("q", value));
+    private void Clear() => Workbench.Replace(("q", null), ("standing", null), ("provider", null), ("target", null));
+    private bool MatchesFilters(RepositoryDbContextSnapshot context, string? skip = null) =>
+        (skip == "standing" || Workbench.Get("standing") is not { } standing || Standing(context) == standing) &&
+        (skip == "provider" || Workbench.Get("provider") is not { } provider || Provider(context.ProviderName) == provider) &&
+        (Workbench.Get("target") is not { } target || Target(context) == target) &&
+        Search(Workbench.Get("q"), context.Registration.DbContextName, context.Registration.FullName, context.Registration.AssemblyName,
+            context.MigrationAssembly, context.Connection?.DataSource, context.Connection?.Database, context.ProviderName);
+
+    private (string, MoVisualRole, string)[] Reasons(IReadOnlyList<RepositoryDbContextSnapshot> registry) =>
+        Standings.Select(standing => (StandingLabel(standing), StandingRole(standing),
+            registry.Count(context => Standing(context) == standing).ToString())).ToArray();
+
+    private string Finding(string standing) => L[standing switch
+    {
+        "disconnected" => "Persistence:DisconnectedFinding",
+        "pending" => "Persistence:PendingFinding",
+        _ => "Persistence:FailedFinding"
+    }];
+    private RenderFragment CountMark(int value, MoVisualRole role) => @<MoValueMark Role="role">@value</MoValueMark>;
+    private RenderFragment DatabaseMark(RepositoryDbContextSnapshot context) =>
+        @<MoValueMark Role="MoVisualRole.Info" Href="@Workbench.Url(("target", Target(context)))">@context.Connection?.Database</MoValueMark>;
+    private RenderFragment ContextLinks(IReadOnlyList<RepositoryDbContextSnapshot> contexts, MoVisualRole role) => @<text>
+        @for (var index = 0; index < contexts.Count; index++)
+        {
+            var context = contexts[index];
+            if (index > 0) { @L["Persistence:ListSeparator"] }
+            <MoValueMark Role="role" Href="@Inspect(context.Registration.ContextId)">@context.Registration.DbContextName</MoValueMark>
+        }
+    </text>;
+
+    private string StandingLabel(string standing) => L[$"Persistence:Standing:{standing}"];
+    private string ProviderLabel(string provider) => L[$"Persistence:Providers:{provider}"];
+    private string MigrationSummary(RepositoryDbContextSnapshot context) => context.PendingMigrationCount switch
+    {
+        null => L["Persistence:Unreadable"],
+        0 => L["Persistence:Aligned"],
+        int pending => L["Persistence:PendingCount", pending]
+    };
+    private static MoVisualRole MigrationSummaryRole(RepositoryDbContextSnapshot context) => context.PendingMigrationCount switch
+    {
+        null => MoVisualRole.Error,
+        0 => MoVisualRole.Success,
+        _ => MoVisualRole.Warning
+    };
 }

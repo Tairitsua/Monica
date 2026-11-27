@@ -1,457 +1,120 @@
-@using Monica.UI.Shared.Components.States
-@inject Monica.UI.Shared.Services.MoTimeFormatter UiTime
-@using System.Globalization
-@using System.Diagnostics.CodeAnalysis
-@using Microsoft.Extensions.Logging
 @using Monica.Repository.Persistence.Services.Support
-@using Monica.Tool.Extensions
+@using static Monica.Repository.UI.UIRepository.Support.RepositoryPresentation
 @inject IStringLocalizer<RepositoryUIResource> L
-@inject IDialogService DialogService
-@inject ILogger<RepositoryActivityTable> Logger
-@implements IAsyncDisposable
+@inject MoTimeFormatter UiTime
 
-<section class="activity-workbench" aria-label="@L["Workbench:Activity:Title"]" aria-busy="@IsLoading.ToString().ToLowerInvariant()">
-    <header class="activity-heading">
-        <div class="activity-heading__identity">
-            <span class="activity-eyebrow">@L["Workbench:Activity:Eyebrow"]</span>
-            <h2>@L["Workbench:Activity:Title"]</h2>
-            <p>@L["Workbench:Activity:Description"]</p>
-        </div>
-        <div class="activity-heading__source">
-            <span class="activity-provider-name">@ProviderDisplayName</span>
-            <span class="activity-source-name">@DisplayValue(ProviderGuide.SourceObject)</span>
-            <MudButton Variant="Variant.Outlined" Size="Size.Small" StartIcon="@MoIcons.FileText"
-                       Disabled="@_openingDialog" OnClick="ShowProviderGuideAsync">
-                @L["Activity:Guide:Button"]
-            </MudButton>
-        </div>
-    </header>
+@{
+    var state = Workbench.State;
+    var activity = state.Activity;
+    var db = Context.Connection?.Database;
+    var guide = activity?.ProviderGuide ?? RepositoryActivityProviderGuideCatalog.Resolve(Context.ProviderName);
+    var postgres = guide.ProviderKind == RepositoryActivityProviderKind.PostgreSql;
+    var peers = state.Contexts.Where(context => context.Registration.ContextId != Context.Registration.ContextId && SharesTarget(context, Context)).ToArray();
+}
+<RepositoryContextPicker Workbench="Workbench" Context="Context" Label="@L["Persistence:ActivityProvenance"]"
+                         Note="@($"{L["Persistence:ActivityProvenanceNote"]} {(peers.Length == 0 ? "" : L["Persistence:Peers", string.Join(" / ", peers.Select(peer => peer.Registration.DbContextName))].Value)}")">
+    <span class="rp-tag">@L[$"Persistence:Providers:{Provider(Context.ProviderName)}"]</span>
+    @if (guide.SourceObject is not null) { <code class="rp-tag">@guide.SourceObject</code> }
+    <MudButton Href="@Workbench.Url(("guide", "1"), ("inspectSession", null))" StartIcon="@MoIcons.FileText" Variant="Variant.Outlined" Size="Size.Small">@L["Persistence:GuideButton"]</MudButton>
+</RepositoryContextPicker>
 
-    @if (_dialogError is not null)
-    {
-        <MudAlert Severity="Severity.Error" Dense="true" Icon="@MoIcons.Error">@_dialogError</MudAlert>
-    }
-
-    @if (IsLoading && _snapshot is null)
-    {
+@if (state.RetainedActivityError is { } retainedError)
+{
+    <MoSemanticCallout Severity="MoVisualRole.Warning" Title="@L["Persistence:StaleTitle"]">
+        @L["Persistence:ActivityStale", UiTime.Format(state.DetailsCapturedAt)]
+        <code class="rp-read-error">@retainedError</code>
+    </MoSemanticCallout>
+}
+@if (activity is null)
+{
+    <section class="mo-vl-surface">
         <MoContentState Loading="true">
-            <MudProgressCircular Color="Color.Primary" Size="Size.Small" Indeterminate="true" />
-            <span>@L["Activity:Loading"]</span>
+            <MudProgressCircular Indeterminate="true" Color="Color.Primary" Size="Size.Small" />
+            <p>@L["Persistence:LoadingActivity"]</p>
         </MoContentState>
-    }
-    else if (IsLoading)
-    {
-        <div class="activity-refresh" role="status">
-            <MudProgressCircular Color="Color.Primary" Size="Size.Small" Indeterminate="true" />
-            <span>@L["Workbench:Activity:RetainedSnapshot"]</span>
-        </div>
-    }
-
-    @if (_snapshot is null)
-    {
-        @if (!IsLoading)
-        {
-            <div class="activity-report activity-report--neutral" role="status">
-                <MoIcon Icon="@MoIcons.TextSearch" Size="1.5rem" />
-                <div><h3>@L["Activity:Empty"]</h3><p>@L["Workbench:Activity:NotLoadedDescription"]</p></div>
-            </div>
-        }
-    }
-    else if (_snapshot.Support != RepositoryActivitySupport.Supported)
-    {
-        <div class="activity-report @(_snapshot.Support == RepositoryActivitySupport.Failed ? "activity-report--error" : "activity-report--warning")" role="status">
-            <MoIcon Icon="@(_snapshot.Support == RepositoryActivitySupport.Failed ? MoIcons.Error : MoIcons.Info)" Size="1.5rem" />
-            <div>
-                <h3>@(_snapshot.Support == RepositoryActivitySupport.Failed ? L["Workbench:Activity:ReadFailed"] : L["Activity:Guide:Unsupported"])</h3>
-                <p>@(string.IsNullOrWhiteSpace(_snapshot.Message) ? L["Workbench:Activity:ReadUnavailableDescription"].Value : _snapshot.Message)</p>
-                <span>@L["Workbench:Activity:NoCountsOnFailure"]</span>
-            </div>
-        </div>
-    }
-    else
-    {
-        <div class="activity-scope-band">
-            <section class="activity-visible-scope" aria-label="@L["Workbench:Activity:VisibleScope"]">
-                <span class="activity-eyebrow">@L["Workbench:Activity:VisibleScope"]</span>
-                <div class="activity-visible-total"><strong>@_rows.Count.ToString("N0", CultureInfo.CurrentCulture)</strong><span>@L["Workbench:Activity:Sessions"]</span></div>
-                <p>@L["Workbench:Activity:VisibleScopeDescription"]</p>
-                <div class="activity-visible-meta">
-                    <span>@L["Workbench:Activity:ClientEndpoints", _clientCount]</span>
-                    <span>@L["Workbench:Activity:Captured"] <time>@FormatCapture(_snapshotCapturedAt)</time></span>
-                </div>
-            </section>
-            <section class="activity-database-scope" aria-label="@L["Workbench:Activity:DatabaseScope"]">
-                <div class="activity-database-heading">
-                    <div>
-                        <span class="activity-eyebrow">@(string.IsNullOrWhiteSpace(_snapshotDatabase) ? L["Workbench:Activity:DatabaseScopeUnknown"] : L["Workbench:Activity:DatabaseScope"])</span>
-                        <h3>@DisplayValue(_snapshotDatabase)</h3>
-                    </div>
-                    <span class="activity-database-total">@(_snapshot.Summary is null ? L["Common:Values:Unavailable"].Value : L["Activity:Stats:Total", _snapshot.Summary.DatabaseSessions].Value)</span>
-                </div>
-                <dl class="activity-database-metrics">
-                    <div class="activity-metric activity-metric--active"><dt>@L["Workbench:Activity:Active"]</dt><dd>@CountValue(_snapshot.Summary?.ActiveSessions)</dd></div>
-                    <div class="activity-metric activity-metric--idle"><dt>@L["Workbench:Activity:Idle"]</dt><dd>@CountValue(_snapshot.Summary?.IdleSessions)</dd></div>
-                    <div class="activity-metric activity-metric--transaction"><dt>@L["Workbench:Activity:IdleInTransaction"]</dt><dd>@CountValue(_snapshot.Summary?.IdleInTransactionSessions)</dd></div>
-                    <div class="activity-metric activity-metric--waiting"><dt>@(IsPostgreSql ? L["Workbench:Activity:LockWaitCount"] : L["Workbench:Activity:Waiting"])</dt><dd>@CountValue(_snapshot.Summary?.WaitingSessions)</dd></div>
-                </dl>
-                <p>@(string.IsNullOrWhiteSpace(_snapshotDatabase) ? L["Workbench:Activity:DatabaseScopeUnknownDescription"] : L["Workbench:Activity:DatabaseScopeDescription"])</p>
-            </section>
-        </div>
-
-        <section class="activity-ledger" aria-label="@L["Workbench:Activity:LedgerTitle"]">
-            <div class="activity-ledger-heading">
-                <div><h3>@L["Workbench:Activity:LedgerTitle"]</h3><p>@L["Workbench:Activity:LedgerDescription"]</p></div>
-                <span class="activity-ledger-count" aria-live="polite">@L["Workbench:Activity:MatchingCount", _filteredRows.Count, _rows.Count]</span>
-            </div>
-            <div class="activity-controls">
-                <MudTextField T="string" @ref="_searchField" Value="@_searchText" ValueChanged="SetSearch"
-                              Immediate="true" DebounceInterval="150" Clearable="true"
-                              Label="@L["Workbench:Activity:SearchLabel"]" Placeholder="@L["Workbench:Activity:SearchPlaceholder"]"
-                              Adornment="Adornment.Start" AdornmentIcon="@MoIcons.Search"
-                              Variant="Variant.Outlined" Margin="Margin.Dense" Class="activity-search" ClearIcon="@MoIcons.Close" />
-                <MudSelect T="ActivitySortKey" Value="@_sortKey" ValueChanged="SetSort"
-                           Label="@L["Activity:Controls:SortBy"]" Variant="Variant.Outlined" Margin="Margin.Dense" OpenIcon="@MoIcons.ChevronDown" CloseIcon="@MoIcons.ChevronUp">
-                    <MudSelectItem T="ActivitySortKey" Value="@ActivitySortKey.Runtime">@L["Workbench:Activity:QueryAge"]</MudSelectItem>
-                    <MudSelectItem T="ActivitySortKey" Value="@ActivitySortKey.State">@L["Activity:Sort:State"]</MudSelectItem>
-                    <MudSelectItem T="ActivitySortKey" Value="@ActivitySortKey.User">@L["Activity:Sort:User"]</MudSelectItem>
-                    <MudSelectItem T="ActivitySortKey" Value="@ActivitySortKey.Application">@L["Activity:Sort:Application"]</MudSelectItem>
-                    <MudSelectItem T="ActivitySortKey" Value="@ActivitySortKey.Client">@L["Activity:Sort:Client"]</MudSelectItem>
-                    <MudSelectItem T="ActivitySortKey" Value="@ActivitySortKey.Query">@L["Activity:Sort:Query"]</MudSelectItem>
-                </MudSelect>
-                <MudSelect T="ActivityGroupMode" Value="@_groupMode" ValueChanged="SetGrouping"
-                           Label="@L["Activity:Controls:GroupBy"]" Variant="Variant.Outlined" Margin="Margin.Dense" OpenIcon="@MoIcons.ChevronDown" CloseIcon="@MoIcons.ChevronUp">
-                    <MudSelectItem T="ActivityGroupMode" Value="@ActivityGroupMode.None">@L["Activity:Group:None"]</MudSelectItem>
-                    <MudSelectItem T="ActivityGroupMode" Value="@ActivityGroupMode.State">@L["Activity:Group:State"]</MudSelectItem>
-                    <MudSelectItem T="ActivityGroupMode" Value="@ActivityGroupMode.Client">@L["Activity:Group:Client"]</MudSelectItem>
-                    <MudSelectItem T="ActivityGroupMode" Value="@ActivityGroupMode.User">@L["Activity:Group:User"]</MudSelectItem>
-                    <MudSelectItem T="ActivityGroupMode" Value="@ActivityGroupMode.Application">@L["Activity:Group:Application"]</MudSelectItem>
-                </MudSelect>
-                <MudButton Variant="Variant.Outlined" StartIcon="@SortDirectionIcon" OnClick="ToggleSortDirection"
-                           aria-label="@(_sortDescending ? L["Workbench:Activity:SwitchAscending"] : L["Workbench:Activity:SwitchDescending"])">
-                    @(_sortDescending ? L["Activity:Controls:Descending"] : L["Activity:Controls:Ascending"])
-                </MudButton>
-            </div>
-            <div class="activity-ledger-note">
-                <span>
-                    @L["Workbench:Activity:QueryAgeDescription"]
-                    @if (IsPostgreSql)
-                    {
-                        <span class="activity-lock-scope">@L["Workbench:Activity:PostgreSqlWaitNote"]</span>
-                    }
-                </span>
-                @if (!string.IsNullOrWhiteSpace(_searchText))
-                {
-                    <MudButton Size="Size.Small" Variant="Variant.Text" OnClick="ClearSearchAsync">@L["Workbench:Activity:ClearSearch"]</MudButton>
-                }
-            </div>
-
-            @if (_rows.Count == 0)
+    </section>
+}
+else if (activity.Support != RepositoryActivitySupport.Supported)
+{
+    var failed = activity.Support == RepositoryActivitySupport.Failed;
+    <section class="mo-vl-surface">
+        <MoContentState>
+            <span class="mo-vl-tile @(failed ? "mo-vl-role--error" : "mo-vl-role--warning")"><MoIcon Icon="@(failed ? MoIcons.Error : MoIcons.Info)" Size="18px" /></span>
+            <h2>@L[failed ? "Workbench:Activity:ReadFailed" : "Persistence:ActivityUnsupported"]</h2>
+            <p>@L[failed ? "Workbench:Activity:ReadUnavailableDescription" : "Activity:Guide:UnsupportedDescription"]</p>
+            @if (failed && activity.Message is not null) { <code class="rp-read-error">@activity.Message</code> }
+            <MudButton Href="@Workbench.Url(("guide", "1"), ("inspectSession", null))" StartIcon="@MoIcons.FileText" Variant="Variant.Outlined" Size="Size.Small">@L["Persistence:GuideButton"]</MudButton>
+        </MoContentState>
+    </section>
+}
+else
+{
+    var rows = activity.Rows;
+    var summary = activity.Summary ?? RepositoryActivitySummary.Create(rows, db);
+    var wait = rows.Where(row => row.Waiting == true).ToArray();
+    var idleTx = rows.Where(row => SessionState(row) == "idleTx").ToArray();
+    var longActive = rows.Where(IsLongActive).ToArray();
+    var attention = rows.Count(row => row.Waiting == true || SessionState(row) == "idleTx" || IsLongActive(row));
+    <section class="mo-vl-surface rp-act-sig">
+        <RepositoryDecision Label="@L["Persistence:SessionAttention"]" Value="@attention.ToString()"
+                            Population="@L["Persistence:SessionPopulation", rows.Count]"
+                            Reasons="@(new (string, MoVisualRole, string)[] {
+                                (WaitingLabel(postgres, true), MoVisualRole.Error, wait.Length.ToString()),
+                                (L["Workbench:Activity:IdleInTransaction"], MoVisualRole.Warning, idleTx.Length.ToString()),
+                                (L["Persistence:LongActive"], MoVisualRole.Warning, longActive.Length.ToString()),
+                                (L["Persistence:OtherDatabases"], MoVisualRole.Third, (summary.TotalSessions - summary.DatabaseSessions).ToString())
+                            })">
+            @if (attention == 0)
             {
-                <div class="activity-ledger-empty" role="status"><MoIcon Icon="@MoIcons.Inbox" Size="1.5rem" /><h4>@L["Workbench:Activity:NoRowsTitle"]</h4><p>@L["Workbench:Activity:NoRowsDescription"]</p></div>
-            }
-            else if (_filteredRows.Count == 0)
-            {
-                <div class="activity-ledger-empty" role="status"><MoIcon Icon="@MoIcons.SearchOff" Size="1.5rem" /><h4>@L["Activity:NoMatches"]</h4><p>@L["Workbench:Activity:NoMatchesDescription"]</p><MudButton Variant="Variant.Outlined" OnClick="ClearSearchAsync">@L["Workbench:Activity:ClearSearch"]</MudButton></div>
-            }
-            else if (_groupMode == ActivityGroupMode.None)
-            {
-                @RenderRows(_filteredRows)
+                <MoRichFinding Template="@L["Persistence:ActivityCalm"]" Values="@(
+                    new RenderFragment[] { Mark(rows.Count, MoVisualRole.Info), Mark(summary.DatabaseSessions, MoVisualRole.Success),
+                        Mark(db ?? L["Persistence:Unavailable"].Value, MoVisualRole.Neutral) })" />
             }
             else
             {
-                <div class="activity-groups">
-                    @foreach (var group in _groups)
-                    {
-                        <section @key="group.Key" class="activity-group">
-                            <header class="activity-group-heading"><h4>@group.Key</h4><span>@L["Activity:Group:Count", group.Rows.Count]</span></header>
-                            @RenderRows(group.Rows)
-                        </section>
-                    }
-                </div>
+                @if (wait.FirstOrDefault() is { } waitRow)
+                {
+                    <MoRichFinding Template="@L[postgres ? "Persistence:LockFinding" : "Persistence:WaitFinding"]"
+                        Values="@(new RenderFragment[] { SessionMark(waitRow, MoVisualRole.Error), Mark(wait.Length, MoVisualRole.Error) })" />@(" ")
+                }
+                @if (idleTx.FirstOrDefault() is { } txRow)
+                {
+                    <MoRichFinding Template="@L["Persistence:IdleFinding"]"
+                        Values="@(new RenderFragment[] { SessionMark(txRow, MoVisualRole.Warning), Mark(idleTx.Length, MoVisualRole.Warning) })" />@(" ")
+                }
+                <MoRichFinding Template="@L["Persistence:ActivityScopeFinding"]" Values="@(new RenderFragment[] {
+                    Mark(longActive.Length, MoVisualRole.Warning), Mark(summary.TotalSessions - summary.DatabaseSessions, MoVisualRole.Third), Mark(db ?? L["Persistence:Unavailable"].Value, MoVisualRole.Info)
+                })" />
             }
-        </section>
-    }
-</section>
+        </RepositoryDecision>
+        <RepositoryFacts Label="@L["Workbench:Activity:DatabaseScope"]" Items="@(new (string, string, string, MoVisualRole)[] {
+            (L["Persistence:SelectedActive"], summary.ActiveSessions.ToString(), L["Persistence:ActiveFact", db ?? L["Persistence:Unavailable"].Value], MoVisualRole.Info),
+            (L["Workbench:Activity:Idle"], summary.IdleSessions.ToString(), L["Persistence:IdleFact"], MoVisualRole.Neutral),
+            (L["Workbench:Activity:IdleInTransaction"], summary.IdleInTransactionSessions.ToString(), L["Persistence:IdleTxFact"], MoVisualRole.Warning),
+            (WaitingLabel(postgres, true), summary.WaitingSessions.ToString(), L[postgres ? "Persistence:PgWaitFact" : "Persistence:WaitFact"], MoVisualRole.Error)
+        })" />
+        <RepositoryActivityRuler Workbench="Workbench" Rows="rows" Database="@db" Postgres="postgres" />
+    </section>
+    <ActivityRowsTable Workbench="Workbench" Rows="rows" Database="@db" Postgres="postgres" />
+}
+
+@if (Workbench.Get("guide") == "1")
+{
+    <RepositoryActivityGuide Workbench="Workbench" Guide="guide" />
+}
+else if (Workbench.Get("inspectSession") is { } sessionId && activity is not null)
+{
+    <RepositorySessionEvidence @key="sessionId" Workbench="Workbench" SessionId="@sessionId" Context="Context"
+        Row="activity.Rows.FirstOrDefault(row => row.BackendId == sessionId)" Postgres="postgres" CapturedAt="state.DetailsCapturedAt" />
+}
 
 @code {
-    /// <summary>The provider result. Its rows are detached when a new result is adopted.</summary>
-    [Parameter] public RepositoryActivityResult? Activity { get; set; }
+    [Parameter, EditorRequired] public RepositoryWorkbench Workbench { get; set; } = null!;
+    [Parameter, EditorRequired] public RepositoryDbContextSnapshot Context { get; set; } = null!;
 
-    /// <summary>The EF provider name used to resolve a guide before a result is available.</summary>
-    [Parameter] public string? ProviderName { get; set; }
-
-    /// <summary>Whether the page owner is reading activity. An existing snapshot remains visible.</summary>
-    [Parameter] public bool IsLoading { get; set; }
-
-    /// <summary>The selected context's database at capture time. Empty means the summary's database scope cannot be confirmed here.</summary>
-    [Parameter] public string? ContextDatabase { get; set; }
-
-    /// <summary>The page owner's activity capture timestamp. Empty means capture time is unknown.</summary>
-    [Parameter] public DateTimeOffset? CapturedAt { get; set; }
-
-    private static readonly DialogOptions InspectorOptions = new()
-    {
-        MaxWidth = MaxWidth.Large, FullWidth = true, CloseButton = true, CloseOnEscapeKey = true
-    };
-    private readonly object _dialogSync = new();
-    private readonly object _disposeSync = new();
-    private readonly HashSet<Task<IDialogReference>> _pendingDialogs = [];
-    private readonly HashSet<IDialogReference> _dialogs = [];
-    private RepositoryActivityResult? _inputActivity;
-    private RepositoryActivityResult? _snapshot;
-    private IReadOnlyList<RepositoryActivityRow> _rows = [];
-    private IReadOnlyList<RepositoryActivityRow> _filteredRows = [];
-    private IReadOnlyList<ActivityGroup> _groups = [];
-    private MudTextField<string>? _searchField;
-    private string? _snapshotDatabase;
-    private DateTimeOffset? _snapshotCapturedAt;
-    private string? _searchText;
-    private string? _dialogError;
-    private ActivitySortKey _sortKey = ActivitySortKey.Runtime;
-    private ActivityGroupMode _groupMode;
-    private bool _sortDescending = true;
-    private bool _openingDialog;
-    private volatile bool _disposed;
-    private Task? _disposeTask;
-    private int _viewRevision;
-    private int _clientCount;
-
-    private RepositoryActivityProviderGuide ProviderGuide => _snapshot?.ProviderGuide
-        ?? RepositoryActivityProviderGuideCatalog.Resolve(_snapshot?.ProviderName ?? ProviderName);
-    private bool IsPostgreSql => ProviderGuide.ProviderKind == RepositoryActivityProviderKind.PostgreSql;
-    private string ProviderDisplayName => DisplayValue(ProviderGuide.DisplayName);
-    private string SortDirectionIcon => _sortDescending ? MoIcons.ArrowDown : MoIcons.ArrowUp;
-
-    protected override void OnParametersSet()
-    {
-        if (_disposed || ReferenceEquals(_inputActivity, Activity)) return;
-        // The route keys this owner by context, so a same-context refresh can retain its detached evidence.
-        if (Activity is null && IsLoading && _snapshot is not null) return;
-        _inputActivity = Activity;
-        _rows = Activity?.Rows.Select(row => row with { }).ToArray() ?? [];
-        _snapshot = Activity is null ? null : Activity with
-        {
-            Rows = _rows,
-            Summary = Activity.Summary is null ? null : Activity.Summary with { },
-            ProviderGuide = Activity.ProviderGuide is null ? null : Activity.ProviderGuide with
-            {
-                SelectedColumns = Activity.ProviderGuide.SelectedColumns.ToArray()
-            }
-        };
-        _snapshotDatabase = ContextDatabase;
-        _snapshotCapturedAt = CapturedAt;
-        _clientCount = _rows.Where(row => !string.IsNullOrWhiteSpace(row.ClientAddress) || !string.IsNullOrWhiteSpace(row.ClientHostname))
-            .Select(FormatClient).Distinct(StringComparer.OrdinalIgnoreCase).Count();
-        RebuildView();
-    }
-
-    private RenderFragment RenderRows(IReadOnlyList<RepositoryActivityRow> rows) => @<ActivityRowsTable
-        Rows="rows" ViewRevision="_viewRevision" OnInspect="ShowInspectorAsync" InspectDisabled="_openingDialog"
-        ProviderKind="@ProviderGuide.ProviderKind"
-        RuntimeLabel="@L["Workbench:Activity:QueryAge"]" StateLabel="@L["Activity:Columns:State"]"
-        UserLabel="@L["Activity:Columns:User"]" ApplicationLabel="@L["Activity:Columns:Application"]"
-        ClientLabel="@L["Activity:Columns:Client"]" QueryLabel="@L["Activity:Columns:Query"]"
-        UnavailableLabel="@L["Common:Values:Unavailable"]" />;
-
-    private void SetSearch(string? value)
-    {
-        if (_disposed) return;
-        _searchText = value;
-        RebuildView();
-    }
-
-    private async Task ClearSearchAsync()
-    {
-        if (_disposed) return;
-        _searchText = string.Empty;
-        RebuildView();
-        if (_searchField is not null) await _searchField.ClearAsync();
-    }
-
-    private void SetSort(ActivitySortKey value)
-    {
-        if (_disposed) return;
-        _sortKey = value;
-        RebuildView();
-    }
-
-    private void SetGrouping(ActivityGroupMode value)
-    {
-        if (_disposed) return;
-        _groupMode = value;
-        RebuildView();
-    }
-
-    private void ToggleSortDirection()
-    {
-        if (_disposed) return;
-        _sortDescending = !_sortDescending;
-        RebuildView();
-    }
-
-    private void RebuildView()
-    {
-        _filteredRows = SortRows(_rows.Where(MatchesSearch)).ToArray();
-        _groups = _groupMode == ActivityGroupMode.None ? [] : _filteredRows
-            .GroupBy(GetGroupKey, StringComparer.OrdinalIgnoreCase)
-            .Select(group => new ActivityGroup(group.Key, group.ToArray()))
-            .OrderByDescending(group => group.Rows.Count)
-            .ThenBy(group => group.Key, StringComparer.OrdinalIgnoreCase).ToArray();
-        _viewRevision++;
-    }
-
-    private IEnumerable<RepositoryActivityRow> SortRows(IEnumerable<RepositoryActivityRow> rows) => _sortKey switch
-    {
-        ActivitySortKey.State => SortByText(rows, row => row.State),
-        ActivitySortKey.User => SortByText(rows, row => row.UserName),
-        ActivitySortKey.Application => SortByText(rows, row => row.ApplicationName),
-        ActivitySortKey.Client => SortByText(rows, FormatClient),
-        ActivitySortKey.Query => SortByText(rows, row => row.Query),
-        _ => _sortDescending
-            ? rows.OrderBy(row => row.Runtime is null).ThenByDescending(row => row.Runtime)
-            : rows.OrderBy(row => row.Runtime is null).ThenBy(row => row.Runtime)
-    };
-
-    private IEnumerable<RepositoryActivityRow> SortByText(IEnumerable<RepositoryActivityRow> rows, Func<RepositoryActivityRow, string?> selector) =>
-        _sortDescending
-            ? rows.OrderByDescending(row => selector(row) ?? string.Empty, StringComparer.OrdinalIgnoreCase)
-                .ThenBy(row => row.Runtime is null).ThenByDescending(row => row.Runtime)
-            : rows.OrderBy(row => selector(row) ?? string.Empty, StringComparer.OrdinalIgnoreCase)
-                .ThenBy(row => row.Runtime is null).ThenByDescending(row => row.Runtime);
-
-    private bool MatchesSearch(RepositoryActivityRow row)
-    {
-        if (string.IsNullOrWhiteSpace(_searchText)) return true;
-        var search = _searchText.Trim();
-        return Contains(row.State, search) || Contains(row.UserName, search) || Contains(row.ApplicationName, search)
-            || Contains(row.ClientAddress, search) || Contains(row.ClientHostname, search)
-            || Contains(row.ClientPort?.ToString(CultureInfo.InvariantCulture), search) || Contains(row.Query, search)
-            || Contains(row.DatabaseName, search) || Contains(row.BackendId, search) || Contains(row.Detail, search)
-            || Contains(row.Waiting?.ToString(), search) || Contains(WaitingText(row.Waiting), search);
-    }
-
-    private string GetGroupKey(RepositoryActivityRow row) => _groupMode switch
-    {
-        ActivityGroupMode.State => DisplayValue(row.State),
-        ActivityGroupMode.Client => FormatClient(row),
-        ActivityGroupMode.User => DisplayValue(row.UserName),
-        ActivityGroupMode.Application => DisplayValue(row.ApplicationName),
-        _ => L["Activity:Group:None"]
-    };
-
-    private string FormatClient(RepositoryActivityRow row)
-    {
-        var address = string.IsNullOrWhiteSpace(row.ClientAddress) ? row.ClientHostname : row.ClientAddress;
-        if (string.IsNullOrWhiteSpace(address)) return L["Common:Values:Unavailable"];
-        return row.ClientPort is null ? address : $"{address}:{row.ClientPort.Value.ToString(CultureInfo.InvariantCulture)}";
-    }
-
-    private string WaitingText(bool? waiting) => waiting switch
-    {
-        true => IsPostgreSql ? L["Workbench:Activity:LockWait"] : L["Workbench:Activity:Waiting"],
-        false => IsPostgreSql ? L["Workbench:Activity:NoLockWait"] : L["Workbench:Activity:NotWaiting"],
-        _ => IsPostgreSql ? L["Workbench:Activity:LockWaitUnknown"] : L["Workbench:Activity:WaitUnknown"]
-    };
-    private string DisplayValue(string? value) => string.IsNullOrWhiteSpace(value) ? L["Common:Values:Unavailable"] : value;
-    private string CountValue(int? value) => value?.ToString("N0", CultureInfo.CurrentCulture) ?? L["Common:Values:Unavailable"];
-    private string FormatCapture(DateTimeOffset? value) => UiTime.Format(value) ?? L["Common:Values:Unavailable"];
-    private static bool Contains(string? value, string search) => !string.IsNullOrWhiteSpace(value) && value.Contains(search, StringComparison.OrdinalIgnoreCase);
-
-    private Task ShowProviderGuideAsync()
-    {
-        var guide = ProviderGuide with { SelectedColumns = ProviderGuide.SelectedColumns.ToArray() };
-        return ShowOwnedDialogAsync(L["Activity:Guide:DialogTitle"], new DialogParameters<ActivityProviderGuideDialog> { { dialog => dialog.Guide, guide } });
-    }
-
-    private Task ShowInspectorAsync(RepositoryActivityRow row)
-    {
-        if (_snapshot is null || _disposed || !_rows.Any(current => ReferenceEquals(current, row))) return Task.CompletedTask;
-        var parameters = new DialogParameters<RepositoryActivityDetailDialog>
-        {
-            { dialog => dialog.Row, row with { } },
-            { dialog => dialog.ContextName, _snapshot.Registration.DbContextType.GetCleanName() },
-            { dialog => dialog.ContextFullName, _snapshot.Registration.DbContextType.GetCleanFullName() },
-            { dialog => dialog.ContextDatabase, _snapshotDatabase },
-            { dialog => dialog.ProviderName, _snapshot.ProviderName },
-            { dialog => dialog.ProviderKind, ProviderGuide.ProviderKind },
-            { dialog => dialog.CapturedAt, _snapshotCapturedAt }
-        };
-        return ShowOwnedDialogAsync(L["Workbench:Activity:Inspector:Title"], parameters);
-    }
-
-    private async Task ShowOwnedDialogAsync<[DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.All)] TDialog>(string title, DialogParameters<TDialog> parameters) where TDialog : IComponent
-    {
-        Task<IDialogReference>? pending = null;
-        var admitted = false;
-        try
-        {
-            lock (_dialogSync)
-            {
-                if (_disposed || _openingDialog) return;
-                admitted = true;
-                _openingDialog = true;
-                _dialogError = null;
-                pending = DialogService.ShowAsync<TDialog>(title, parameters, InspectorOptions);
-                _pendingDialogs.Add(pending);
-            }
-            var dialog = await pending;
-            lock (_dialogSync)
-            {
-                if (_disposed) CloseDialog(dialog);
-                else
-                {
-                    _dialogs.RemoveWhere(reference => reference.Result.IsCompleted);
-                    _dialogs.Add(dialog);
-                }
-            }
-        }
-        catch (Exception exception)
-        {
-            Logger.LogWarning(exception, "Could not open a Repository activity dialog.");
-            if (!_disposed) _dialogError = L["Workbench:Activity:DialogFailed"];
-        }
-        finally
-        {
-            if (admitted) lock (_dialogSync)
-            {
-                if (pending is not null) _pendingDialogs.Remove(pending);
-                _openingDialog = false;
-            }
-        }
-    }
-
-    public ValueTask DisposeAsync()
-    {
-        lock (_disposeSync) return new ValueTask(_disposeTask ??= DisposeCoreAsync());
-    }
-
-    private async Task DisposeCoreAsync()
-    {
-        Task<IDialogReference>[] pending;
-        IDialogReference[] dialogs;
-        lock (_dialogSync)
-        {
-            _disposed = true;
-            pending = _pendingDialogs.ToArray();
-            dialogs = _dialogs.ToArray();
-        }
-        foreach (var dialog in dialogs) CloseDialog(dialog);
-        foreach (var opening in pending)
-        {
-            try { CloseDialog(await opening); }
-            catch (Exception exception) { Logger.LogDebug(exception, "An activity dialog failed while its owner was retiring."); }
-        }
-        lock (_dialogSync) { _dialogs.Clear(); _pendingDialogs.Clear(); }
-    }
-
-    private static void CloseDialog(IDialogReference dialog)
-    {
-        var result = DialogResult.Cancel();
-        dialog.Close(result);
-        dialog.Dismiss(result);
-    }
-
-    private enum ActivitySortKey { Runtime, State, User, Application, Client, Query }
-    private enum ActivityGroupMode { None, State, Client, User, Application }
-    private sealed record ActivityGroup(string Key, IReadOnlyList<RepositoryActivityRow> Rows);
+    private string WaitingLabel(bool postgres, bool plural) => L[postgres
+        ? plural ? "Workbench:Activity:LockWaitCount" : "Workbench:Activity:LockWait" : "Workbench:Activity:Waiting"];
+    private static RenderFragment Mark(object value, MoVisualRole role) => @<MoValueMark Role="role">@value</MoValueMark>;
+    private RenderFragment SessionMark(RepositoryActivityRow row, MoVisualRole role) => @<MoValueMark Role="role"
+        Href="@(row.BackendId is { } id ? Workbench.Url(("inspectSession", id), ("guide", null)) : null)">#@row.BackendId</MoValueMark>;
 }

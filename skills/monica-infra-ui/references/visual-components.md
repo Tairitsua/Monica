@@ -58,6 +58,8 @@ For an editable sheet, handle `DismissRequested` to collect any draft confirmati
 
 A component rooted in `MoSideSheet` can also be opened with `IDialogService.ShowAsync<T>(title, parameters)` without special dialog options. In that mode `Open` is ignored and the caller owns the returned native reference and retires it with its route. JobScheduler's `ExecutionDetailDialog` and Locker's `LeaseEvidence` demonstrate service-opened and inline ownership respectively. Use ordinary `MudDialog` for confirmations; keep its reference with the feature that owns the decision.
 
+Set `FocusCloseOnOpen="true"` when a read-only evidence sheet starts at Close, as the Repository session sheet does. This setting focuses the enabled Close control in the stationary heading when the sheet opens. Native dialog focus remains the default.
+
 Module System and Help, HealthCheck, Seeder, Kubernetes and Terminal's modal context use the same component. Verify affected callers after changing it: page scroll before opening, stationary heading/tabs/footer while the body scrolls, desktop and phone bounds, live evidence/title changes, Escape/backdrop/focus return, nested confirmation, disabled dismissal during work, and route/back/forward cleanup. `components/mo-side-sheet.css` owns the shared frame; never copy it into feature CSS.
 
 ## Compose a localized finding

@@ -77,7 +77,7 @@ public sealed class ModuleRepositoryUI : MonicaModule<ModuleRepositoryUIOption>,
                     "Workbench:Views:Options:Label",
                     MoIcons.Sliders,
                     category,
-                    addToNav: true,
+                    addToNav: false,
                     navOrder: 38);
             }));
     }

@@ -1,0 +1,11 @@
+<div class="rp-search">
+    <MoIcon Icon="@MoIcons.Search" Size="14px" />
+    <input type="search" value="@Value" aria-label="@Label" placeholder="@Label" @oninput="OnInput" />
+</div>
+
+@code {
+    [Parameter, EditorRequired] public string Label { get; set; } = "";
+    [Parameter] public string? Value { get; set; }
+    [Parameter, EditorRequired] public EventCallback<string?> Changed { get; set; }
+    private Task OnInput(ChangeEventArgs input) => Changed.InvokeAsync(input.Value?.ToString());
+}

@@ -1,132 +1,168 @@
-@using Monica.UI.Shared.Components.States
-@using System.Globalization
 @inject IStringLocalizer<RepositoryUIResource> L
+@using static Monica.Repository.UI.UIRepository.Support.RepositoryPresentation
 
-<div class="activity-rows-table">
-    <MudTable T="RepositoryActivityRow" Items="Rows" Dense="false" Hover="true" Elevation="0" Square="true"
-              Breakpoint="Breakpoint.Xs" Class="activity-table" TableAttributes="@(new Dictionary<string, object?> { ["aria-label"] = L["Workbench:Activity:TableLabel"].Value })"
-              @bind-RowsPerPage="_pageSize" @bind-CurrentPage="_currentPage">
-        <HeaderContent>
-            <MudTh Class="activity-session-column">@L["Workbench:Activity:Session"]</MudTh>
-            <MudTh Class="activity-state-column">@StateLabel</MudTh>
-            <MudTh Class="activity-client-column">@ClientLabel</MudTh>
-            <MudTh Class="activity-query-column">@QueryLabel</MudTh>
-            <MudTh Class="activity-age-column">@RuntimeLabel</MudTh>
-        </HeaderContent>
-        <RowTemplate>
-            <MudTd DataLabel="@L["Workbench:Activity:Session"]" Class="activity-session-column">
-                <div class="activity-cell activity-session">
-                    <strong class="activity-backend">@DisplayValue(context.BackendId)</strong>
-                    <span class="activity-database">@DisplayValue(context.DatabaseName)</span>
+@{
+    var search = Workbench.Get("q");
+    var scope = Workbench.Get("scope");
+    var state = Workbench.Get("state");
+    var sort = Workbench.Get("sort") ?? "runtime";
+    var ascending = Workbench.Get("dir") == "asc";
+    var grouping = Workbench.Get("group") ?? "none";
+    var filtered = Rows.Where(row => scope switch { "selected" => InDatabase(row, Database), "other" => !InDatabase(row, Database), _ => true })
+        .Where(row => Search(search, row.Query, row.State, row.UserName, row.ApplicationName, row.ClientAddress, row.ClientHostname,
+            row.ClientPort?.ToString(), row.DatabaseName, row.BackendId, row.Detail, Waiting(row))).ToArray();
+    var result = filtered.Where(row => state is null || MatchesState(row, state)).OrderBy(row => SortValue(row, sort) is null);
+    var ordered = (ascending ? result.ThenBy(row => SortValue(row, sort)) : result.ThenByDescending(row => SortValue(row, sort))).ToArray();
+}
+<section class="mo-vl-surface rp-act-ledger">
+    <header class="mo-vl-surface-heading rp-surface-heading">
+        <span class="mo-vl-tile mo-vl-role--info"><MoIcon Icon="@MoIcons.Table" Size="16px" /></span>
+        <div class="rp-heading-copy"><h2>@L["Persistence:SessionLedger"]</h2><p>@L["Workbench:Activity:LedgerDescription"]</p></div>
+        <span class="rp-pill mo-vl-role--info mono">@ordered.Length / @Rows.Count</span>
+    </header>
+    <div class="mo-vl-surface-body">
+        <div class="rp-toolbar">
+            <RepositorySearch Label="@L["Workbench:Activity:SearchPlaceholder"]" Value="@search"
+                              Changed="@((string? value) => Workbench.Replace(("q", value)))" />
+            <div class="rp-chips" role="group" aria-label="@L["Persistence:State"]">
+                @foreach (var option in FILTER_STATES)
+                {
+                    <MoFilterChip Label="@StateLabel(option.Key)" Role="option.Role" ShowDot="true" Pill="true"
+                                  Count="@filtered.Count(row => MatchesState(row, option.Key))" Selected="@(state == option.Key)"
+                                  SelectedChanged="@(_ => Workbench.Toggle("state", option.Key))" />
+                }
+            </div>
+            <div class="rp-sort-controls">
+                <div class="rp-select">
+                    <MudSelect T="string" Value="@sort" ValueChanged="@((string? value) => Workbench.Replace(("sort", value is "runtime" ? null : value)))"
+                               aria-label="@L["Persistence:Sort"]" Variant="Variant.Outlined" Margin="Margin.Dense" OpenIcon="@MoIcons.ChevronDown" CloseIcon="@MoIcons.ChevronUp">
+                        @foreach (var key in SORT_KEYS)
+                        {
+                            <MudSelectItem T="string" Value="@key">@L[$"Persistence:SessionColumns:{key}"]</MudSelectItem>
+                        }
+                    </MudSelect>
                 </div>
-            </MudTd>
-            <MudTd DataLabel="@StateLabel" Class="activity-state-column">
-                <div class="activity-cell activity-state">
-                    <span class="activity-state-badge @StateClass(context.State)"><span aria-hidden="true" class="activity-state-dot"></span>@DisplayValue(context.State)</span>
-                    <span class="activity-wait @WaitClass(context.Waiting)">
-                        @if (context.Waiting == true) { <MoIcon Icon="@MoIcons.Hourglass" Size="1.25rem" /> }
-                        @WaitingText(context.Waiting)
-                    </span>
+                <MudButton StartIcon="@(ascending ? MoIcons.ArrowUp : MoIcons.ArrowDown)" Size="Size.Small" Variant="Variant.Outlined"
+                           OnClick="@(() => Workbench.Toggle("dir", "asc"))">@L[ascending ? "Persistence:Ascending" : "Persistence:Descending"]</MudButton>
+                <div class="rp-select">
+                    <MudSelect T="string" Value="@grouping" ValueChanged="@((string? value) => Workbench.Replace(("group", value is "none" ? null : value)))"
+                               aria-label="@L["Persistence:Group"]" Variant="Variant.Outlined" Margin="Margin.Dense" OpenIcon="@MoIcons.ChevronDown" CloseIcon="@MoIcons.ChevronUp">
+                        <MudSelectItem T="string" Value="@("none")">@L["Persistence:NoGrouping"]</MudSelectItem>
+                        @foreach (var key in GROUP_KEYS)
+                        {
+                            <MudSelectItem T="string" Value="@key">@L[$"Persistence:SessionColumns:{key}"]</MudSelectItem>
+                        }
+                    </MudSelect>
                 </div>
-            </MudTd>
-            <MudTd DataLabel="@ClientLabel" Class="activity-client-column">
-                <div class="activity-cell activity-client">
-                    <span class="activity-application" title="@ApplicationLabel">@DisplayValue(context.ApplicationName)</span>
-                    <span class="activity-client-account"><span>@UserLabel</span> @DisplayValue(context.UserName)</span>
-                    <span class="activity-client-address">@FormatClient(context)</span>
-                </div>
-            </MudTd>
-            <MudTd DataLabel="@QueryLabel" Class="activity-query-column">
-                <div class="activity-cell activity-query">
-                    <code class="activity-query-preview">@QueryPreview(context.Query)</code>
-                    @if (OnInspect.HasDelegate)
-                    {
-                        <MudButton Size="Size.Small" Variant="Variant.Text" EndIcon="@MoIcons.ArrowRight"
-                                   Disabled="InspectDisabled" OnClick="@(() => OnInspect.InvokeAsync(context))"
-                                   aria-label="@L["Workbench:Activity:InspectLabel", DisplayValue(context.BackendId), DisplayValue(context.DatabaseName)]">
-                            @L["Workbench:Activity:Inspect"]
-                        </MudButton>
-                    }
-                </div>
-            </MudTd>
-            <MudTd DataLabel="@RuntimeLabel" Class="activity-age-column">
-                <span class="activity-age-value">@FormatRuntime(context.Runtime)</span>
-            </MudTd>
-        </RowTemplate>
-        <NoRecordsContent>
-            <MoContentState Compact="true">@L["Activity:NoMatches"]</MoContentState>
-        </NoRecordsContent>
-        <PagerContent>
-            <MudTablePager PageSizeOptions="@PageSizes" RowsPerPageString="@L["Workbench:Activity:PageSize"]"
-                           InfoFormat="@L["Workbench:Activity:PageInfo"]" FirstIcon="@MoIcons.FirstPage" BeforeIcon="@MoIcons.ChevronLeft" NextIcon="@MoIcons.ChevronRight" LastIcon="@MoIcons.LastPage" />
-        </PagerContent>
-    </MudTable>
-</div>
+            </div>
+        </div>
+        <div class="rp-honesty-bar">
+            <span>@L["Workbench:Activity:QueryAgeDescription"]</span>
+            @if (Postgres) { <span>@L["Workbench:Activity:PostgreSqlWaitNote"]</span> }
+        </div>
+        @if (Rows.Count == 0)
+        {
+            <MoContentState Compact="true"><h3>@L["Workbench:Activity:NoRowsTitle"]</h3><p>@L["Workbench:Activity:NoRowsDescription"]</p></MoContentState>
+        }
+        else if (ordered.Length == 0)
+        {
+            <MoContentState Compact="true">
+                <MoIcon Icon="@MoIcons.SearchOff" Size="18px" />
+                <p>@L["Workbench:Activity:NoMatchesDescription"]</p>
+                <MudButton Size="Size.Small" Variant="Variant.Outlined" OnClick="Clear">@L["Persistence:ClearFilters"]</MudButton>
+            </MoContentState>
+        }
+        else if (GROUP_KEYS.Contains(grouping, StringComparer.Ordinal))
+        {
+            <div class="rp-groups">
+                @foreach (var group in ordered.GroupBy(row => GroupValue(row, grouping)))
+                {
+                    <section class="rp-group">
+                        <header class="rp-group-head"><h3>@group.Key</h3><span class="rp-tag mono">@group.Count()</span></header>
+                        @Ledger(group)
+                    </section>
+                }
+            </div>
+        }
+        else
+        {
+            @Ledger(ordered)
+        }
+        <p class="rp-scope-note"><MoIcon Icon="@MoIcons.Info" Size="14px" />@L["Workbench:Activity:DatabaseScopeDescription"]</p>
+    </div>
+</section>
 
 @code {
-    /// <summary>Detached rows in the selected sort order. Native paging keeps every row reachable.</summary>
-    [Parameter] public IReadOnlyList<RepositoryActivityRow> Rows { get; set; } = [];
-    /// <summary>Changes when filters or ordering change and resets the native pager to its first page.</summary>
-    [Parameter] public int ViewRevision { get; set; }
-    /// <summary>Opens an exact detached row inspector owned by the calling activity component.</summary>
-    [Parameter] public EventCallback<RepositoryActivityRow> OnInspect { get; set; }
-    /// <summary>Prevents another inspector from opening while a dialog is being mounted.</summary>
-    [Parameter] public bool InspectDisabled { get; set; }
-    /// <summary>The captured provider kind. Omission keeps the generic waiting labels.</summary>
-    [Parameter] public RepositoryActivityProviderKind ProviderKind { get; set; }
-    [Parameter] public string RuntimeLabel { get; set; } = string.Empty;
-    [Parameter] public string StateLabel { get; set; } = string.Empty;
-    [Parameter] public string UserLabel { get; set; } = string.Empty;
-    [Parameter] public string ApplicationLabel { get; set; } = string.Empty;
-    [Parameter] public string ClientLabel { get; set; } = string.Empty;
-    [Parameter] public string QueryLabel { get; set; } = string.Empty;
-    [Parameter] public string UnavailableLabel { get; set; } = string.Empty;
+    [Parameter, EditorRequired] public RepositoryWorkbench Workbench { get; set; } = null!;
+    [Parameter, EditorRequired] public IReadOnlyList<RepositoryActivityRow> Rows { get; set; } = [];
+    [Parameter] public string? Database { get; set; }
+    [Parameter] public bool Postgres { get; set; }
+    private static readonly string[] SORT_KEYS = ["runtime", "state", "user", "application", "client", "query"];
+    private static readonly string[] GROUP_KEYS = ["state", "database", "client", "user", "application"];
+    private static readonly (string Key, MoVisualRole Role)[] FILTER_STATES =
+        [("waiting", MoVisualRole.Error), ("idleTx", MoVisualRole.Warning), ("active", MoVisualRole.Info), ("idle", MoVisualRole.Neutral)];
 
-    private static readonly int[] PageSizes = [10, 25, 50, 100];
-    private int _pageSize = 10;
-    private int _currentPage;
-    private int _lastRevision = -1;
-
-    protected override void OnParametersSet()
+    private string StateLabel(string state) => state == "waiting" ? L[Postgres ? "Workbench:Activity:LockWait" : "Workbench:Activity:Waiting"]
+        : L[$"Persistence:SessionStates:{state}"];
+    private static bool MatchesState(RepositoryActivityRow row, string state) => state == "waiting" ? row.Waiting == true : SessionState(row) == state;
+    private static IComparable? SortValue(RepositoryActivityRow row, string sort) => sort switch
     {
-        if (_lastRevision != ViewRevision)
-        {
-            _lastRevision = ViewRevision;
-            _currentPage = 0;
-        }
-        _currentPage = Math.Min(_currentPage, Math.Max(0, (Rows.Count - 1) / _pageSize));
-    }
-
-    private string FormatRuntime(TimeSpan? runtime) => runtime?.ToString("c", CultureInfo.InvariantCulture) ?? UnavailableLabel;
-
-    private string FormatClient(RepositoryActivityRow row)
-    {
-        var address = string.IsNullOrWhiteSpace(row.ClientAddress) ? row.ClientHostname : row.ClientAddress;
-        if (string.IsNullOrWhiteSpace(address)) return UnavailableLabel;
-        return row.ClientPort is null ? address : $"{address}:{row.ClientPort.Value.ToString(CultureInfo.InvariantCulture)}";
-    }
-
-    private string QueryPreview(string? value)
-    {
-        if (string.IsNullOrWhiteSpace(value)) return UnavailableLabel;
-        return value.Length <= 360 ? value : value[..360] + "…";
-    }
-
-    private string DisplayValue(string? value) => string.IsNullOrWhiteSpace(value) ? UnavailableLabel : value;
-    private bool IsPostgreSql => ProviderKind == RepositoryActivityProviderKind.PostgreSql;
-    private string WaitingText(bool? value) => value switch
-    {
-        true => IsPostgreSql ? L["Workbench:Activity:LockWait"] : L["Workbench:Activity:Waiting"],
-        false => IsPostgreSql ? L["Workbench:Activity:NoLockWait"] : L["Workbench:Activity:NotWaiting"],
-        _ => IsPostgreSql ? L["Workbench:Activity:LockWaitUnknown"] : L["Workbench:Activity:WaitUnknown"]
+        "state" => row.State, "user" => row.UserName, "application" => row.ApplicationName,
+        "client" => Client(row), "query" => row.Query, _ => row.Runtime
     };
-    private static string WaitClass(bool? value) => value == true ? "activity-wait--waiting" : "activity-wait--neutral";
-    private static string StateClass(string? value)
+    private string GroupValue(RepositoryActivityRow row, string group) => (group switch
     {
-        var state = value?.Trim() ?? string.Empty;
-        if (state.Equals("active", StringComparison.OrdinalIgnoreCase)) return "activity-state-badge--active";
-        if (state.Equals("idle", StringComparison.OrdinalIgnoreCase)) return "activity-state-badge--idle";
-        if (state.StartsWith("idle in transaction", StringComparison.OrdinalIgnoreCase)) return "activity-state-badge--transaction";
-        return "activity-state-badge--other";
-    }
+        "state" => StateLabel(SessionState(row)), "database" => row.DatabaseName, "client" => Client(row), "user" => row.UserName,
+        "application" => row.ApplicationName, _ => null
+    }) is { Length: > 0 } value ? value : L["Persistence:Unavailable"].Value;
+    private string Waiting(RepositoryActivityRow row) => row.Waiting switch
+    {
+        true => L[Postgres ? "Workbench:Activity:LockWait" : "Workbench:Activity:Waiting"],
+        false => L[Postgres ? "Workbench:Activity:NoLockWait" : "Workbench:Activity:NotWaiting"],
+        null => L[Postgres ? "Workbench:Activity:LockWaitUnknown" : "Workbench:Activity:WaitUnknown"]
+    };
+    private void Clear() => Workbench.Replace(("scope", null), ("state", null), ("q", null));
+    private string Inspect(string id) => Workbench.Url(("inspectSession", id), ("guide", null));
+
+    private RenderFragment Ledger(IEnumerable<RepositoryActivityRow> rows) => @<div class="rp-table-wrap">
+        <table class="rp-table rp-session-table" aria-label="@L["Workbench:Activity:TableLabel"]">
+            <thead><tr>
+                <th scope="col">@L["Workbench:Activity:Session"]</th><th scope="col">@L["Persistence:State"]</th>
+                <th scope="col">@L["Workbench:Activity:QueryAge"]</th><th scope="col">@L["Persistence:SessionOwner"]</th>
+                <th scope="col">@L["Persistence:SessionColumns:client"]</th><th scope="col">@L["Persistence:SessionColumns:query"]</th>
+                <th scope="col">@L["Persistence:Actions"]</th>
+            </tr></thead>
+            <tbody>
+                @foreach (var row in rows)
+                {
+                    <tr class="@(row.BackendId is not null && Workbench.Get("inspectSession") == row.BackendId ? "is-selected" : null)">
+                        <td data-label="@L["Workbench:Activity:Session"]">
+                            @if (row.BackendId is { } id) { <a class="rp-row-link mono" href="@Inspect(id)">#@id</a> }
+                            else { <span>—</span> }
+                            <small class="mono">@row.DatabaseName</small>
+                            @if (!InDatabase(row, Database)) { <span class="rp-pill rp-pill-xs mo-vl-role--third">@L["Persistence:OtherDatabase"]</span> }
+                        </td>
+                        <td data-label="@L["Persistence:State"]">
+                            <span class="rp-pill rp-pill-xs @SessionRole(row).ToCssClass()"><i class="rp-swatch"></i>@StateLabel(SessionState(row))</span>
+                            @if (row.Waiting != false)
+                            {
+                                <span class="rp-pill rp-pill-xs @(row.Waiting == true ? "mo-vl-role--error" : "mo-vl-role--neutral")">@Waiting(row)</span>
+                            }
+                        </td>
+                        <td data-label="@L["Workbench:Activity:QueryAge"]"><strong class="mono rp-tinted @SessionRole(row).ToCssClass()">@Duration(row.Runtime, L)</strong></td>
+                        <td data-label="@L["Persistence:SessionOwner"]"><b>@(row.UserName ?? "—")</b><small>@row.ApplicationName</small></td>
+                        <td data-label="@L["Persistence:SessionColumns:client"]"><code>@(Client(row) ?? "—")</code><small>@row.Detail</small></td>
+                        <td data-label="@L["Persistence:SessionColumns:query"]"><code class="rp-query-preview">@(string.IsNullOrWhiteSpace(row.Query) ? "—" : row.Query)</code></td>
+                        <td data-label="@L["Persistence:Actions"]" class="rp-row-actions">
+                            @if (row.BackendId is { } key)
+                            {
+                                <MudIconButton Icon="@MoIcons.Search" Size="Size.Small" Href="@Inspect(key)" title="@L["Workbench:Activity:Inspect"]"
+                                               aria-label="@L["Workbench:Activity:InspectLabel", key, row.DatabaseName ?? "—"]" />
+                            }
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>;
 }

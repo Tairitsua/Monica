@@ -95,6 +95,12 @@ public sealed record RepositoryDbContextSnapshot
     public int? MigrationCount { get; init; }
 
     /// <summary>
+    /// Migration assembly and history evidence captured with this registration. A failed history
+    /// read is represented by its error. A snapshot that could not resolve its context has no status.
+    /// </summary>
+    public RepositoryMigrationStatus? MigrationStatus { get; init; }
+
+    /// <summary>
     /// Flattened Repository and EF option entries suitable for property-grid display.
     /// </summary>
     public IReadOnlyList<RepositoryOptionEntry> Options { get; init; } = [];

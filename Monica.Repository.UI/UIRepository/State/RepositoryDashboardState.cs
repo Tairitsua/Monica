@@ -18,6 +18,9 @@ public sealed class RepositoryDashboardState(
     IHostEnvironment hostEnvironment)
 {
     private readonly SemaphoreSlim _gate = new(1, 1);
+    private readonly Dictionary<string, ActivitySample> _activitySamples = new(StringComparer.Ordinal);
+
+    private sealed record ActivitySample(RepositoryActivityResult Result, DateTime CapturedAt, string? RefreshError = null);
 
     /// <summary>Gets the last successfully captured Repository registrations, including per-context read failures.</summary>
     public IReadOnlyList<RepositoryDbContextSnapshot> Contexts { get; private set; } = [];
@@ -45,6 +48,8 @@ public sealed class RepositoryDashboardState(
     public DateTime? ContextsCapturedAt { get; private set; }
     /// <summary>Gets the UTC adoption time of the selected detail results, including failed or unsupported provider results.</summary>
     public DateTime? DetailsCapturedAt { get; private set; }
+    /// <summary>Gets the last activity read failure when a prior sample is still being displayed.</summary>
+    public string? RetainedActivityError { get; private set; }
     /// <summary>Gets whether updates are permitted. Production is read-only unless the module explicitly opts in.</summary>
     public bool MigrationUpdatesEnabled => !hostEnvironment.IsProduction() || options.Value.AllowMigrationUpdateInProduction;
     /// <summary>Gets the host-configured migration timeout; the module default is one hour.</summary>
@@ -52,6 +57,77 @@ public sealed class RepositoryDashboardState(
 
     /// <summary>Loads current registrations while preserving circuit selection when it still exists.</summary>
     public Task InitializeAsync(CancellationToken cancellationToken = default) => RefreshContextsAsync(cancellationToken: cancellationToken);
+
+    /// <summary>
+    /// Prepares a routed workspace. Registry evidence is shared across routes. A provider activity
+    /// query runs only for the selected registration on the activity route, on first use or refresh.
+    /// A missing explicit registration ID never falls back to another context.
+    /// </summary>
+    /// <param name="contextId">Optional exact registration ID. A null value preserves selection or uses the first registration.</param>
+    /// <param name="readActivity">Whether the current route needs activity evidence.</param>
+    /// <param name="refresh">Whether to refresh the registry and any selected activity.</param>
+    /// <param name="revealConnectionStrings">Optional explicit change to connection-string visibility.</param>
+    /// <param name="cancellationToken">Cancellation owned by the routed component.</param>
+    public Task PrepareWorkspaceAsync(string? contextId, bool readActivity, bool refresh,
+        bool? revealConnectionStrings, CancellationToken cancellationToken) =>
+        SerializeAsync(async token =>
+        {
+            if (revealConnectionStrings is { } reveal)
+            {
+                SetReveal(reveal);
+            }
+
+            var previousId = SelectedContext?.Registration.ContextId;
+            var capture = refresh || ContextsCapturedAt is null || revealConnectionStrings is not null;
+            if (capture && !await CaptureContextsAsync(token))
+            {
+                if (contextId is not null && contextId != previousId)
+                {
+                    SelectWorkspaceContext(contextId, readActivity);
+                }
+                return;
+            }
+
+            SelectWorkspaceContext(contextId ?? previousId, readActivity, useDefault: contextId is null);
+            if (!readActivity || SelectedContext is not { } selected ||
+                (Activity is not null && !refresh)) return;
+
+            IsLoadingDetails = true;
+            try
+            {
+                var result = await ReadActivityAsync(selected, token);
+                if (result.Support == RepositoryActivitySupport.Failed &&
+                    _activitySamples.TryGetValue(selected.Registration.ContextId, out var previous) &&
+                    previous.Result.Support == RepositoryActivitySupport.Supported)
+                {
+                    RetainedActivityError = result.Message;
+                    _activitySamples[selected.Registration.ContextId] = previous with { RefreshError = result.Message };
+                }
+                else
+                    AdoptActivity(result);
+            }
+            finally { IsLoadingDetails = false; }
+        }, cancellationToken);
+
+    /// <summary>Returns the last supported sample for a registration in this circuit, when available.</summary>
+    public RepositoryActivitySummary? FindSampledActivity(string contextId) =>
+        _activitySamples.TryGetValue(contextId, out var sample) ? sample.Result.Summary : null;
+
+    private void SelectWorkspaceContext(string? contextId, bool readActivity, bool useDefault = false)
+    {
+        SelectedContext = SelectSnapshot(contextId) ?? (useDefault ? Contexts.FirstOrDefault() : null);
+        MigrationStatus = SelectedContext?.MigrationStatus;
+        Activity = null;
+        DetailsCapturedAt = null;
+        RetainedActivityError = null;
+        if (readActivity && SelectedContext is { } selected &&
+            _activitySamples.TryGetValue(selected.Registration.ContextId, out var sample))
+        {
+            Activity = sample.Result;
+            DetailsCapturedAt = sample.CapturedAt;
+            RetainedActivityError = sample.RefreshError;
+        }
+    }
 
     /// <summary>Refreshes registrations, retaining prior successful evidence on a failed read.</summary>
     public Task RefreshContextsAsync(bool keepSelection = true, CancellationToken cancellationToken = default) =>
@@ -69,7 +145,7 @@ public sealed class RepositoryDashboardState(
     public Task ToggleConnectionStringRevealAsync(CancellationToken cancellationToken = default) =>
         SerializeAsync(async token =>
         {
-            RevealConnectionStrings = !RevealConnectionStrings;
+            SetReveal(!RevealConnectionStrings);
             await RefreshCoreAsync(true, token);
         }, cancellationToken);
 
@@ -85,7 +161,10 @@ public sealed class RepositoryDashboardState(
     /// <param name="contextId">The exact Repository registration ID captured before confirmation.</param>
     /// <param name="cancellationToken">Component-owned cancellation. The component must drain this task before retiring.</param>
     /// <returns>The actual provider outcome, or null when admission is denied or the facade read fails.</returns>
-    public async Task<RepositoryMigrationUpdateResult?> UpdateMigrationAsync(string contextId, CancellationToken cancellationToken = default)
+    public Task<RepositoryMigrationUpdateResult?> UpdateMigrationAsync(string contextId, CancellationToken cancellationToken = default) =>
+        UpdateMigrationAsync(contextId, true, cancellationToken);
+
+    internal async Task<RepositoryMigrationUpdateResult?> UpdateMigrationAsync(string contextId, bool refreshDetails, CancellationToken cancellationToken)
     {
         RepositoryMigrationUpdateResult? outcome = null;
         await SerializeAsync(async token =>
@@ -114,7 +193,7 @@ public sealed class RepositoryDashboardState(
                 }
                 outcome = update;
                 UpdateResults = [CopyResult(update)];
-                await RefreshCoreAsync(true, token);
+                await RefreshCoreAsync(true, token, refreshDetails);
             }
             finally { IsUpdatingMigrations = false; }
         }, cancellationToken);
@@ -125,7 +204,10 @@ public sealed class RepositoryDashboardState(
     /// Applies pending migrations across all registered contexts in the facade's sequential order.
     /// A failed envelope is not a successful empty outcome; inspect MigrationCommandError before announcing success.
     /// </summary>
-    public async Task<IReadOnlyList<RepositoryMigrationUpdateResult>> UpdateAllPendingMigrationsAsync(CancellationToken cancellationToken = default)
+    public Task<IReadOnlyList<RepositoryMigrationUpdateResult>> UpdateAllPendingMigrationsAsync(CancellationToken cancellationToken = default) =>
+        UpdateAllPendingMigrationsAsync(true, cancellationToken);
+
+    internal async Task<IReadOnlyList<RepositoryMigrationUpdateResult>> UpdateAllPendingMigrationsAsync(bool refreshDetails, CancellationToken cancellationToken)
     {
         IReadOnlyList<RepositoryMigrationUpdateResult> outcomes = [];
         await SerializeAsync(async token =>
@@ -154,7 +236,7 @@ public sealed class RepositoryDashboardState(
                 }
                 outcomes = updates.Select(CopyResult).ToArray();
                 UpdateResults = outcomes;
-                await RefreshCoreAsync(true, token);
+                await RefreshCoreAsync(true, token, refreshDetails);
             }
             finally { IsUpdatingMigrations = false; }
         }, cancellationToken);
@@ -168,9 +250,27 @@ public sealed class RepositoryDashboardState(
         finally { _gate.Release(); }
     }
 
-    private async Task RefreshCoreAsync(bool keepSelection, CancellationToken token)
+    private async Task RefreshCoreAsync(bool keepSelection, CancellationToken token, bool refreshDetails = true)
     {
         var selectedId = keepSelection ? SelectedContext?.Registration.ContextId : null;
+        if (!await CaptureContextsAsync(token)) return;
+        SelectWorkspaceContext(selectedId, readActivity: false, useDefault: true);
+        if (refreshDetails) await LoadSelectedDetailsAsync(token);
+    }
+
+    private void SetReveal(bool reveal)
+    {
+        RevealConnectionStrings = reveal;
+        if (reveal) return;
+        var selectedId = SelectedContext?.Registration.ContextId;
+        Contexts = Contexts.Select(snapshot => snapshot.Connection?.IsRevealed == true
+            ? snapshot with { Connection = snapshot.Connection with { RevealedConnectionString = null } }
+            : snapshot).ToArray();
+        SelectedContext = SelectSnapshot(selectedId);
+    }
+
+    private async Task<bool> CaptureContextsAsync(CancellationToken token)
+    {
         IsLoadingContexts = true;
         ErrorMessage = null;
         try
@@ -179,14 +279,15 @@ public sealed class RepositoryDashboardState(
             token.ThrowIfCancellationRequested();
             var error = result.WithoutData();
             var snapshots = result.Data;
-            if (result.IsFailure()) { ErrorMessage = error.Message; return; }
-            if (snapshots is null) { ErrorMessage = "The repository context read returned no data."; return; }
+            if (result.IsFailure()) { ErrorMessage = error.Message; return false; }
+            if (snapshots is null) { ErrorMessage = "The repository context read returned no data."; return false; }
             Contexts = snapshots.Select(snapshot => snapshot with { Options = snapshot.Options.ToArray() }).ToArray();
             ContextsCapturedAt = DateTime.UtcNow;
-            SelectedContext = SelectSnapshot(selectedId) ?? Contexts.FirstOrDefault();
+            foreach (var id in _activitySamples.Keys.Where(id => SelectSnapshot(id) is null).ToArray())
+                _activitySamples.Remove(id);
+            return true;
         }
         finally { IsLoadingContexts = false; }
-        await LoadSelectedDetailsAsync(token);
     }
 
     private async Task LoadSelectedDetailsAsync(CancellationToken token)
@@ -199,33 +300,47 @@ public sealed class RepositoryDashboardState(
         IsLoadingDetails = true;
         try
         {
-            var migrationResult = await facade.GetMigrationStatusAsync(selected.Registration.ContextId, token);
-            token.ThrowIfCancellationRequested();
-            var migrationError = migrationResult.WithoutData();
-            var migrationStatus = migrationResult.Data;
-            var migrations = migrationResult.IsFailure() || migrationStatus is null
-                ? new RepositoryMigrationStatus { Registration = selected.Registration, ErrorMessage = migrationError.Message ?? "The migration status was unavailable." }
-                : migrationStatus with
-                {
-                    AllMigrations = migrationStatus.AllMigrations.ToArray(),
-                    AppliedMigrations = migrationStatus.AppliedMigrations.ToArray(),
-                    PendingMigrations = migrationStatus.PendingMigrations.ToArray()
-                };
-            var activityResult = await facade.GetActivityAsync(selected.Registration.ContextId, token);
-            token.ThrowIfCancellationRequested();
-            var activityError = activityResult.WithoutData();
-            var activity = activityResult.Data;
-            Activity = activityResult.IsFailure() || activity is null
-                ? new RepositoryActivityResult { Registration = selected.Registration, Support = RepositoryActivitySupport.Failed, Message = activityError.Message ?? "The repository activity was unavailable." }
-                : activity with { Rows = activity.Rows.Select(row => row with { }).ToArray() };
+            var migrations = selected.MigrationStatus ?? await ReadMigrationsAsync(selected, token);
+            AdoptActivity(await ReadActivityAsync(selected, token));
             MigrationStatus = migrations;
-            DetailsCapturedAt = DateTime.UtcNow;
         }
         finally { IsLoadingDetails = false; }
     }
 
     private RepositoryDbContextSnapshot? SelectSnapshot(string? id) => Contexts.FirstOrDefault(context =>
         string.Equals(context.Registration.ContextId, id, StringComparison.Ordinal));
+
+    private async Task<RepositoryMigrationStatus> ReadMigrationsAsync(RepositoryDbContextSnapshot selected, CancellationToken token)
+    {
+        var result = await facade.GetMigrationStatusAsync(selected.Registration.ContextId, token);
+        token.ThrowIfCancellationRequested();
+        if (result.IsFailure() || result.Data is not { } status)
+            return new RepositoryMigrationStatus { Registration = selected.Registration, ErrorMessage = result.WithoutData().Message ?? "The migration status was unavailable." };
+        return status with
+        {
+            AllMigrations = status.AllMigrations.ToArray(),
+            AppliedMigrations = status.AppliedMigrations.ToArray(),
+            PendingMigrations = status.PendingMigrations.ToArray()
+        };
+    }
+
+    private async Task<RepositoryActivityResult> ReadActivityAsync(RepositoryDbContextSnapshot selected, CancellationToken token)
+    {
+        var result = await facade.GetActivityAsync(selected.Registration.ContextId, token);
+        token.ThrowIfCancellationRequested();
+        if (result.IsFailure() || result.Data is not { } activity)
+            return new RepositoryActivityResult { Registration = selected.Registration, Support = RepositoryActivitySupport.Failed, Message = result.WithoutData().Message ?? "The repository activity was unavailable." };
+        return activity with { Rows = activity.Rows.ToArray() };
+    }
+
+    private void AdoptActivity(RepositoryActivityResult result)
+    {
+        var capturedAt = DateTime.UtcNow;
+        Activity = result;
+        DetailsCapturedAt = capturedAt;
+        RetainedActivityError = null;
+        _activitySamples[result.Registration.ContextId] = new ActivitySample(result, capturedAt);
+    }
     private static RepositoryMigrationUpdateResult CopyResult(RepositoryMigrationUpdateResult result) =>
         result with { AttemptedMigrations = result.AttemptedMigrations.ToArray() };
 }

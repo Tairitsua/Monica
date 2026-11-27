@@ -1,0 +1,78 @@
+@inject IStringLocalizer<RepositoryUIResource> L
+@using static Monica.Repository.UI.UIRepository.Support.RepositoryPresentation
+
+@{
+    var search = Workbench.Get("q");
+    var state = Workbench.Get("state");
+    var rows = Status.CurrentAssemblyMigrations.Where(item => Search(search, item.MigrationId)).ToArray();
+    var filtered = rows.Where(item => state is null || item.State.ToString() == state).ToArray();
+}
+<div class="rp-mig-split">
+    <section class="rp-mig-panel">
+        <div class="rp-mig-panel-head">
+            <h3>@L["Migrations:Lists:CurrentAssembly"] <span class="rp-tag mono">@Status.AllMigrations.Count</span></h3>
+            <p>@L["Persistence:AssemblyNote", Status.MigrationAssembly ?? "—"]</p>
+        </div>
+        <div class="rp-toolbar">
+            <RepositorySearch Label="@L["Persistence:MigrationSearch"]" Value="@search"
+                              Changed="@((string? value) => Workbench.Replace(("q", value)))" />
+            <div class="rp-chips" role="group" aria-label="@L["Persistence:State"]">
+                @foreach (var option in STATES)
+                {
+                    <MoFilterChip Label="@L[$"Migrations:States:{option}"]" Role="@MigrationRole(option)" Count="@rows.Count(item => option == item.State)"
+                                  ShowDot="true" Pill="true" Selected="@(option.ToString() == state)" SelectedChanged="@(_ => Workbench.Toggle("state", option.ToString()))" />
+                }
+            </div>
+        </div>
+        @if (Status.AllMigrations.Count == 0)
+        {
+            <MoContentState Compact="true">@L["Migrations:Lists:NoMigrations"]</MoContentState>
+        }
+        else if (filtered.Length == 0)
+        {
+            <MoContentState Compact="true"><p>@L["Persistence:MigrationNoMatch"]</p>
+                <MudButton Variant="Variant.Outlined" Size="Size.Small" OnClick="Clear">@L["Persistence:ClearFilters"]</MudButton>
+            </MoContentState>
+        }
+        else
+        {
+            @Ledger(filtered.Select(item => (item.MigrationId, L[$"Migrations:States:{item.State}"].Value, MigrationRole(item.State))))
+        }
+    </section>
+    <section class="rp-mig-panel">
+        <div class="rp-mig-panel-head">
+            <h3>@L["Migrations:Lists:ExternalApplied"] <span class="rp-tag mono">@External.Count</span></h3>
+            <p>@L["Migrations:Lists:ExternalAppliedDescription"]</p>
+        </div>
+        @if (External.Count == 0)
+        {
+            <MoContentState Compact="true">@L["Migrations:Lists:NoExternalApplied"]</MoContentState>
+        }
+        else
+        {
+            @Ledger(External.Select(id => (id, L["Persistence:ExternalState"].Value, MoVisualRole.Third)))
+        }
+        <p class="rp-scope-note"><MoIcon Icon="@MoIcons.History" Size="14px" />@L["Migrations:Summary:HistoryRows", Status.AppliedMigrations.Count]</p>
+    </section>
+</div>
+
+@code {
+    [Parameter, EditorRequired] public RepositoryWorkbench Workbench { get; set; } = null!;
+    [Parameter, EditorRequired] public RepositoryMigrationStatus Status { get; set; } = null!;
+    [Parameter, EditorRequired] public IReadOnlyList<string> External { get; set; } = [];
+    private static readonly RepositoryMigrationApplicationState[] STATES =
+        [RepositoryMigrationApplicationState.Pending, RepositoryMigrationApplicationState.Applied, RepositoryMigrationApplicationState.Unknown];
+    private void Clear() => Workbench.Replace(("q", null), ("state", null));
+    private RenderFragment Ledger(IEnumerable<(string Id, string Label, MoVisualRole Role)> rows) => @<div class="rp-table-wrap">
+        <table class="rp-table rp-mig-table">
+            <thead><tr><th scope="col">@L["Persistence:MigrationId"]</th><th scope="col">@L["Persistence:State"]</th></tr></thead>
+            <tbody>
+                @foreach (var (id, label, role) in rows)
+                {
+                    <tr><td data-label="@L["Persistence:MigrationId"]"><code>@id</code></td>
+                        <td data-label="@L["Persistence:State"]"><span class="rp-pill rp-pill-xs @role.ToCssClass()"><i class="rp-swatch"></i>@label</span></td></tr>
+                }
+            </tbody>
+        </table>
+    </div>;
+}

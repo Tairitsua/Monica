@@ -1,0 +1,30 @@
+<div class="rp-decision">
+    <div class="rp-decision-value">
+        <p class="rp-display-label">@Label</p>
+        <div class="rp-display-line">
+            <MoDisplayValue Value="@Value" Unit="@Population" Compact="true" />
+            @if (!string.IsNullOrEmpty(Annotation))
+            {
+                <span class="rp-pill rp-pill-xs is-hatch mo-vl-role--error">@Annotation</span>
+            }
+        </div>
+        <div class="rp-reasons">
+            @foreach (var (label, role, number) in Reasons)
+            {
+                <span class="@role.ToCssClass() @(number == "0" ? "is-zero" : null)">
+                    <i class="rp-swatch @(role == MoVisualRole.Error ? "is-diamond" : null)" aria-hidden="true"></i>@label <b class="mono">@number</b>
+                </span>
+            }
+        </div>
+    </div>
+    <div class="rp-finding">@ChildContent</div>
+</div>
+
+@code {
+    [Parameter, EditorRequired] public string Label { get; set; } = "";
+    [Parameter, EditorRequired] public string Value { get; set; } = "";
+    [Parameter, EditorRequired] public string Population { get; set; } = "";
+    [Parameter] public string? Annotation { get; set; }
+    [Parameter, EditorRequired] public IReadOnlyList<(string Label, MoVisualRole Role, string Count)> Reasons { get; set; } = [];
+    [Parameter, EditorRequired] public RenderFragment? ChildContent { get; set; }
+}

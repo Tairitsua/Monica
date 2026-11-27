@@ -1,0 +1,15 @@
+<dl class="rp-facts" aria-label="@Label">
+    @foreach (var (label, value, sub, role) in Items)
+    {
+        <div class="@role.ToCssClass()">
+            <dt><i class="rp-swatch" aria-hidden="true"></i>@label</dt>
+            <dd>@value</dd>
+            @if (!string.IsNullOrEmpty(sub)) { <dd class="rp-fact-sub">@sub</dd> }
+        </div>
+    }
+</dl>
+
+@code {
+    [Parameter, EditorRequired] public string Label { get; set; } = "";
+    [Parameter, EditorRequired] public IReadOnlyList<(string Label, string Value, string Sub, MoVisualRole Role)> Items { get; set; } = [];
+}

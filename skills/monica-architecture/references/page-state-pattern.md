@@ -26,7 +26,7 @@ services.AddScoped<RepositoryDashboardState>();
 
 Place feature state in `UI{Name}/State/`. Inject infrastructure facades directly; do not add a `*UIService` wrapper that merely forwards the same calls. Keep route pages as composition and query-parameter shells, and pass evidence or callbacks to children with parameters and `EventCallback`.
 
-`RepositoryDashboardState` is a concrete example: it owns detached context evidence, selection, and migration outcomes, serializes reads and commands, and accepts each consuming component's cancellation token. Its four routed workbenches own cancellation and disposal separately. See [Repository diagnostics](../../monica-infra-persistence/references/repository-diagnostics.md) for that feature's routes and data semantics.
+`RepositoryDashboardState` owns detached context evidence, selection, and migration outcomes, serializes reads and commands, and accepts each consuming component's cancellation token. The three routed workbenches own cancellation and disposal separately. See [Repository diagnostics](../../monica-infra-persistence/references/repository-diagnostics.md) for the routes and data semantics.
 
 For transitions that must remain ordered, admit the complete read or command through one state gate. Freeze the operation's identity before awaiting, use the caller token for provider work, and recheck it before adoption. Releasing the gate only after the actual operation completes protects a later route from adopting an earlier route's stale result. Circuit serialization does not provide cross-user, cross-process, or distributed command exclusion.
 

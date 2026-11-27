@@ -1,0 +1,123 @@
+@inject IStringLocalizer<RepositoryUIResource> L
+@using static Monica.Repository.UI.UIRepository.Support.RepositoryPresentation
+
+@{
+    var count = Rows.Count;
+    var selected = Rows.Count(row => InDatabase(row, Database));
+    var other = count - selected;
+    var scope = Workbench.Get("scope");
+    var selectedPercent = count == 0 ? 0 : 100d * selected / count;
+    var index = 0;
+}
+<div class="rp-ruler" data-rp-keyboard>
+    <div class="rp-instrument-heading">
+        <div><h2>@L["Persistence:RulerTitle"]</h2><p>@L["Persistence:RulerDescription"]</p></div>
+        <div class="rp-legend">
+            <span class="mo-vl-role--info"><i class="rp-swatch is-circle"></i>@L["Persistence:SelectedDatabase"]</span>
+            <span class="mo-vl-role--third"><i class="rp-swatch is-circle is-hollow"></i>@L["Persistence:OtherDatabases"]</span>
+            <span class="mo-vl-role--error"><i class="rp-swatch is-diamond"></i>@WaitingLabel</span>
+        </div>
+    </div>
+    <div class="rp-scope-bar">
+        <div class="rp-chips" role="group" aria-label="@L["Persistence:SessionScope"]">
+            <MoFilterChip Role="MoVisualRole.Primary" Pill="true" Label="@L["Workbench:Activity:VisibleScope"]" Count="count" Selected="@(scope is null)"
+                          SelectedChanged="@(_ => Workbench.Replace(("scope", null)))" />
+            <MoFilterChip Role="MoVisualRole.Info" Pill="true" ShowDot="true" Label="@L["Persistence:SelectedDatabaseChip", Database ?? "—"]" Count="selected"
+                          Selected="@(scope == "selected")" SelectedChanged="@(_ => Workbench.Toggle("scope", "selected"))" />
+            <MoFilterChip Role="MoVisualRole.Third" Pill="true" ShowDot="true" Label="@L["Persistence:OtherDatabases"]" Count="other"
+                          Selected="@(scope == "other")" SelectedChanged="@(_ => Workbench.Toggle("scope", "other"))" />
+        </div>
+        <div class="rp-scope-meter" aria-hidden="true">
+            <i class="mo-vl-role--info" style="width:@CssPercent(selectedPercent)"></i>
+            <i class="mo-vl-role--third is-hollow" style="width:@CssPercent(count == 0 ? 0 : 100 - selectedPercent)"></i>
+        </div>
+    </div>
+    <div class="rp-ruler-lanes">
+        <div class="rp-ruler-axis-row">
+            <span class="rp-ruler-axis-title">@L["Persistence:RulerAxis"]</span>
+            <div class="rp-ruler-axis-track">
+                @foreach (var (ms, label) in TICKS)
+                {
+                    <span class="rp-ruler-tick" style="left:@TickPosition(ms)">@label</span>
+                }
+            </div>
+        </div>
+        @foreach (var lane in LANES)
+        {
+            var items = Rows.Where(row => (lane.Key == "waiting" ? row.Waiting == true :
+                    lane.Key == "idle" ? SessionState(row) is "idle" or "other" : SessionState(row) == lane.Key))
+                .Where(row => scope switch { "selected" => InDatabase(row, Database), "other" => !InDatabase(row, Database), _ => true })
+                .OrderBy(row => row.Runtime).ToArray();
+            var label = lane.Key == "waiting" ? WaitingLabel : L[$"Persistence:SessionStates:{lane.Key}"].Value;
+            <div class="rp-ruler-lane @(lane.Key == "waiting" ? "is-overlap" : null)" data-rp-lane>
+                <div class="rp-ruler-label @lane.Role.ToCssClass()">
+                    <i class="rp-swatch @(lane.Key == "waiting" ? "is-diamond" : "is-circle")"></i><b>@label</b>
+                    @if (lane.Key == "waiting") { <span class="rp-overlap-tag">@L["Persistence:Overlap"]</span> }
+                </div>
+                <div class="rp-ruler-track">
+                    @foreach (var (ms, _) in TICKS.Skip(1).SkipLast(1))
+                    {
+                        <i class="rp-ruler-grid" style="left:@TickPosition(ms)" aria-hidden="true"></i>
+                    }
+                    @if (lane.Threshold is { } threshold)
+                    {
+                        <i class="rp-ruler-thresh mo-vl-role--warning" style="left:@TickPosition(threshold)"
+                           title="@L["Persistence:RulerThreshold", Duration(TimeSpan.FromMilliseconds(threshold), L)]"></i>
+                    }
+                    @foreach (var row in items)
+                    {
+                        var position = AgePosition(row.Runtime);
+                        var role = lane.Key == "waiting" ? MoVisualRole.Error : !InDatabase(row, Database) ? MoVisualRole.Third : SessionRole(row);
+                        var rowLabel = $"{row.BackendId ?? "—"} · {row.DatabaseName ?? "—"} · {Duration(row.Runtime, L)}";
+                        var hollow = !InDatabase(row, Database);
+                        var diamond = row.Waiting == true;
+                        var slot = index++;
+                        var style = $"left:{CssPercent(position)};--rp-mark-offset:{(slot % 3 - 1) * 5}px";
+                        if (row.BackendId is { } id)
+                        {
+                            <a href="@Workbench.Url(("inspectSession", id), ("guide", null))"
+                               class="@MarkClass(role, hollow, diamond, id == Workbench.Get("inspectSession"))"
+                               style="@style" data-rp-mark="@position.ToString(System.Globalization.CultureInfo.InvariantCulture)"
+                               tabindex="@(slot == 0 ? 0 : -1)" aria-label="@rowLabel" title="@rowLabel" @onfocus="@(() => _focus = row)"></a>
+                        }
+                        else
+                        {
+                            <i class="@MarkClass(role, hollow, diamond, false)" style="@style" title="@rowLabel" aria-hidden="true"></i>
+                        }
+                    }
+                </div>
+                <b class="rp-ruler-count mono">@items.Length</b>
+            </div>
+        }
+    </div>
+    <div class="rp-readout" aria-live="polite">
+        <MoIcon Icon="@MoIcons.Info" Size="14px" />
+        @if (_focus is { } focus)
+        {
+            <strong>#@focus.BackendId</strong><span>@focus.DatabaseName · @L[$"Persistence:SessionStates:{SessionState(focus)}"] · @Duration(focus.Runtime, L)</span>
+        }
+        else
+        {
+            <span>@L["Persistence:RulerKeyboard"]</span>
+        }
+    </div>
+</div>
+
+@code {
+    [Parameter, EditorRequired] public RepositoryWorkbench Workbench { get; set; } = null!;
+    [Parameter, EditorRequired] public IReadOnlyList<RepositoryActivityRow> Rows { get; set; } = [];
+    [Parameter] public string? Database { get; set; }
+    [Parameter] public bool Postgres { get; set; }
+
+    private RepositoryActivityRow? _focus;
+    private string WaitingLabel => L[Postgres ? "Workbench:Activity:LockWait" : "Workbench:Activity:Waiting"];
+    private static readonly (int Ms, string Label)[] TICKS = [(100, "0.1s"), (1000, "1s"), (10_000, "10s"), (60_000, "1m"), (600_000, "10m"), (3_600_000, "1h+")];
+    private static readonly (string Key, MoVisualRole Role, int? Threshold)[] LANES =
+    [
+        ("waiting", MoVisualRole.Warning, null), ("idleTx", MoVisualRole.Warning, 300_000),
+        ("active", MoVisualRole.Info, 30_000), ("idle", MoVisualRole.Neutral, null)
+    ];
+    private static string TickPosition(int ms) => CssPercent(ms == 100 ? 0 : ms == 3_600_000 ? 100 : AgePosition(TimeSpan.FromMilliseconds(ms)));
+    private static string MarkClass(MoVisualRole role, bool hollow, bool diamond, bool selected) =>
+        $"rp-ruler-mark {role.ToCssClass()} {(hollow ? "is-hollow" : "")} {(diamond ? "is-diamond" : "")} {(selected ? "is-selected" : "")}";
+}

@@ -3,11 +3,8 @@
 @inject IStringLocalizer<RepositoryUIResource> L
 
 <PageTitle>@L["Workbench:Views:Activity:Title"]</PageTitle>
-<RepositoryWorkbench View="Activity" ContextId="@ContextId" />
+<RepositoryWorkbench View="Activity" />
 
 @code {
     public const string PAGE_URL = "/repository-dashboard/activity";
-
-    [SupplyParameterFromQuery(Name = "context")]
-    public string? ContextId { get; set; }
 }
