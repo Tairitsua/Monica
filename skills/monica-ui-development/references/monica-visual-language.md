@@ -68,13 +68,14 @@ Not allowed: multi-hue decorative gradients, and gradients on controls, filters,
 
 ### Selection and surface edge accents
 
-Never combine a thickened left or inline-start accent border (`border-left` / `border-inline-start` of `2px` or more, or `box-shadow: inset 2px+ 0 0`) with a rounded corner (`border-radius > 0`), or on the first/last row inside a rounded `overflow: hidden` container where corner clipping turns the accent bar into curved slivers. This applies to selected list items, option pickers, cards, callouts, notices, and highlighted form rows.
+Never combine a thickened left or inline-start accent border (`border-left` / `border-inline-start` of `2px` or more, or `box-shadow: inset 2px+ 0 0`) with a rounded corner (`border-radius > 0`), or on the first/last row inside a rounded `overflow: hidden` container where corner clipping turns the accent bar into curved slivers. This ban covers selected list items, option pickers, cards, callouts, notices, and highlighted form rows.
 
-Instead:
+The ban rules out that distorted geometry rather than prescribing a single replacement recipe. Pick whichever corner-clean treatment best fits the component's role, hierarchy, and density — for example:
 
-- For rounded selectable items, cards, callouts, and highlighted rows, use a uniform full-perimeter hairline ring (`inset 0 0 0 1px color-mix(...)`) with a soft tonal fill, optional subtle elevation (`--mo-shadow-rest`), and role-tinted title ink when selected.
-- When a directional marker is needed beside a rounded item, draw a detached inset vertical pill (`::before`) kept clear of the corner radii (as in the shell tree) rather than hugging the rounded edge.
-- Reserve flush straight left accent bars strictly for square (`border-radius: 0`) table or ledger rows that never meet a rounded corner.
+- A soft tonal fill paired with role-tinted label ink, a check mark, status dot, or icon (for lightweight lists, menus, and rails).
+- An elevated surface with a uniform full-perimeter hairline ring (`inset 0 0 0 1px color-mix(...)`) and optional subtle elevation (`--mo-shadow-rest`) (for pickers, cards, callouts, or emphasized form rows).
+- A detached inset vertical pill (`::before`) kept clear of corner radii (as in the shell tree), or an internal status badge, swatch, icon tile, or header tint when encoding category or state on an object card.
+- A straight flush left accent bar strictly on square (`border-radius: 0`) table or ledger rows that never meet a rounded corner.
 
 ## Scale tiers
 
