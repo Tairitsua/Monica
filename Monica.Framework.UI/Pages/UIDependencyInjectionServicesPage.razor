@@ -1,0 +1,9 @@
+@attribute [Route(PAGE_URL)]
+@using Monica.Framework.UI.UIDependencyInjection.Components
+
+<DependencyInjectionWorkbench Services="true" />
+
+@code {
+    /// <summary>The canonical URL for the dependency-injection service registry.</summary>
+    public const string PAGE_URL = "/dependency-injection/services";
+}

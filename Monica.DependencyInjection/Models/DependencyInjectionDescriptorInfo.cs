@@ -12,6 +12,10 @@ public sealed class DependencyInjectionDescriptorInfo
     /// </summary>
     public required int Index { get; init; }
 
+    /// <summary>Gets the first index of this exact service type and key within the snapshot.</summary>
+    /// <remarks>Display text can coincide for unequal service keys. This index distinguishes those identities.</remarks>
+    public required int ServiceIdentityIndex { get; init; }
+
     /// <summary>
     /// Gets the full service type name.
     /// </summary>
@@ -47,6 +51,9 @@ public sealed class DependencyInjectionDescriptorInfo
     /// </summary>
     public required DependencyInjectionDescriptorImplementationKind ImplementationKind { get; init; }
 
+    /// <summary>Gets how the descriptor activates the implementation without invoking the service or factory.</summary>
+    public required DependencyInjectionActivation Activation { get; init; }
+
     /// <summary>
     /// Gets the full implementation type name when it can be resolved without invoking factories.
     /// </summary>
@@ -73,9 +80,13 @@ public sealed class DependencyInjectionDescriptorInfo
     public bool IsOpenGeneric { get; init; }
 
     /// <summary>
-    /// Gets whether Monica conventional registration created this descriptor.
+    /// Gets whether the snapshot attributes this descriptor to conventional registration.
     /// </summary>
     public bool IsAutoRegistered { get; init; }
+
+    /// <summary>Gets whether the finalized descriptor is the same descriptor the registrar created.</summary>
+    /// <remarks>False for both unattributed descriptors and logical matches of a conventional descriptor.</remarks>
+    public bool IsDirectConventionMatch { get; init; }
 
     /// <summary>
     /// Gets the associated conventional-registration details when available.

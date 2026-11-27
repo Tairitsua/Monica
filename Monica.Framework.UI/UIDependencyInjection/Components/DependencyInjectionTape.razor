@@ -1,0 +1,396 @@
+@inject IStringLocalizer<DependencyInjectionResource> L
+@inject IJSRuntime JS
+@implements IAsyncDisposable
+
+<div class="di-tape" @ref="_root" data-count="@Model.Descriptors.Length">
+    <div class="di-tape-head">
+        <div><h3 id="di-tape-title">@L["Workbench:TapeTitle"]</h3><p>@L["Workbench:TapeNote", Model.Descriptors.Length]</p></div>
+        <div class="legend">
+            <span><i class="swatch role-info" aria-hidden="true"></i>@L["Workbench:Legend:Auto"]</span>
+            <span><i class="di-sw-other" aria-hidden="true"></i>@L["Workbench:Legend:Other"]</span>
+            @if (_tape.Arcs.Any(a => a.Reason != ConventionFinding.RegisteredTwice))
+            {
+                <span><i class="di-sw-arc role-warning" aria-hidden="true"></i>@L["Workbench:Legend:Elsewhere"]</span>
+            }
+            @if (_tape.Arcs.Any(a => a.Reason == ConventionFinding.RegisteredTwice))
+            {
+                <span><i class="di-sw-arc is-dashed role-warning" aria-hidden="true"></i>@L["Workbench:Legend:Twice"]</span>
+            }
+            @if (_tape.Replaced.Length > 0) { <span><i class="swatch role-third is-diamond" aria-hidden="true"></i>@L["Workbench:Legend:Replaced"]</span> }
+            @if (_tape.Advisory.Length > 0) { <span><i class="di-sw-adv" aria-hidden="true"></i>@L["Workbench:Legend:Advisory"]</span> }
+            @if (_tape.Missing.Length > 0) { <span><i class="swatch is-hatch" aria-hidden="true"></i>@L["Workbench:Legend:NotIn"]</span> }
+        </div>
+    </div>
+    @if (Model.Descriptors.Length == 0 && _tape.Missing.Length == 0)
+    {
+        <MoContentState Class="di-none" Compact="true"><p>@L["Workbench:EmptyRegistry"]</p></MoContentState>
+    }
+    else
+    {
+        <div class="di-tape-body @(_tape.Missing.Length > 0 ? "has-missing" : null)">
+            <svg class="di-tape-labels" width="100%" height="208" aria-hidden="true">
+                @SvgLabel(19, L["Workbench:Lanes:Segments"])
+                @SvgLabel(74, L["Workbench:Lanes:Arcs"])
+                @SvgLabel(99, L["Workbench:Lanes:Auto"])
+                @SvgLabel(119, L["Workbench:Lanes:Advisory"], "is-advisory")
+                @for (var i = 0; i < Lifetimes.Length; i++)
+                {
+                    @SvgLabel(140 + i * 18, Lifetime(L, Lifetimes[i]))
+                }
+            </svg>
+            <div class="di-tape-viewport" id="di-registration-tape" role="region" aria-labelledby="di-tape-title" aria-describedby="di-tape-readout" tabindex="0">
+                <div class="di-tape-track @(HighlightedFinding is not null ? "has-highlight" : null)">
+                    <svg class="di-tape-svg" width="100%" height="208" viewBox="@($"0 0 {IndexExtent} 208")"
+                         preserveAspectRatio="none" aria-hidden="true">
+                        @for (var i = 0; i < Lifetimes.Length; i++)
+                        {
+                            var y = 130 + i * 18;
+                            <rect x="0" y="@y" width="@IndexExtent" height="12" class="di-t-lane" />
+                            @foreach (var run in _tape.Lifetimes[i])
+                            {
+                                <rect x="@run.From" y="@y" width="@(run.To - run.From + 1)" height="12" class="di-t-lt role-third" />
+                            }
+                        }
+                        @foreach (var segment in _tape.Segments.Skip(1))
+                        {
+                            <line x1="@segment.From" x2="@segment.From" y1="36" y2="186" class="di-t-grid" vector-effect="non-scaling-stroke" />
+                        }
+                        <rect x="0" y="84" width="@IndexExtent" height="22" class="di-t-other" />
+                        @foreach (var run in _tape.Conventional)
+                        {
+                            <rect x="@run.From" y="84" width="@(run.To - run.From + 1)" height="22" class="di-t-auto role-info" />
+                        }
+                        @foreach (var index in _tape.Advisory)
+                        {
+                            <rect x="@index" y="113" width="1" height="6" class="di-t-adv role-warning" />
+                        }
+                        @if (_range is { } range)
+                        {
+                            <rect x="@range.From" y="36" width="@(range.To - range.From + 1)" height="150" class="di-t-range role-primary"
+                                  vector-effect="non-scaling-stroke" />
+                        }
+                        @for (var i = 0; i < _tape.Arcs.Length; i++)
+                        {
+                            var arc = _tape.Arcs[i];
+                            var path = ArcPath(arc);
+                            <g class="di-t-arc @CssRole(FindingRole(arc.Reason)) @HighlightClass(arc)" data-arc-index="@i">
+                                <path d="@path" class="di-t-arc-line @(arc.Reason == ConventionFinding.RegisteredTwice ? "is-dashed" : null)"
+                                      vector-effect="non-scaling-stroke" />
+                                <path d="@path" class="di-t-arc-hit" data-arc-index="@i" vector-effect="non-scaling-stroke" />
+                            </g>
+                        }
+                        @if (_hover >= 0 && _range is null)
+                        {
+                            <line x1="@G(_hover + .5)" x2="@G(_hover + .5)" y1="36" y2="186" class="di-t-cross" vector-effect="non-scaling-stroke" />
+                        }
+                    </svg>
+                    @if (Model.Descriptors.Length > 0)
+                    {
+                        <div class="di-tape-hit" tabindex="-1"></div>
+                    }
+                    <div class="di-seg-strip" role="toolbar" aria-label="@L["Workbench:SegmentLabel"]">
+                        @for (var i = 0; i < _tape.Segments.Length; i++)
+                        {
+                            var segment = _tape.Segments[i];
+                            <button type="button" class="di-seg-btn @(i % 2 != 0 ? "is-alt" : null) @(_activeSegment == segment ? "is-focus" : null)"
+                                    tabindex="@(i == 0 ? "0" : "-1")" style="@($"left:{Percent(segment.From)};width:{Percent(segment.Count)}")"
+                                    aria-label="@($"{SegmentCaption(segment)}. {L["Workbench:SegmentAction"]}")"
+                                    @onfocus="() => ReadSegment(segment, true)" @onblur="ClearReadout"
+                                    @onmouseenter="() => ReadSegment(segment, false)" @onmouseleave="ClearReadout"
+                                    @onclick="() => OpenRange.InvokeAsync((segment.From, segment.To))">
+                                <span class="di-seg-label"><b>@Family(segment)</b><span>@segment.Count</span></span>
+                            </button>
+                        }
+                    </div>
+                    @foreach (var index in _tape.Replaced)
+                    {
+                        <i class="di-t-diamond role-third" style="@($"left:{Percent(index + .5)}")" aria-hidden="true"></i>
+                    }
+                    @for (var i = 0; i < _tape.Arcs.Length; i++)
+                    {
+                        var arc = _tape.Arcs[i];
+                        var role = CssRole(FindingRole(arc.Reason));
+                        var highlighted = HighlightClass(arc);
+                        var label = ArcCaption(arc);
+                        <span class="di-arc-origin @role @highlighted" style="@($"left:{Percent(arc.From + .5)}")" aria-hidden="true"></span>
+                        <button type="button" class="di-arc-btn @role @highlighted" data-arc-index="@i"
+                                data-implementation="@arc.Type" data-from="@arc.From" data-to="@arc.To"
+                                style="@($"left:{Percent(arc.To + .5)};width:min(20px, {Percent(_targetGaps[arc.To])})")"
+                                aria-label="@label" title="@label"
+                                @onfocus="() => ReadArc(arc)" @onblur="ClearReadout" @onmouseenter="() => ReadArc(arc)"
+                                @onmouseleave="ClearReadout" @onclick="() => OpenImplementation.InvokeAsync(arc.Type)"></button>
+                    }
+                    <div class="di-tape-axis" aria-hidden="true"></div>
+                </div>
+            </div>
+            @if (_tape.Missing.Length > 0)
+            {
+                <div class="di-tape-missing">
+                    <span class="di-bin-count" aria-hidden="true">@_tape.Missing.Length</span>
+                    <div class="di-bin-buttons">
+                        @foreach (var implementation in _tape.Missing)
+                        {
+                            var label = $"{implementation.Display} · {Reason(L, ConventionFinding.NotRegistered)}";
+                            <button type="button" class="di-bin-btn role-error" aria-label="@label" title="@label"
+                                    @onfocus="() => _readout = label" @onblur="ClearReadout"
+                                    @onclick="() => OpenImplementation.InvokeAsync(implementation.Type)">
+                                <MoIcon Icon="@MoIcons.Error" Size="12px" /><span>@implementation.Display</span>
+                            </button>
+                        }
+                    </div>
+                </div>
+            }
+        </div>
+        <div class="di-tape-caption">
+            <p id="di-tape-readout" class="mono" aria-live="polite">@Caption</p>
+            @if (_range is { } selected)
+            {
+                <span class="di-tape-actions">
+                    <button type="button" class="di-btn is-soft is-small" @onclick="() => OpenRange.InvokeAsync(selected)"><MoIcon Icon="@MoIcons.ListTree" Size="14px" />@L["Workbench:OpenRange"]</button>
+                    <button type="button" class="di-btn is-ghost is-small" @onclick="ClearRange">@L["Workbench:ClearRange"]</button>
+                </span>
+            }
+            else if (_activeSegment is not null)
+            {
+                <span class="di-tape-hint">@L["Workbench:SegmentAction"]</span>
+            }
+            @if (_locatedFinding is not null)
+            {
+                <button type="button" class="di-btn is-ghost is-small" @onclick="ClearFinding">@L["Workbench:Zoom:ClearHighlight"]</button>
+            }
+            @if (Model.Descriptors.Length > 1)
+            {
+                <div class="di-tape-zoom" role="group" aria-label="@L["Workbench:Zoom:Label"]">
+                    <button type="button" class="di-btn is-small" data-tape-zoom="out" aria-label="@L["Workbench:Zoom:Out"]" title="@L["Workbench:Zoom:Out"]" aria-disabled="true">
+                        <MoIcon Icon="@MoIcons.ZoomOut" Size="14px" />
+                    </button>
+                    <button type="button" class="di-btn is-small mono" data-tape-zoom="fit" aria-label="@L["Workbench:Zoom:Fit"]" title="@L["Workbench:Zoom:Fit"]" aria-disabled="true">
+                        <span data-tape-scale>@(1d.ToString("P0", CultureInfo.CurrentCulture))</span>
+                    </button>
+                    <button type="button" class="di-btn is-small" data-tape-zoom="in" aria-label="@L["Workbench:Zoom:In"]" title="@L["Workbench:Zoom:In"]">
+                        <MoIcon Icon="@MoIcons.ZoomIn" Size="14px" />
+                    </button>
+                </div>
+            }
+        </div>
+    }
+</div>
+
+@code {
+    internal const string ModulePath = "./_content/Monica.Framework.UI/UIDependencyInjection/Components/DependencyInjectionTape.razor.js";
+
+    [Parameter, EditorRequired] public DependencyInjectionWorkbenchSnapshot Model { get; set; } = default!;
+    [Parameter, EditorRequired] public EventCallback<string> OpenImplementation { get; set; }
+    [Parameter, EditorRequired] public EventCallback<ServiceIdentity> OpenIdentity { get; set; }
+    [Parameter, EditorRequired] public EventCallback<(int From, int To)> OpenRange { get; set; }
+
+    private RegistrationTape _tape = default!;
+    private Dictionary<int, int> _targetGaps = [];
+    private ElementReference _root;
+    private DotNetObjectReference<DependencyInjectionTape>? _reference;
+    private Task? _binding;
+    private IJSObjectReference? _module;
+    private int _hover = -1;
+    private (int From, int To)? _range;
+    private RegistrationTape.Segment? _activeSegment;
+    private string? _readout;
+    private string? _hoveredFinding, _focusedFinding, _locatedFinding;
+    private bool _disposed;
+
+    private int IndexExtent => Math.Max(1, Model.Descriptors.Length);
+    private string? HighlightedFinding => _hoveredFinding ?? _focusedFinding ?? _locatedFinding;
+
+    protected override void OnInitialized()
+    {
+        // The composition keys this component by snapshot. A new snapshot gets a fresh viewport and selection.
+        _tape = new(Model);
+        var targets = _tape.Arcs.Select(arc => arc.To).Distinct().Order().ToArray();
+        for (var i = 0; i < targets.Length; i++)
+        {
+            var leftGap = i > 0 ? targets[i] - targets[i - 1] : IndexExtent;
+            var rightGap = i + 1 < targets.Length ? targets[i + 1] - targets[i] : IndexExtent;
+            _targetGaps[targets[i]] = Math.Min(leftGap, rightGap);
+        }
+    }
+
+    protected override Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender && Model.Descriptors.Length > 0 && !_disposed)
+        {
+            _binding = BindAsync();
+            return _binding;
+        }
+
+        return Task.CompletedTask;
+    }
+
+    private async Task BindAsync()
+    {
+        try
+        {
+            _module = await JS.InvokeAsync<IJSObjectReference>("import", ModulePath);
+            if (!_disposed)
+            {
+                _reference = DotNetObjectReference.Create(this);
+                await _module.InvokeVoidAsync("bindTape", _root, _reference);
+            }
+        }
+        catch (JSDisconnectedException) { }
+    }
+
+    internal async Task PreviewFindingAsync((string Implementation, bool IsFocus, bool Active) change)
+    {
+        var previous = HighlightedFinding;
+        if (change.IsFocus)
+        {
+            _focusedFinding = PreviewValue(_focusedFinding, change.Implementation, change.Active);
+        }
+        else
+        {
+            _hoveredFinding = PreviewValue(_hoveredFinding, change.Implementation, change.Active);
+        }
+
+        if (HighlightedFinding is { } next && next != previous)
+        {
+            ClearReadout();
+            _hover = -1;
+            await RevealFindingAsync(next, false);
+        }
+        else if (previous != HighlightedFinding)
+        {
+            StateHasChanged();
+        }
+    }
+
+    internal Task LocateFindingAsync(string implementation)
+    {
+        _locatedFinding = implementation;
+        ClearReadout();
+        ClearRange();
+        return RevealFindingAsync(implementation, true);
+    }
+
+    private async Task RevealFindingAsync(string implementation, bool moveFocus)
+    {
+        if (_disposed) { return; }
+        StateHasChanged();
+        if (_module is not null)
+        {
+            try
+            {
+                await _module.InvokeVoidAsync("revealTapeFinding", _root, implementation, moveFocus);
+            }
+            catch (JSDisconnectedException) { }
+        }
+    }
+
+    private static string? PreviewValue(string? current, string implementation, bool active)
+        => active ? implementation : current == implementation ? null : current;
+
+    [JSInvokable]
+    public Task ReadPointer(int hover, int from, int to, bool open) => InvokeAsync(async () =>
+    {
+        if (_disposed) { return; }
+        _hover = hover;
+        if (from >= 0)
+        {
+            _range = (from, to);
+        }
+        else if (open)
+        {
+            ClearRange();
+            if (hover >= 0 && hover < Model.Descriptors.Length)
+            {
+                await OpenIdentity.InvokeAsync(Model.Identities[Model.Descriptors[hover].ServiceIdentityIndex]);
+            }
+        }
+
+        if (!_disposed) { StateHasChanged(); }
+    });
+
+    private string Caption => _range is { } range ? L["Workbench:Caption:Range", range.From, range.To, range.To - range.From + 1]
+        : _hover >= 0 && _hover < Model.Descriptors.Length ? DescriptorCaption(Model.Descriptors[_hover])
+        : _readout ?? FindingCaption() ?? L["Workbench:Caption:Idle"].Value;
+
+    private string? FindingCaption()
+    {
+        if (HighlightedFinding is not { } implementation)
+        {
+            return null;
+        }
+
+        var arcs = _tape.Arcs.Where(arc => arc.Type == implementation).ToArray();
+        return arcs.Length switch
+        {
+            0 => null,
+            1 => ArcCaption(arcs[0]),
+            _ => L["Workbench:Caption:FindingArcs", arcs.Length, arcs[0].Display].Value
+        };
+    }
+
+    private string ArcCaption(RegistrationTape.Arc arc) => arc.Reason == ConventionFinding.RegisteredTwice
+        ? L["Workbench:Caption:ArcRepeat", arc.Display, arc.From, arc.To]
+        : L["Workbench:Caption:Arc", arc.Display, arc.From, arc.To];
+
+    private string DescriptorCaption(DependencyInjectionDescriptorInfo descriptor)
+    {
+        var implementation = Implementation(L, descriptor);
+        var name = descriptor.ServiceTypeDisplayName;
+        return L["Workbench:Caption:Descriptor", descriptor.Index, name, implementation == name ? "" : $" → {implementation}",
+            Lifetime(L, descriptor.Lifetime), Activation(L, descriptor.Activation),
+            descriptor.IsAutoRegistered ? L["Workbench:Caption:ConventionalSuffix"].Value : ""];
+    }
+
+    private string SegmentCaption(RegistrationTape.Segment segment) => L["Workbench:Caption:Segment", segment.From, segment.To,
+        Family(segment), segment.Count, segment.Conventional > 0 ? L["Workbench:Caption:SegmentAuto", segment.Conventional].Value : "",
+        string.Join(" · ", Lifetimes.Select((l, i) => $"{Lifetime(L, l)} {segment.Lifetimes[i]}"))];
+
+    private static string Family(RegistrationTape.Segment s) => s.Mixed ? s.Family + "+" : s.Family;
+    private void ReadSegment(RegistrationTape.Segment segment, bool focus)
+    {
+        _hover = -1;
+        if (focus) { _range = null; }
+        _activeSegment = segment;
+        _readout = SegmentCaption(segment);
+    }
+
+    private void ReadArc(RegistrationTape.Arc arc)
+    {
+        _hover = -1;
+        _readout = ArcCaption(arc);
+    }
+
+    private void ClearReadout() { _activeSegment = null; _readout = null; }
+    private void ClearRange() { _range = null; _hover = -1; }
+    private void ClearFinding() { _locatedFinding = null; ClearReadout(); }
+
+    private string? HighlightClass(RegistrationTape.Arc arc) => arc.Type == HighlightedFinding ? "is-highlighted" : null;
+    private string ArcPath(RegistrationTape.Arc arc)
+    {
+        var from = arc.From + .5;
+        var to = arc.To + .5;
+        var height = 12 + Math.Min(26, Math.Abs(to - from) / IndexExtent * 250);
+        return $"M{G(from)},80 Q{G((from + to) / 2)},{G(80 - 2 * height)} {G(to)},80";
+    }
+
+    private string Percent(double index) => $"{G(100 * index / IndexExtent)}%";
+    private static string G(double value) => value.ToString("0.######", CultureInfo.InvariantCulture);
+    private static RenderFragment SvgLabel(int y, string label, string? css = null)
+        => @<g><text x="0" y="@y" class="di-t-label @css">@label</text></g>;
+
+    public async ValueTask DisposeAsync()
+    {
+        _disposed = true;
+        try
+        {
+            if (_binding is not null) { await _binding; }
+            if (_module is not null)
+            {
+                await _module.InvokeVoidAsync("unbindTape", _root);
+                await _module.DisposeAsync();
+            }
+        }
+        catch (JSDisconnectedException) { }
+        finally { _reference?.Dispose(); }
+    }
+}

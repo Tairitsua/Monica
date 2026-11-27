@@ -1,191 +1,309 @@
 {
+  "Navigation": {
+    "Category": "Dependency Injection"
+  },
   "Pages": {
     "DependencyInjection": {
       "Title": "Dependency Injection",
-      "Description": "Inspect registered services, lifetimes, and automatic registration issues."
+      "Description": "Inspect conventional registrations and findings across the host."
+    },
+    "DependencyInjectionServices": {
+      "Title": "Service resolution",
+      "Description": "One row per service identity (service type plus key); expand it to see every descriptor."
     }
   },
-  "Page": {
-    "PageTitle": "Dependency Injection",
-    "Header": {
-      "Title": "Dependency Injection",
-      "Description": "Inspect the finalized service collection and highlight descriptors created by Monica conventional registration.",
-      "Eyebrow": "Monica / Runtime composition",
-      "Refresh": "Refresh",
-      "GeneratedAt": "Registry materialized · {0}"
+  "Workbench": {
+    "DisplayLabel": "Conventional implementations needing attention",
+    "OfImpls": "/ {0} implementations",
+    "Advisory": "{0} more expose only their concrete type and are listed separately as advisory.",
+    "NoConvention": "Monica discovered no conventional implementations on this host: all {0} descriptors come from manual or framework registration, so there is nothing to compare with declarations. To see what a service resolves to, open Service resolution.",
+    "Calm": "All {0} implementations Monica discovered resolve as declared: each exposed service returns its conventional implementation, and none was registered again by hand.",
+    "CalmAdvisory": " {0} expose only their concrete type, which is expected for controllers and event handlers.",
+    "ClauseSep": ", and ",
+    "SentenceEnd": ".",
+    "Facts": {
+      "Impls": "Conventional implementations",
+      "ImplsSub": "{0} descriptors · #{1}–#{2}",
+      "NoDescriptors": "No descriptors",
+      "Forward": "Shared by forwarding",
+      "ForwardSub": "multi-exposure singleton, scoped",
+      "Monica": "Monica activation",
+      "MonicaSub": "assigns CachedServiceProvider",
+      "Attribute": "Declared by [Dependency]",
+      "AttributeSub": "{0} Replace · {1} TryAdd"
     },
-    "Composition": {
-      "RegistryLabel": "FINALIZED COLLECTION",
-      "CachedHint": "A cached snapshot of the host’s finalized registrations. Refresh re-reads this registry.",
-      "LifetimesTitle": "Registration lifetimes",
-      "CategoriesHint": "Registration categories may overlap.",
-      "Instances": "Instances"
+    "FindingParts": {
+      "NotRegisteredOne": "{0} declares a lifetime but exposes no service, so it never entered the collection and injecting it fails at runtime",
+      "NotRegistered": "{0} declare a lifetime but expose no service, so they never entered the collection and injecting them fails at runtime",
+      "Bypass": "{0} is registered again as a plain type at {1}, so resolving it bypasses Monica activation and leaves CachedServiceProvider unset",
+      "ElsewhereFirstOne": "A later registration ({1}) takes over {0}, leaving the conventional implementation reachable only through IEnumerable<T>",
+      "ElsewhereFirst": "Later registrations ({1}) take over {0}, leaving the conventional implementations reachable only through IEnumerable<T>",
+      "ElsewhereOne": "later registrations ({1}) take over {0}, leaving the conventional implementation reachable only through IEnumerable<T>",
+      "Elsewhere": "later registrations ({1}) take over {0}, leaving the conventional implementations reachable only through IEnumerable<T>",
+      "Twice": "{0} is registered twice, so enumerating it creates an extra instance",
+      "TwiceMany": "{0} are registered twice, so enumeration includes an extra registration for each"
     },
-    "Registry": {
-      "Title": "Service registry",
-      "Description": "Inspect service identities, implementations, keys, and convention provenance."
+    "ListLast": " and ",
+    "ListSeparator": ", ",
+    "SheetImpl": "Conventional implementation",
+    "SheetIdentity": "Service identity",
+    "Close": "Close",
+    "Fields": {
+      "OpenGeneric": "Open generic",
+      "LifetimeSource": "Lifetime source",
+      "Mode": "Registration mode",
+      "Exposed": "Exposed services",
+      "ServiceType": "Service type",
+      "ServiceAssembly": "Service assembly",
+      "Key": "Service key",
+      "SourceAssembly": "Source assembly",
+      "Lifetime": "Lifetime",
+      "Outcome": "Outcome",
+      "Created": "Descriptors created"
     },
-    "Summary": {
-      "AriaLabel": "Dependency injection registration summary",
-      "Total": "Descriptors",
-      "AutoRegistered": "Auto Registered",
-      "Keyed": "Keyed",
-      "Factories": "Factories",
+    "Markers": {
+      "Multiple": "Several registrations",
+      "Errors": "Errors",
       "Warnings": "Warnings",
-      "Errors": "Errors"
+      "Keyed": "Keyed",
+      "Standard": "Standard"
     },
-    "Issues": {
-      "Title": "Auto-registration issues",
-      "Description": "Convention diagnostics cover the whole host, independently of the registry filters. They also include issues that produced no final descriptor.",
-      "SearchLabel": "Find a convention issue",
-      "SearchPlaceholder": "Search source types, assemblies, lifetimes, or exposed services",
-      "Showing": "Showing {0} of {1} issues",
-      "Empty": "No convention issues in this evidence set.",
-      "NoMatches": "No issues match this search. Clear the search to view the full issue index.",
-      "NoExposures": "No exposed service identities."
+    "SourceAuto": "Auto registered",
+    "UnknownImplText": "There's no conventional implementation {0} in this snapshot.",
+    "UnknownService": "There's no service identity {0} in this snapshot.",
+    "GetService": "GetService returns",
+    "Enumerable": "IEnumerable<T> returns {0}",
+    "EnumerableOne": "IEnumerable<T> returns only this one",
+    "LifetimeMix": "These descriptors have different lifetimes, so the enumerated instances live for different spans.",
+    "Provenance": "Convention provenance",
+    "NotAuto": "This descriptor was not created by Monica conventional registration.",
+    "SharedInstance": "These exposures share one {0} instance.",
+    "ReplacedNote": "Replace removed an earlier descriptor of the same service identity; the snapshot doesn't record what it removed.",
+    "LogicalNote": "An inferred match means the original convention descriptor is absent. Attribution uses the service, lifetime and implementation.",
+    "DescriptorFacts": "Descriptor",
+    "Keyless": "Unkeyed",
+    "Yes": "Yes",
+    "No": "No",
+    "Winner": "GetService",
+    "OpenImpl": "Open conventional implementation",
+    "AutoBadge": "Auto",
+    "LogicalBadge": "Inferred match",
+    "Advice": {
+      "NotRegistered": "Monica resolved {0} as {1} ({2}), but it doesn't expose any service type, so nothing was registered. Injecting it or its interface throws \"Unable to resolve service\".",
+      "NotRegisteredNext": "Implement an interface whose name matches the class name (for example {0}), or expose services explicitly with {1}.",
+      "ConcreteOnly": "Monica registered only the concrete type for {0}. Consider exposing an abstraction when other components should depend on it.",
+      "Bypass": "The plain type descriptor at #{1} is registered after the convention's Monica activation factory (#{2}). GetService<{0}>() returns its instance, CachedServiceProvider is never assigned, and Logger access throws \"Cached service provider is not initialized\".",
+      "BypassNext": "Remove the manual registration at #{0} so the conventional one applies.",
+      "Elsewhere": "{0} resolves to {1} ({2}, #{3}), not to the conventional {4} ({5}). The conventional implementation appears only in IEnumerable<{0}>.",
+      "ElsewhereNext": "If the replacement is intended (a decorator or a transitional implementation), nothing to do; otherwise remove the later registration, or state the intent with [Dependency(ReplaceServices = true)].",
+      "Twice": "{0} has {1} naming the same implementation. GetService returns #{2}; resolving IEnumerable<{0}> creates one instance per descriptor.",
+      "TwiceNext": "Remove the manual registration and keep the conventional one."
+    },
+    "NextStep": "Next step",
+    "ExposuresTitle": "How each exposed service resolves",
+    "TryAddNote": "TryAdd adds only when the identity doesn't exist yet; a skipped exposure leaves no trace in the snapshot.",
+    "None": "—",
+    "ShadowedBy": "Taken over by #{0}",
+    "Outcomes": {
+      "ReplacedExisting": "Replaced existing descriptor",
+      "Added": "Added"
+    },
+    "ActivationTips": {
+      "Monica": "The type implements ICachedServiceProviderAccessor (ServiceBase, DomainService, EventHandlerBase); a Monica factory creates it and assigns CachedServiceProvider.",
+      "Forward": "A singleton or scoped type exposed as several services: this exposure forwards to the concrete registration, so every exposure shares one instance.",
+      "Factory": "Created by the delegate given at registration; the actual type isn't known without invoking it.",
+      "Direct": "Created from its type or instance."
     },
     "States": {
-      "Loading": "Loading dependency injection diagnostics...",
-      "Empty": "No service descriptors matched the current filters.",
-      "LoadFailed": "Failed to load dependency injection diagnostics.",
-      "NotAvailable": "Not available"
+      "Bypass": "Bypasses Monica activation",
+      "Elsewhere": "Resolves elsewhere",
+      "Twice": "Registered twice",
+      "Kept": "TryAdd kept the existing registration",
+      "Absent": "Not in the collection",
+      "Resolves": "Resolves as declared"
     },
-    "Messages": {
-      "RefreshSucceeded": "Dependency injection diagnostics refreshed.",
-      "RefreshFailed": "Failed to load dependency injection diagnostics: {0}",
-      "DialogOpenFailed": "Failed to open descriptor details: {0}"
+    "Copy": "Copy",
+    "Copied": "Copied.",
+    "CopyFailed": "Couldn't copy the identity.",
+    "FindingsTitle": "Convention findings",
+    "FindingsDesc": "Covers conventional registration across the whole host, independently of the Service resolution filters, including implementations that produced no descriptor.",
+    "FindingSearch": "Find a conventional implementation",
+    "FindingSearchPh": "Search source types, assemblies or exposed services",
+    "Showing": "Showing {0} of {1} implementations",
+    "NoMatches": "No implementation matches this search.",
+    "ClearSearch": "Clear search",
+    "NoFindingsCalm": "No conventional implementation needs attention. Implementations that expose only their concrete type are under Concrete only.",
+    "NoFindings": "No convention issues in this evidence set.",
+    "FindingFilters": {
+      "Attention": "Needs attention",
+      "BypassesActivation": "Bypasses activation",
+      "ConcreteOnly": "Concrete only"
     },
-    "Filters": {
-      "SearchLabel": "Search",
-      "SearchPlaceholder": "Search by service, implementation, assembly, or key",
-      "SourceLabel": "Source",
-      "LifetimeLabel": "Lifetime",
-      "MarkersLabel": "Markers",
-      "Showing": "Showing {0} of {1} descriptors",
-      "CombinationHint": "Match any selected option within each group, and match all groups.",
-      "StandardHint": "Standard means no key, warning, or error marker.",
-      "Actions": {
-        "SelectAll": "All",
-        "Clear": "Clear",
-        "Reset": "Reset filters"
-      },
-      "SourceOptions": {
-        "AutoRegistered": "Auto registered",
-        "Other": "Other descriptors"
-      },
-      "MarkerOptions": {
-        "Standard": "Standard",
-        "Keyed": "Keyed",
-        "Warnings": "Warnings",
-        "Errors": "Errors"
-      }
+    "Consequence": {
+      "NotRegistered": "No descriptor; injection fails",
+      "BypassesActivation": "#{0} bypasses Monica activation",
+      "ResolvesElsewhere": "{0} → {1}",
+      "RegisteredTwice": "{0} has {1} descriptors",
+      "ConcreteOnly": "Only the concrete type is registered"
     },
-    "Grid": {
-      "Columns": {
-        "Service": "Service",
-        "Lifetime": "Lifetime",
-        "Implementation": "Implementation",
-        "ServiceKey": "Key",
-        "Kind": "Implementation kind",
-        "Index": "Index",
-        "Actions": "Actions"
-      },
-      "Badges": {
-        "AutoRegistered": "Auto registered by ModuleDependencyInjection",
-        "Warning": "Automatic-registration warning",
-        "Error": "Automatic-registration error",
-        "Keyed": "Keyed service"
-      },
-      "Actions": {
-        "ViewDetails": "Details",
-        "ViewDetailsFor": "Inspect {0}"
-      },
-      "States": {
-        "Unkeyed": "Unkeyed"
-      },
-      "Kinds": {
-        "Type": "Type",
-        "Factory": "Factory",
-        "Instance": "Instance"
-      }
+    "MatrixTitle": "By lifetime and kind of what resolves",
+    "MatrixNote": "Counted by the last descriptor, the one GetService returns. The bar in each cell shows the conventional share.",
+    "MatrixTotal": "Total",
+    "MatrixInstanceNa": "Instance descriptors are always singletons",
+    "MatrixAuto": "{0} conventional",
+    "IdsLabel": "Service identities",
+    "AllIds": "identities · {0} descriptors",
+    "OfIds": "/ {0} identities",
+    "ScopeDescriptors": "{0} descriptors in scope.",
+    "IdsFinding": "Of {0} service identities, {1} have one registration; {2} have several, and for {3} of them the registrations name different implementations — GetService returns the last, IEnumerable<T> returns all.",
+    "IdsFindingConvention": " Monica conventions are involved in {0}.",
+    "IdsFindingCalm": "All {0} service identities resolve to one implementation each: {1} have several registrations, but they name the same implementation.",
+    "IdsFindingSingle": "Each of the {0} service identities has one registration.",
+    "EmptyRegistry": "The finalized service collection contains no descriptors.",
+    "EmptyFilter": "No service identities match the current filters.",
+    "RegistryTitle": "Service registry",
+    "RegistryDesc": "One row per service identity (service type plus key); expand it to see every descriptor.",
+    "Search": "Search",
+    "SearchPh": "Search by service, implementation, assembly, or key",
+    "SourceLabel": "Source",
+    "SourceAll": "All",
+    "SourceOther": "Other descriptors",
+    "MarkersLabel": "Markers",
+    "StandardHint": "Standard means no key, several registrations, warning or error marker.",
+    "RangeClear": "Clear range",
+    "RangeChip": "#{0}–#{1}",
+    "LifetimeChip": "Lifetime · {0}",
+    "KindChip": "Kind · {0}",
+    "ShowingIds": "Showing {0} of {1} service identities",
+    "SortLabel": "Sort",
+    "Sorts": {
+      "Order": "Registration order",
+      "Name": "Name",
+      "Count": "Registrations"
     },
-    "Dialog": {
-      "Title": "Service Descriptor Details",
-      "Close": "Close",
-      "Sections": {
-        "Descriptor": "Descriptor",
-        "Implementation": "Implementation",
-        "AutoRegistration": "Convention provenance"
-      },
-      "Fields": {
-        "ServiceType": "Service type",
-        "ServiceAssembly": "Service assembly",
-        "Lifetime": "Lifetime",
-        "ServiceKey": "Service key",
-        "Index": "Index",
-        "IsKeyed": "Keyed",
-        "IsOpenGeneric": "Open generic",
-        "ImplementationKind": "Implementation kind",
-        "ImplementationType": "Implementation type",
-        "ImplementationAssembly": "Implementation assembly",
-        "FactoryDisplay": "Factory",
-        "SourceImplementationType": "Source implementation",
-        "SourceImplementationAssembly": "Source assembly",
-        "LifetimeSource": "Lifetime source",
-        "RegistrationMode": "Registration mode",
-        "Outcome": "Outcome",
-        "ExposedServices": "Exposed services",
-        "Issues": "Issues"
-      },
-      "States": {
-        "NoAutoRegistration": "This descriptor was not created by Monica conventional registration."
-      }
+    "Reset": "Reset filters",
+    "Cols": {
+      "Index": "Index",
+      "Service": "Service",
+      "Resolves": "Resolves to",
+      "Lifetime": "Lifetime",
+      "Kind": "Implementation kind",
+      "Count": "Registrations"
     },
-    "Shared": {
-      "Common": {
-        "Yes": "Yes",
-        "No": "No"
-      },
-      "Lifetimes": {
-        "Singleton": "Singleton",
-        "Scoped": "Scoped",
-        "Transient": "Transient"
-      },
-      "RegistrationModes": {
-        "Add": "Add",
-        "TryAdd": "TryAdd",
-        "Replace": "Replace"
-      },
-      "Outcomes": {
-        "Added": "Added",
-        "ReplacedExisting": "Replaced existing descriptor"
-      },
-      "LifetimeSources": {
-        "Unknown": "Unknown",
-        "DependencyAttribute": "DependencyAttribute",
-        "TransientMarkerInterface": "ITransientDependency",
-        "ScopedMarkerInterface": "IScopedDependency",
-        "SingletonMarkerInterface": "ISingletonDependency"
-      },
-      "IssueSeverities": {
-        "Warning": "Warning",
-        "Error": "Error"
-      },
-      "IssueKinds": {
-        "MissingExposedServices": {
-          "Title": "No exposed service types were found",
-          "Summary": "A discovered implementation had no exposed service identity, so no descriptor was registered.",
-          "Description": "Monica resolved {0} as {1}, but it did not expose any service type, so nothing was registered."
-        },
-        "ConcreteTypeOnlyExposure": {
-          "Title": "Only the concrete type was exposed",
-          "Summary": "These implementations expose their concrete type without an abstraction.",
-          "Description": "Monica registered only the concrete type for {0}. Consider exposing an abstraction when other components should depend on it."
-        }
-      }
-    }
-  },
-  "Navigation": {
-    "Category": "Dependency injection"
+    "MultiTipDivergent": "{0} registrations naming different implementations",
+    "MultiTipSame": "{0} registrations of the same implementation",
+    "Page": "Page {0} of {1}",
+    "Prev": "Previous",
+    "Next": "Next step",
+    "TapeTitle": "Registration order",
+    "TapeNote": "The {0} descriptors of the finalized collection in registration order. Within one service identity, the later descriptor wins GetService.",
+    "Legend": {
+      "Auto": "Conventional descriptor",
+      "Other": "Other descriptor",
+      "Elsewhere": "Taken over by a later registration",
+      "Twice": "Registered twice",
+      "Replaced": "Replace removed an earlier descriptor",
+      "Advisory": "Concrete type only",
+      "NotIn": "Not in the collection"
+    },
+    "Lanes": {
+      "Segments": "Source",
+      "Arcs": "Takeover",
+      "Auto": "Convention",
+      "Advisory": "Concrete only"
+    },
+    "SegmentLabel": "Segments by source",
+    "SegmentAction": "Enter opens this segment in Service resolution",
+    "Caption": {
+      "Arc": "{0}: #{1} taken over by #{2}",
+      "Range": "Selected #{0}–#{1} · {2} descriptors",
+      "ArcRepeat": "{0}: registration #{1} repeated at #{2}",
+      "FindingArcs": "{0} registration arcs for {1}",
+      "Idle": "Hover to read a descriptor. Scroll over the tape to zoom horizontally or drag across the lanes to select a range.",
+      "Descriptor": "#{0} · {1}{2} · {3} · {4}{5}",
+      "ConventionalSuffix": " · convention",
+      "Segment": "#{0}–#{1} · {2} · {3} descriptors{4} · {5}",
+      "SegmentAuto": ", {0} conventional"
+    },
+    "Zoom": {
+      "Label": "Registration tape zoom",
+      "In": "Zoom in",
+      "Out": "Zoom out",
+      "Fit": "Fit all registrations",
+      "ClearHighlight": "Clear highlight"
+    },
+    "Findings": {
+      "Locate": "Locate {0} in registration order",
+      "OpenEvidence": "Open evidence for {0}"
+    },
+    "OpenRange": "Open in Service resolution",
+    "ClearRange": "Clear selection",
+    "Status": {
+      "None": "No conventional registration",
+      "Calm": "Conventions resolve as declared",
+      "AttentionOne": "1 implementation needs attention",
+      "Attention": "{0} implementations need attention"
+    },
+    "Host": "Host · {0}",
+    "FixedTip": "The snapshot is built once, after the host finalizes its service collection, and stays the same until the process restarts. Refresh re-reads the same registry.",
+    "Fixed": "Fixed at startup",
+    "MaterializedStale": "Last read",
+    "Materialized": "Registry materialized",
+    "Refresh": "Refresh",
+    "Export": "Export snapshot",
+    "Retry": "Retry",
+    "NavLabel": "Dependency injection pages",
+    "CompositionNav": "Composition",
+    "ServicesTitle": "Service resolution",
+    "StaleTitle": "Re-read failed",
+    "Stale": "The latest read of the registry failed. The page still shows the snapshot read at {0}. The service collection is finalized only at process start, so this evidence still describes the running process.",
+    "Loading": "Loading dependency injection diagnostics...",
+    "UnavailableTitle": "Registration diagnostics are off on this host",
+    "Unavailable": "Dependency-injection diagnostics are captured only when {0} is on. Turn it on and restart the host to capture the registration snapshot.",
+    "LoadFailedTitle": "Dependency injection diagnostics didn't load",
+    "LoadFailed": "The finalized registration snapshot could not be read. Retry or check the host logs for details.",
+    "CompositionTitle": "Dependency Injection",
+    "RefreshFailed": "Couldn't re-read the registry. Showing the last snapshot read.",
+    "Reread": "Re-read: the registry is unchanged since {0}.",
+    "Exported": "Exported the snapshot of {0} descriptors.",
+    "ExportFailed": "Couldn't export the snapshot.",
+    "Lifetimes": {
+      "Singleton": "Singleton",
+      "Scoped": "Scoped",
+      "Transient": "Transient"
+    },
+    "Kinds": {
+      "Type": "Type",
+      "Factory": "Factory",
+      "Instance": "Instance"
+    },
+    "Sources": {
+      "DependencyAttribute": "[Dependency]",
+      "TransientMarkerInterface": "ITransientDependency",
+      "SingletonMarkerInterface": "ISingletonDependency",
+      "ScopedMarkerInterface": "IScopedDependency",
+      "Unknown": "Unknown"
+    },
+    "Reasons": {
+      "NotRegistered": "Not registered",
+      "BypassesActivation": "Bypasses Monica activation",
+      "ResolvesElsewhere": "Resolves elsewhere",
+      "RegisteredTwice": "Registered twice",
+      "ConcreteOnly": "Concrete type only"
+    },
+    "ReasonTips": {
+      "NotRegistered": "Monica found a lifetime but no service type to expose, so no descriptor was created.",
+      "BypassesActivation": "A later plain type registration wins; resolving it skips Monica activation, so CachedServiceProvider stays unset.",
+      "ResolvesElsewhere": "The last descriptor of an exposed service names another implementation, which GetService returns.",
+      "RegisteredTwice": "Several descriptors of one service identity name this implementation.",
+      "ConcreteOnly": "Only the concrete type is registered; expected for controllers and event handlers that are resolved by type."
+    },
+    "Activations": {
+      "Direct": "Created directly",
+      "Forward": "Forwards to concrete type",
+      "Monica": "Monica activation",
+      "Factory": "Factory delegate"
+    },
+    "UnknownImpl": "Unknown type"
   }
 }

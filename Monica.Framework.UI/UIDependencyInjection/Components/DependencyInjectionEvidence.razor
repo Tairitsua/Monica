@@ -1,0 +1,339 @@
+@inject IStringLocalizer<DependencyInjectionResource> L
+
+@{
+    var implementation = ImplementationType is null ? null : Model.Implementations.FirstOrDefault(i => i.Type == ImplementationType);
+    var identity = ServiceType is null ? null : FindIdentity();
+    var show = ImplementationType is not null || ServiceType is not null;
+    var title = ImplementationType is not null
+        ? implementation?.Display ?? L["Workbench:SheetImpl"].Value
+        : identity?.Display ?? L["Workbench:SheetIdentity"].Value;
+    var technicalName = ImplementationType is not null ? implementation?.Type
+        : identity is null ? null : KeyedName(identity.Type, identity.Key);
+}
+<MoSideSheet Open="show" OpenChanged="OnOpenChangedAsync" Width="560px" Compact="true" CloseLabel="@L["Workbench:Close"]">
+    <TitleContent>
+        <div class="di-sheet-id">
+            <span class="mo-vl-tile mo-vl-role--neutral"><MoIcon Icon="@(ImplementationType is not null ? MoIcons.Puzzle : MoIcons.ListTree)" Size="16px" /></span>
+            <div class="di-sheet-name">
+                <DependencyInjectionEvidenceHeading @key="(ImplementationType, ServiceType, ServiceKey, IdentityIndex)"
+                                                    Title="@title" TechnicalName="@technicalName" />
+                @if (implementation is not null)
+                {
+                    <div class="di-sheet-flags">
+                        <span class="di-chip is-outline">@Lifetime(L, implementation.Lifetime)</span>
+                        <span class="di-chip is-outline mono">@Source(L, implementation.LifetimeSource)</span>
+                        @if (implementation.Mode is not null and not DependencyInjectionAutoRegistrationMode.Add)
+                        {
+                            <span class="di-chip role-primary mono">@implementation.Mode</span>
+                        }
+                        @foreach (var reason in Reasons.Where(implementation.Matches))
+                        {
+                            <span class="di-chip @CssRole(FindingRole(reason))">@Reason(L, reason)</span>
+                        }
+                        @if (implementation.Matches(ConventionFinding.ConcreteOnly))
+                        {
+                            <span class="di-chip is-outline">@Reason(L, ConventionFinding.ConcreteOnly)</span>
+                        }
+                    </div>
+                }
+                else if (identity is not null)
+                {
+                    <div class="di-sheet-flags">
+                        <span class="di-chip is-outline">@Lifetime(L, identity.Winner.Lifetime)</span>
+                        @if (identity.Winner.IsKeyedService) { <span class="di-chip role-info mono">@identity.Key</span> }
+                        @if (identity.Winner.IsOpenGeneric) { <span class="di-chip is-outline">@L["Workbench:Fields:OpenGeneric"]</span> }
+                        @if (identity.Descriptors.Length > 1)
+                        {
+                            <span class="di-chip @(identity.Divergent ? "role-warning" : "role-neutral")">@L["Workbench:Markers:Multiple"] · @identity.Descriptors.Length</span>
+                        }
+                        @if (identity.Conventional) { <span class="di-chip role-info">@L["Workbench:SourceAuto"]</span> }
+                    </div>
+                }
+            </div>
+        </div>
+    </TitleContent>
+    <ChildContent>
+        <div class="di-sheet-body">
+            @if (implementation is not null)
+            {
+                @ImplementationContent(implementation)
+            }
+            else if (identity is not null)
+            {
+                @IdentityContent(identity)
+            }
+            else if (show)
+            {
+                <MoSemanticCallout Severity="MoVisualRole.Warning" Icon="@MoIcons.SearchOff" Title="@title">
+                    @(ImplementationType is not null ? L["Workbench:UnknownImplText", ImplementationType]
+                        : L["Workbench:UnknownService", KeyedName(ServiceType!, ServiceKey)])
+                </MoSemanticCallout>
+            }
+        </div>
+    </ChildContent>
+</MoSideSheet>
+
+@code {
+    [Parameter, EditorRequired] public DependencyInjectionWorkbenchSnapshot Model { get; set; } = default!;
+    [Parameter] public string? ImplementationType { get; set; }
+    [Parameter] public string? ServiceType { get; set; }
+    [Parameter] public string? ServiceKey { get; set; }
+    [Parameter] public int? IdentityIndex { get; set; }
+    [Parameter, EditorRequired] public EventCallback<string> OpenImplementation { get; set; }
+    [Parameter, EditorRequired] public EventCallback<ServiceIdentity> OpenIdentity { get; set; }
+    [Parameter, EditorRequired] public EventCallback Close { get; set; }
+
+    private ServiceIdentity? FindIdentity()
+    {
+        // When a type and printed key are ambiguous, only a link for the exact snapshot identity selects it.
+        var matches = Model.Identities.Values.Where(id => id.Type == ServiceType &&
+            id.Winner.IsKeyedService == (ServiceKey is not null) && string.Equals(id.Key, ServiceKey, StringComparison.Ordinal));
+        if (IdentityIndex is int index)
+        {
+            return matches.FirstOrDefault(id => id.Index == index);
+        }
+
+        var candidates = matches.Take(2).ToArray();
+        return candidates.Length == 1 ? candidates[0] : null;
+    }
+
+    private Task OnOpenChangedAsync(bool open) => open ? Task.CompletedTask : Close.InvokeAsync();
+
+    private RenderFragment IdentityContent(ServiceIdentity identity) => @<text>
+        <section class="di-sec">
+            <h3>@L["Workbench:GetService"]</h3>
+            <ol class="di-res">@DescriptorRow(identity.Winner, true)</ol>
+        </section>
+        <section class="di-sec">
+            <h3>
+                @(identity.Descriptors.Length > 1 ? L["Workbench:Enumerable", identity.Descriptors.Length] : L["Workbench:EnumerableOne"])
+                @if (identity.MixedLifetimes) { <small>@L["Workbench:LifetimeMix"]</small> }
+            </h3>
+            @if (identity.Descriptors.Length > 1)
+            {
+                <ol class="di-res">
+                    @foreach (var descriptor in identity.Descriptors)
+                    {
+                        @DescriptorRow(descriptor, descriptor.Index == identity.Winner.Index)
+                    }
+                </ol>
+            }
+        </section>
+        <section class="di-sec">
+            <h3>@L["Workbench:Provenance"]</h3>
+            @{
+                var sources = identity.Descriptors.Where(d => d.AutoRegistration is not null)
+                    .Select(d => d.AutoRegistration!.SourceImplementationType).ToHashSet(StringComparer.Ordinal);
+            }
+            @if (sources.Count == 0)
+            {
+                <p class="di-sheet-note">@L["Workbench:NotAuto"]</p>
+            }
+            @foreach (var implementation in Model.Implementations.Where(i => sources.Contains(i.Type)))
+            {
+                <div class="di-prov">
+                    <button type="button" class="di-rec" @onclick="() => OpenImplementation.InvokeAsync(implementation.Type)">
+                        <DependencyInjectionTypeName Full="@implementation.Type" Display="@implementation.Display" />
+                    </button>
+                    <dl class="di-kv">
+                        @Fact(L["Workbench:Fields:LifetimeSource"], Source(L, implementation.LifetimeSource))
+                        @Fact(L["Workbench:Fields:Mode"], implementation.Mode?.ToString())
+                        <div><dt>@L["Workbench:Fields:Exposed"]</dt><dd class="di-chips">
+                            @foreach (var exposure in implementation.Exposures)
+                            {
+                                var label = KeyedName(exposure.Declared.ServiceTypeDisplayName, exposure.Declared.ServiceKey);
+                                @if (exposure.Identity is { } sibling && sibling.Index != identity.Index)
+                                {
+                                    <button class="di-chip is-outline" type="button" @onclick="() => OpenIdentity.InvokeAsync(sibling)">@label</button>
+                                }
+                                else { <span class="di-chip is-outline">@label</span> }
+                            }
+                        </dd></div>
+                    </dl>
+                    @if (implementation.Forwarded) { <p class="di-sheet-note">@L["Workbench:SharedInstance", implementation.Display]</p> }
+                    @if (implementation.Replaced) { <p class="di-sheet-note">@L["Workbench:ReplacedNote"]</p> }
+                </div>
+            }
+            @if (identity.Descriptors.Any(d => d.IsAutoRegistered && !d.IsDirectConventionMatch))
+            {
+                <p class="di-sheet-note">@L["Workbench:LogicalNote"]</p>
+            }
+        </section>
+        <section class="di-sec">
+            <h3>@L["Workbench:DescriptorFacts"]</h3>
+            <dl class="di-kv">
+                @Fact(L["Workbench:Fields:ServiceType"], identity.Type, true)
+                @Fact(L["Workbench:Fields:ServiceAssembly"], identity.Winner.ServiceAssemblyName, true)
+                @Fact(L["Workbench:Fields:Key"], identity.Winner.IsKeyedService ? identity.Key : L["Workbench:Keyless"].Value, true)
+                @Fact(L["Workbench:Fields:OpenGeneric"], identity.Winner.IsOpenGeneric ? L["Workbench:Yes"].Value : L["Workbench:No"].Value)
+            </dl>
+        </section>
+    </text>;
+
+    private RenderFragment DescriptorRow(DependencyInjectionDescriptorInfo descriptor, bool winner) => @<li class="di-res-row @(winner ? "is-win" : null)">
+        <span class="di-res-idx mono">#@descriptor.Index</span>
+        <div class="di-res-id">
+            <b title="@(descriptor.ImplementationType ?? descriptor.FactoryDisplay)">@Implementation(L, descriptor)</b>
+            <small>@Lifetime(L, descriptor.Lifetime) · @Kind(L, descriptor.ImplementationKind) ·
+                <span class="di-tip" tabindex="0" title="@ActivationTip(descriptor.Activation)">@Activation(L, descriptor.Activation)</span>
+                @if (descriptor.ImplementationAssemblyName is { } assembly) { <text> · @assembly</text> }
+            </small>
+            @if (descriptor.FactoryDisplay is { } signature) { <code class="di-factory">@signature</code> }
+        </div>
+        <span class="di-res-end">
+            @if (winner) { <span class="di-badge role-success">@L["Workbench:Winner"]</span> }
+            @if (descriptor.AutoRegistration is { } auto)
+            {
+                <button type="button" class="di-chip role-info" title="@L["Workbench:OpenImpl"]" @onclick="() => OpenImplementation.InvokeAsync(auto.SourceImplementationType)">
+                    @(descriptor.IsDirectConventionMatch ? L["Workbench:AutoBadge"] : L["Workbench:LogicalBadge"])
+                </button>
+            }
+        </span>
+    </li>;
+
+    private RenderFragment ImplementationContent(ConventionImplementation implementation) => @<text>
+        @if (implementation.NeedsAttention || implementation.Matches(ConventionFinding.ConcreteOnly))
+        {
+            <div class="di-callouts">
+                @if (implementation.Matches(ConventionFinding.NotRegistered))
+                {
+                    <MoSemanticCallout Severity="MoVisualRole.Error" Title="@Reason(L, ConventionFinding.NotRegistered)">
+                        <MoRichFinding Template="@L["Workbench:Advice:NotRegistered"]" Values="@([Strong(implementation.Display), Plain(Lifetime(L, implementation.Lifetime)), Code(Source(L, implementation.LifetimeSource))])" />
+                        <span class="di-next"><b>@L["Workbench:NextStep"]</b>
+                            <MoRichFinding Template="@L["Workbench:Advice:NotRegisteredNext"]" Values="@([Code($"I{implementation.Display.Split('<')[0]}"), Code("[ExposeServices(typeof(…))]")])" />
+                        </span>
+                    </MoSemanticCallout>
+                }
+                @foreach (var exposure in implementation.Exposures.Where(e => e.Finding != ConventionFinding.Attention))
+                {
+                    @ExposureCallout(implementation, exposure)
+                }
+                @if (!implementation.NeedsAttention && implementation.Matches(ConventionFinding.ConcreteOnly))
+                {
+                    <MoSemanticCallout Severity="MoVisualRole.Neutral" Title="@Reason(L, ConventionFinding.ConcreteOnly)">
+                        <MoRichFinding Template="@L["Workbench:Advice:ConcreteOnly"]" Values="@([Strong(implementation.Display)])" />
+                    </MoSemanticCallout>
+                }
+            </div>
+        }
+        <section class="di-sec">
+            <h3>@L["Workbench:ExposuresTitle"]
+                @if (implementation.Mode == DependencyInjectionAutoRegistrationMode.TryAdd) { <small>@L["Workbench:TryAddNote"]</small> }
+            </h3>
+            @if (implementation.Exposures.Length == 0)
+            {
+                <p class="di-sheet-note">@ReasonTip(L, ConventionFinding.NotRegistered)</p>
+            }
+            else
+            {
+                <ol class="di-res">
+                    @foreach (var exposure in implementation.Exposures)
+                    {
+                        <li class="di-res-row">
+                            <span class="di-res-idx mono">@(exposure.Own is { } own ? $"#{own.Index}" : L["Workbench:None"].Value)</span>
+                            <div class="di-res-id">
+                                @{ var label = KeyedName(exposure.Declared.ServiceTypeDisplayName, exposure.Declared.ServiceKey); }
+                                @if (exposure.Identity is { } id) { @IdentityLink(id, label) }
+                                else { <b>@label</b> }
+                                <small>
+                                    @(exposure.Own is { } ownDescriptor ? Activation(L, ownDescriptor.Activation) : L["Workbench:None"])
+                                    @if (exposure.Winner is { } winner && exposure.State is not (ExposureState.Resolves or ExposureState.Twice))
+                                    {
+                                        <text> · @L["Workbench:ShadowedBy", winner.Index] · @Implementation(L, winner)</text>
+                                    }
+                                </small>
+                            </div>
+                            <span class="di-res-end"><span class="di-status @StateRole(exposure.State)"><i class="swatch" aria-hidden="true"></i>@State(exposure.State)</span></span>
+                        </li>
+                    }
+                </ol>
+            }
+            @if (implementation.Forwarded) { <p class="di-sheet-note">@L["Workbench:SharedInstance", implementation.Display]</p> }
+        </section>
+        <section class="di-sec">
+            <h3>@L["Workbench:Provenance"]</h3>
+            <dl class="di-kv">
+                @Fact(L["Workbench:Fields:SourceAssembly"], implementation.Assembly)
+                @Fact(L["Workbench:Fields:Lifetime"], Lifetime(L, implementation.Lifetime))
+                @Fact(L["Workbench:Fields:LifetimeSource"], Source(L, implementation.LifetimeSource))
+                @Fact(L["Workbench:Fields:Mode"], implementation.Mode?.ToString())
+                @Fact(L["Workbench:Fields:Outcome"], implementation.Replaced ? L["Workbench:Outcomes:ReplacedExisting"].Value
+                    : implementation.Descriptors.Length > 0 ? L["Workbench:Outcomes:Added"].Value : null)
+                @Fact(L["Workbench:Fields:Created"], IndexList(implementation.Descriptors), true)
+            </dl>
+            @if (implementation.Replaced) { <p class="di-sheet-note">@L["Workbench:ReplacedNote"]</p> }
+        </section>
+    </text>;
+
+    private RenderFragment ExposureCallout(ConventionImplementation implementation, Exposure exposure)
+    {
+        var id = exposure.Identity!;
+        var winner = exposure.Winner!;
+        var own = exposure.Own!;
+        var link = IdentityLink(id, id.Display);
+        var (template, next, values) = exposure.State switch
+        {
+            ExposureState.Bypass => (L["Workbench:Advice:Bypass"], L["Workbench:Advice:BypassNext", winner.Index],
+                new[] { link, Plain(winner.Index), Plain(own.Index) }),
+            ExposureState.Elsewhere => (L["Workbench:Advice:Elsewhere"], L["Workbench:Advice:ElsewhereNext"],
+                new[] { link, Strong(Implementation(L, winner)), Plain(Lifetime(L, winner.Lifetime)),
+                    Plain(winner.Index), Strong(implementation.Display), Plain(Lifetime(L, own.Lifetime)) }),
+            _ => (L["Workbench:Advice:Twice"], L["Workbench:Advice:TwiceNext"],
+                new[] { link, Plain(IndexList(id.Descriptors.Where(d => DependencyInjectionWorkbenchSnapshot.NamesImplementation(d, implementation.Type)))),
+                    Plain(winner.Index) })
+        };
+        return @<MoSemanticCallout Severity="@FindingRole(exposure.Finding)" Title="@Reason(L, exposure.Finding)">
+            <MoRichFinding Template="@template" Values="values" />
+            <span class="di-next"><b>@L["Workbench:NextStep"]</b>@next</span>
+        </MoSemanticCallout>;
+    }
+
+    private string? IndexList(IEnumerable<DependencyInjectionDescriptorInfo> descriptors)
+    {
+        var indices = descriptors.Select(d => $"#{d.Index}").ToArray();
+        return indices.Length switch
+        {
+            0 => null,
+            1 => indices[0],
+            _ => string.Join(L["Workbench:ListSeparator"].Value, indices[..^1]) + L["Workbench:ListLast"].Value + indices[^1]
+        };
+    }
+
+    private RenderFragment IdentityLink(ServiceIdentity identity, string label)
+        => @<button type="button" class="di-rec" @onclick="() => OpenIdentity.InvokeAsync(identity)">@label</button>;
+
+    private RenderFragment Fact(string label, string? value, bool mono = false) => @<div>
+        <dt>@label</dt><dd class="@(mono ? "mono" : null)">@(string.IsNullOrEmpty(value) ? L["Workbench:None"].Value : value)</dd>
+    </div>;
+
+    private static string KeyedName(string name, string? key) => key is null ? name : $"{name} [{key}]";
+    private static RenderFragment Strong(string value) => @<b>@value</b>;
+    private static RenderFragment Plain(object? value) => @<text>@value</text>;
+    private static RenderFragment Code(string value) => @<code>@value</code>;
+
+    private string ActivationTip(DependencyInjectionActivation activation) => activation switch
+    {
+        DependencyInjectionActivation.MonicaActivated => L["Workbench:ActivationTips:Monica"],
+        DependencyInjectionActivation.Forward => L["Workbench:ActivationTips:Forward"],
+        DependencyInjectionActivation.Factory => L["Workbench:ActivationTips:Factory"],
+        _ => L["Workbench:ActivationTips:Direct"]
+    };
+
+    private string State(ExposureState state) => state switch
+    {
+        ExposureState.Bypass => L["Workbench:States:Bypass"],
+        ExposureState.Elsewhere => L["Workbench:States:Elsewhere"],
+        ExposureState.Twice => L["Workbench:States:Twice"],
+        ExposureState.Kept => L["Workbench:States:Kept"],
+        ExposureState.Absent => L["Workbench:States:Absent"],
+        _ => L["Workbench:States:Resolves"]
+    };
+
+    private static string StateRole(ExposureState state) => state switch
+    {
+        ExposureState.Bypass or ExposureState.Absent => "role-error",
+        ExposureState.Elsewhere or ExposureState.Twice => "role-warning",
+        ExposureState.Resolves => "role-success",
+        _ => "role-neutral"
+    };
+}

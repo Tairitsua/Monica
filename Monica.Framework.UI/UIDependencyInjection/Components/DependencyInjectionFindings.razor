@@ -1,0 +1,155 @@
+@inject IStringLocalizer<DependencyInjectionResource> L
+
+@{
+    var matches = Model.Implementations.Where(i => i.Matches(Query?.Trim() ?? "")).ToArray();
+    var filtered = matches.Where(i => i.Matches(Filter));
+    var groups = Filter == ConventionFinding.ConcreteOnly
+        ? filtered.OrderBy(i => i.Assembly, StringComparer.OrdinalIgnoreCase).GroupBy(i => i.Assembly).Select(g => (g.Key, g.ToArray())).ToArray()
+        : [(null, filtered.OrderBy(i => Array.FindIndex(Reasons, i.Matches)).ToArray())];
+    var count = groups.Sum(group => group.Item2.Length);
+}
+<section class="mo-vl-panel di-findings" aria-labelledby="di-findings-title">
+    <header class="mo-vl-surface-heading di-findings-head">
+        <span class="mo-vl-tile mo-vl-role--info"><MoIcon Icon="@MoIcons.ListChecks" Size="16px" /></span>
+        <div><h2 id="di-findings-title">@L["Workbench:FindingsTitle"]</h2><p>@L["Workbench:FindingsDesc"]</p></div>
+    </header>
+    <div class="di-findings-tools">
+        <div class="fchips" role="group" aria-label="@L["Workbench:FindingsTitle"]">
+            @foreach (var (filter, url) in FindingFilters)
+            {
+                var optionCount = matches.Count(i => i.Matches(filter));
+                <button type="button" class="fchip @CssRole(FindingRole(filter)) @(optionCount == 0 ? "is-zero" : null)"
+                        aria-pressed="@(Filter == filter ? "true" : "false")" @onclick="@(() => SetAsync("finding", url))">
+                    @if (filter != ConventionFinding.Attention) { <i class="swatch" aria-hidden="true"></i> }
+                    @FilterLabel(filter)<span class="n">@optionCount</span>
+                </button>
+            }
+        </div>
+        <label class="di-search">
+            <MoIcon Icon="@MoIcons.Search" Size="15px" />
+            <input type="search" value="@Query" aria-label="@L["Workbench:FindingSearch"]" placeholder="@L["Workbench:FindingSearchPh"]"
+                   @oninput="@(e => SetAsync("q", e.Value?.ToString()))" />
+        </label>
+    </div>
+    <p class="di-showing">@L["Workbench:Showing", count, Model.Implementations.Count(i => i.Matches(Filter))]</p>
+    @if (count == 0)
+    {
+        <MoContentState Class="di-none" Compact="true">
+            @if (!string.IsNullOrWhiteSpace(Query))
+            {
+                <p>@L["Workbench:NoMatches"]</p>
+                <button type="button" class="di-btn is-small" @onclick="@(() => SetAsync("q", null))">@L["Workbench:ClearSearch"]</button>
+            }
+            else
+            {
+                <p>@(Filter != ConventionFinding.ConcreteOnly && Model.Implementations.All(i => !i.NeedsAttention)
+                    ? L["Workbench:NoFindingsCalm"] : L["Workbench:NoFindings"])</p>
+            }
+        </MoContentState>
+    }
+    else
+    {
+        <div class="di-flist">
+            @foreach (var (assembly, group) in groups)
+            {
+                @if (assembly is not null)
+                {
+                    <h3 class="di-fgroup"><span class="mono">@assembly</span><span class="n">@group.Length</span></h3>
+                }
+                <ul>
+                    @foreach (var implementation in group)
+                    {
+                        var reasons = Reasons.Where(implementation.Matches).ToArray();
+                        var role = reasons.Length == 0 ? "role-neutral" : CssRole(FindingRole(reasons[0]));
+                        var canLocate = RegistrationTape.HasArc(implementation);
+                        <li class="di-frow @role" @key="implementation.Type"
+                            @onmouseenter="() => PreviewAsync(implementation.Type, canLocate, false, true)"
+                            @onmouseleave="() => PreviewAsync(implementation.Type, canLocate, false, false)">
+                            <button type="button" class="di-frow-main"
+                                    title="@(canLocate ? L["Workbench:Findings:Locate", implementation.Display].Value : null)"
+                                    aria-controls="@(canLocate ? "di-registration-tape" : null)"
+                                    @onfocus="() => PreviewAsync(implementation.Type, canLocate, true, true)"
+                                    @onblur="() => PreviewAsync(implementation.Type, canLocate, true, false)"
+                                    @onclick="() => ActivateAsync(implementation.Type, canLocate)">
+                                <span class="di-frow-mark"><i class="swatch @(implementation.Descriptors.Length == 0 ? "is-hatch" : null)" aria-hidden="true"></i></span>
+                                <span class="di-frow-id">
+                                    <DependencyInjectionTypeName Full="@implementation.Type" Display="@implementation.Display" />
+                                    <small>@implementation.Assembly · @Lifetime(L, implementation.Lifetime) · @Source(L, implementation.LifetimeSource)@ModeSuffix(implementation.Mode)</small>
+                                </span>
+                                <span class="di-frow-why">@Consequence(implementation, reasons.FirstOrDefault())</span>
+                                <span class="di-frow-tags">
+                                    @foreach (var reason in reasons)
+                                    {
+                                        <span class="di-chip @CssRole(FindingRole(reason))">@Reason(L, reason)</span>
+                                    }
+                                    @if (reasons.Length == 0)
+                                    {
+                                        <span class="di-chip is-outline">@Reason(L, ConventionFinding.ConcreteOnly)</span>
+                                    }
+                                </span>
+                                <MoIcon Icon="@(canLocate ? MoIcons.Crosshair : MoIcons.ChevronRight)" Size="15px" />
+                            </button>
+                            @if (canLocate)
+                            {
+                                <button type="button" class="di-frow-evidence"
+                                        title="@L["Workbench:Findings:OpenEvidence", implementation.Display]"
+                                        aria-label="@L["Workbench:Findings:OpenEvidence", implementation.Display]"
+                                        @onfocus="() => PreviewAsync(implementation.Type, true, true, true)"
+                                        @onblur="() => PreviewAsync(implementation.Type, true, true, false)"
+                                        @onclick="() => OpenImplementation.InvokeAsync(implementation.Type)">
+                                    <MoIcon Icon="@MoIcons.ChevronRight" Size="15px" />
+                                </button>
+                            }
+                        </li>
+                    }
+                </ul>
+            }
+        </div>
+    }
+</section>
+
+@code {
+    [Parameter, EditorRequired] public DependencyInjectionWorkbenchSnapshot Model { get; set; } = default!;
+    [Parameter] public ConventionFinding Filter { get; set; }
+    [Parameter] public string? Query { get; set; }
+    [Parameter, EditorRequired] public EventCallback<IReadOnlyDictionary<string, object?>> Change { get; set; }
+    [Parameter, EditorRequired] public EventCallback<string> OpenImplementation { get; set; }
+    [Parameter, EditorRequired] public EventCallback<string> LocateFinding { get; set; }
+    [Parameter, EditorRequired] public EventCallback<(string Implementation, bool IsFocus, bool Active)> PreviewFinding { get; set; }
+
+    private Task PreviewAsync(string implementation, bool canLocate, bool isFocus, bool active)
+        => canLocate ? PreviewFinding.InvokeAsync((implementation, isFocus, active)) : Task.CompletedTask;
+
+    private Task ActivateAsync(string implementation, bool canLocate)
+        => canLocate ? LocateFinding.InvokeAsync(implementation) : OpenImplementation.InvokeAsync(implementation);
+
+    private Task SetAsync(string key, string? value) => Change.InvokeAsync(new Dictionary<string, object?>
+    {
+        [key] = string.IsNullOrEmpty(value) ? null : value
+    });
+
+    private string FilterLabel(ConventionFinding filter) => filter switch
+    {
+        ConventionFinding.Attention => L["Workbench:FindingFilters:Attention"],
+        ConventionFinding.BypassesActivation => L["Workbench:FindingFilters:BypassesActivation"],
+        ConventionFinding.ConcreteOnly => L["Workbench:FindingFilters:ConcreteOnly"],
+        _ => Reason(L, filter)
+    };
+
+    private static string? ModeSuffix(DependencyInjectionAutoRegistrationMode? mode)
+        => mode is null or DependencyInjectionAutoRegistrationMode.Add ? null : $" · {mode}";
+
+    private string Consequence(ConventionImplementation implementation, ConventionFinding reason)
+    {
+        var exposure = implementation.Exposures.FirstOrDefault(e => e.Finding == reason);
+        return reason switch
+        {
+            ConventionFinding.NotRegistered => L["Workbench:Consequence:NotRegistered"],
+            ConventionFinding.BypassesActivation => L["Workbench:Consequence:BypassesActivation", exposure!.Winner!.Index],
+            ConventionFinding.ResolvesElsewhere => L["Workbench:Consequence:ResolvesElsewhere", exposure!.Identity!.Display, Implementation(L, exposure.Winner!)],
+            ConventionFinding.RegisteredTwice => L["Workbench:Consequence:RegisteredTwice", exposure!.Identity!.Display,
+                exposure.Identity.Descriptors.Count(d => DependencyInjectionWorkbenchSnapshot.NamesImplementation(d, implementation.Type))],
+            _ => L["Workbench:Consequence:ConcreteOnly"]
+        };
+    }
+}

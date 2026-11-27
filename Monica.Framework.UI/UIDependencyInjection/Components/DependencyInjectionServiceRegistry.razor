@@ -1,0 +1,252 @@
+@inject IStringLocalizer<DependencyInjectionResource> L
+
+@{
+    var identities = Model.Identities.Values;
+    var scoped = Filter.Apply(identities);
+    var multiple = scoped.Where(id => id.Descriptors.Length > 1).ToArray();
+    var divergent = multiple.Where(id => id.Divergent).ToArray();
+    var involvingConvention = divergent.Where(id => id.Conventional).ToArray();
+    var all = scoped.Length == Model.Identities.Count;
+    var pages = Math.Max(1, (scoped.Length + PageSize - 1) / PageSize);
+    var page = Math.Clamp(Filter.Page, 1, pages);
+}
+<section class="mo-vl-panel di-sig di-sig-ids" aria-labelledby="di-ids-display">
+    <div class="di-decision">
+        <div class="di-decision-value">
+            <p class="display-label" id="di-ids-display">@L["Workbench:IdsLabel"]</p>
+            <div class="display">@scoped.Length.ToString("N0")<small>@(all ? L["Workbench:AllIds", Model.Descriptors.Length.ToString("N0")] : L["Workbench:OfIds", Model.Identities.Count.ToString("N0")])</small></div>
+            @if (!all)
+            {
+                <p class="di-advisory">@L["Workbench:ScopeDescriptors", scoped.Sum(id => id.Descriptors.Length).ToString("N0")]</p>
+            }
+        </div>
+        <p class="lede di-lede">
+            @if (divergent.Length > 0)
+            {
+                <MoRichFinding Template="@L["Workbench:IdsFinding"].Value" Values="@([Text(scoped.Length), Mark(scoped.Length - multiple.Length, MoVisualRole.Neutral),
+                    Mark(multiple.Length, MoVisualRole.Neutral), Mark(divergent.Length, MoVisualRole.Warning)])" />
+                @if (involvingConvention.Length > 0)
+                {
+                    <MoRichFinding Template="@L["Workbench:IdsFindingConvention"]" Values="@([Links(involvingConvention)])" />
+                }
+            }
+            else if (multiple.Length > 0)
+            {
+                <MoRichFinding Template="@L["Workbench:IdsFindingCalm"]" Values="@([Text(scoped.Length), Mark(multiple.Length, MoVisualRole.Neutral)])" />
+            }
+            else if (scoped.Length > 0)
+            {
+                @L["Workbench:IdsFindingSingle", scoped.Length.ToString("N0")]
+            }
+            else
+            {
+                @(Model.Identities.Count == 0 ? L["Workbench:EmptyRegistry"] : L["Workbench:EmptyFilter"])
+            }
+        </p>
+    </div>
+    <DependencyInjectionMatrix Scope="@((Filter with { Lifetime = null, Kind = null }).Apply(identities))"
+                               LifetimeFilter="Filter.Lifetime" KindFilter="Filter.Kind" Pick="PickMatrixAsync" />
+</section>
+
+<section class="mo-vl-panel di-registry" aria-labelledby="di-registry-title">
+    <header class="mo-vl-surface-heading">
+        <span class="mo-vl-tile mo-vl-role--neutral"><MoIcon Icon="@MoIcons.Table" Size="16px" /></span>
+        <div><h2 id="di-registry-title">@L["Workbench:RegistryTitle"]</h2><p>@L["Workbench:RegistryDesc"]</p></div>
+    </header>
+    <div class="di-tools">
+        <label class="di-search is-wide">
+            <MoIcon Icon="@MoIcons.Search" Size="15px" />
+            <input type="search" value="@Filter.Query" aria-label="@L["Workbench:Search"]" placeholder="@L["Workbench:SearchPh"]"
+                   @oninput="@(e => SetAsync("q", e.Value?.ToString()))" />
+        </label>
+        <div class="di-tool-group" role="group" aria-label="@L["Workbench:SourceLabel"]">
+            <span class="di-tool-label">@L["Workbench:SourceLabel"]</span>
+            <div class="seg">
+                @foreach (var (option, label) in new (string?, string)[] { (null, L["Workbench:SourceAll"]), ("auto", L["Workbench:SourceAuto"]), ("other", L["Workbench:SourceOther"]) })
+                {
+                    <button type="button" aria-pressed="@Bool(Filter.Source == option)" @onclick="@(() => SetAsync("source", option))">
+                        @if (option == "auto") { <i class="swatch role-info" aria-hidden="true"></i> }
+                        @label<span class="n">@((Filter with { Source = option }).Apply(identities).Length)</span>
+                    </button>
+                }
+            </div>
+        </div>
+        <div class="di-tool-group" role="group" aria-label="@L["Workbench:MarkersLabel"]">
+            <span class="di-tool-label di-tip" tabindex="0" title="@L["Workbench:StandardHint"]">@L["Workbench:MarkersLabel"]</span>
+            <div class="fchips">
+                @foreach (var (marker, url) in MarkerFilters)
+                {
+                    var (label, role) = MarkerLabel(marker);
+                    var count = (Filter with { Markers = marker }).Apply(identities).Length;
+                    <button type="button" class="fchip @role @(count == 0 ? "is-zero" : null)" aria-pressed="@Bool(Filter.Markers.HasFlag(marker))"
+                            @onclick="() => ToggleMarkerAsync(marker)">
+                        <i class="swatch" aria-hidden="true"></i>@label<span class="n">@count</span>
+                    </button>
+                }
+            </div>
+        </div>
+        <div class="di-tool-row">
+            @if (Filter.From is { } from && Filter.To is { } to)
+            {
+                <button type="button" class="di-chip role-primary" title="@L["Workbench:RangeClear"]"
+                        @onclick="ClearRangeAsync">
+                    @L["Workbench:RangeChip", from, to]<MoIcon Icon="@MoIcons.Close" Size="12px" />
+                </button>
+            }
+            @if (Filter.Lifetime is { } lifetime)
+            {
+                <button type="button" class="di-chip role-third" @onclick="@(() => SetAsync("lifetime", null))">
+                    @L["Workbench:LifetimeChip", Lifetime(L, lifetime)]<MoIcon Icon="@MoIcons.Close" Size="12px" />
+                </button>
+            }
+            @if (Filter.Kind is { } kind)
+            {
+                <button type="button" class="di-chip role-third" @onclick="@(() => SetAsync("kind", null))">
+                    @L["Workbench:KindChip", Kind(L, kind)]<MoIcon Icon="@MoIcons.Close" Size="12px" />
+                </button>
+            }
+            <span class="di-showing">@L["Workbench:ShowingIds", scoped.Length.ToString("N0"), Model.Identities.Count.ToString("N0")]</span>
+            <span class="di-spacer"></span>
+            <div class="seg di-sort" role="group" aria-label="@L["Workbench:SortLabel"]">
+                @foreach (var (option, label) in new (string?, string)[] { (null, L["Workbench:Sorts:Order"]), ("name", L["Workbench:Sorts:Name"]), ("count", L["Workbench:Sorts:Count"]) })
+                {
+                    <button type="button" aria-pressed="@Bool(Filter.Sort == option)" @onclick="@(() => SetAsync("sort", option))">@label</button>
+                }
+            </div>
+            @if (Filter.Active)
+            {
+                <button type="button" class="di-btn is-ghost is-small" @onclick="ResetAsync">
+                    <MoIcon Icon="@MoIcons.FilterOff" Size="14px" />@L["Workbench:Reset"]
+                </button>
+            }
+        </div>
+    </div>
+    @if (scoped.Length == 0)
+    {
+        <MoContentState Class="di-none" Compact="true">
+            <p>@(Model.Identities.Count == 0 ? L["Workbench:EmptyRegistry"] : L["Workbench:EmptyFilter"])</p>
+            @if (Filter.Active)
+            {
+                <button type="button" class="di-btn is-small" @onclick="ResetAsync">@L["Workbench:Reset"]</button>
+            }
+        </MoContentState>
+    }
+    else
+    {
+        <div class="di-table" role="table" aria-label="@L["Workbench:RegistryTitle"]">
+            <div class="di-tr is-head" role="row">
+                <span class="di-c-index" role="columnheader">@L["Workbench:Cols:Index"]</span>
+                <span class="di-c-service" role="columnheader">@L["Workbench:Cols:Service"]</span>
+                <span class="di-c-resolves" role="columnheader">@L["Workbench:Cols:Resolves"]</span>
+                <span class="di-c-lifetime" role="columnheader">@L["Workbench:Cols:Lifetime"]</span>
+                <span class="di-c-kind" role="columnheader">@L["Workbench:Cols:Kind"]</span>
+                <span class="di-c-count" role="columnheader">@L["Workbench:Cols:Count"]</span>
+            </div>
+            @foreach (var identity in scoped.Skip((page - 1) * PageSize).Take(PageSize))
+            {
+                var descriptor = identity.Winner;
+                <div class="di-tr @(identity.Divergent ? "is-divergent" : null)" role="row" @key="identity.Index">
+                    <span class="di-c-index mono" role="cell" data-label="@L["Workbench:Cols:Index"]">#@descriptor.Index</span>
+                    <span class="di-c-service" role="cell" data-label="@L["Workbench:Cols:Service"]">
+                        <button type="button" class="di-row-open" @onclick="() => OpenIdentity.InvokeAsync(identity)">
+                            <DependencyInjectionTypeName Full="@identity.Type" Display="@identity.Display" />
+                        </button>
+                        @if (descriptor.IsKeyedService) { <span class="di-badge role-info">@identity.Key</span> }
+                    </span>
+                    <span class="di-c-resolves" role="cell" data-label="@L["Workbench:Cols:Resolves"]">
+                        <span class="di-impl" title="@(descriptor.ImplementationType ?? descriptor.FactoryDisplay)">@Implementation(L, descriptor)</span>
+                        <small>
+                            @Activation(L, descriptor.Activation)
+                            @if (descriptor.IsAutoRegistered) { <text> · </text><span class="di-auto">@L["Workbench:AutoBadge"]</span> }
+                        </small>
+                    </span>
+                    <span class="di-c-lifetime" role="cell" data-label="@L["Workbench:Cols:Lifetime"]">
+                        @Lifetime(L, descriptor.Lifetime)@if (identity.MixedLifetimes) { <span class="di-mixmark" title="@L["Workbench:LifetimeMix"]">*</span> }
+                    </span>
+                    <span class="di-c-kind" role="cell" data-label="@L["Workbench:Cols:Kind"]">@Kind(L, descriptor.ImplementationKind)</span>
+                    <span class="di-c-count" role="cell" data-label="@L["Workbench:Cols:Count"]">
+                        @if (identity.Descriptors.Length > 1)
+                        {
+                            <span class="di-badge @(identity.Divergent ? "role-warning" : "role-neutral")"
+                                  title="@(identity.Divergent ? L["Workbench:MultiTipDivergent", identity.Descriptors.Length] : L["Workbench:MultiTipSame", identity.Descriptors.Length])">×@identity.Descriptors.Length</span>
+                        }
+                        else { <span class="di-dim">1</span> }
+                        @if (identity.Markers.HasFlag(ServiceMarkers.Errors)) { <i class="swatch role-error" title="@L["Workbench:Markers:Errors"]"></i> }
+                        else if (identity.Markers.HasFlag(ServiceMarkers.Warnings)) { <i class="di-sw-adv" title="@L["Workbench:Markers:Warnings"]"></i> }
+                    </span>
+                </div>
+            }
+        </div>
+        @if (pages > 1)
+        {
+            <nav class="di-pager" aria-label="@L["Workbench:Page", page, pages]">
+                <button type="button" class="di-btn is-small" disabled="@(page == 1)" @onclick="() => SetPageAsync(page - 1)">
+                    <MoIcon Icon="@MoIcons.ChevronLeft" Size="14px" />@L["Workbench:Prev"]
+                </button>
+                <span class="mono">@L["Workbench:Page", page, pages]</span>
+                <button type="button" class="di-btn is-small" disabled="@(page == pages)" @onclick="() => SetPageAsync(page + 1)">
+                    @L["Workbench:Next"]<MoIcon Icon="@MoIcons.ChevronRight" Size="14px" />
+                </button>
+            </nav>
+        }
+    }
+</section>
+
+@code {
+    private const int PageSize = 50;
+
+    [Parameter, EditorRequired] public DependencyInjectionWorkbenchSnapshot Model { get; set; } = default!;
+    [Parameter, EditorRequired] public ServiceRegistryFilter Filter { get; set; } = default!;
+    [Parameter, EditorRequired] public EventCallback<IReadOnlyDictionary<string, object?>> Change { get; set; }
+    [Parameter, EditorRequired] public EventCallback<ServiceIdentity> OpenIdentity { get; set; }
+
+    private static RenderFragment Text(int value) => @<text>@value.ToString("N0")</text>;
+    private static RenderFragment Mark(int value, MoVisualRole role) => @<MoValueMark Role="role">@value.ToString("N0")</MoValueMark>;
+
+    private RenderFragment Links(ServiceIdentity[] identities) => @<text>
+        @for (var i = 0; i < identities.Length; i++)
+        {
+            var identity = identities[i];
+            @if (i > 0) { @(i == identities.Length - 1 ? L["Workbench:ListLast"] : L["Workbench:ListSeparator"]) }
+            <button type="button" class="di-rec role-warning" @onclick="() => OpenIdentity.InvokeAsync(identity)">@identity.Display</button>
+        }
+    </text>;
+
+    private (string Label, string Role) MarkerLabel(ServiceMarkers marker) => marker switch
+    {
+        ServiceMarkers.Keyed => (L["Workbench:Markers:Keyed"], "role-info"),
+        ServiceMarkers.Multiple => (L["Workbench:Markers:Multiple"], "role-warning"),
+        ServiceMarkers.Warnings => (L["Workbench:Markers:Warnings"], "role-warning"),
+        ServiceMarkers.Errors => (L["Workbench:Markers:Errors"], "role-error"),
+        _ => (L["Workbench:Markers:Standard"], "role-neutral")
+    };
+
+    private static string Bool(bool value) => value ? "true" : "false";
+
+    private Task SetAsync(string key, string? value) => Change.InvokeAsync(new Dictionary<string, object?>
+    {
+        [key] = string.IsNullOrEmpty(value) ? null : value, ["page"] = null
+    });
+
+    private Task SetPageAsync(int page) => Change.InvokeAsync(new Dictionary<string, object?> { ["page"] = page > 1 ? page : null });
+
+    private Task ToggleMarkerAsync(ServiceMarkers marker)
+    {
+        var selected = Filter.Markers ^ marker;
+        return SetAsync("markers", string.Join(',', MarkerFilters.Where(m => (selected & m.Value) != 0).Select(m => m.Url)));
+    }
+
+    private Task PickMatrixAsync((ServiceLifetime? Lifetime, DependencyInjectionDescriptorImplementationKind? Kind) choice)
+        => Change.InvokeAsync(new Dictionary<string, object?> { ["lifetime"] = choice.Lifetime?.ToString(), ["kind"] = choice.Kind?.ToString(), ["page"] = null });
+
+    private Task ClearRangeAsync() => Change.InvokeAsync(new Dictionary<string, object?>
+    {
+        ["from"] = null, ["to"] = null, ["page"] = null
+    });
+
+    private Task ResetAsync() => Change.InvokeAsync(new Dictionary<string, object?>
+    {
+        ["q"] = null, ["source"] = null, ["markers"] = null, ["lifetime"] = null, ["kind"] = null,
+        ["from"] = null, ["to"] = null, ["page"] = null
+    });
+}

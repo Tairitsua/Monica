@@ -1,0 +1,22 @@
+<span class="di-type" title="@Full">
+    @foreach (var segment in NamespaceSegments)
+    {
+        <span class="di-ns">@(segment).<wbr /></span>
+    }
+    <b>@Display</b>
+</span>
+
+@code {
+    [Parameter, EditorRequired] public string Full { get; set; } = string.Empty;
+    [Parameter, EditorRequired] public string Display { get; set; } = string.Empty;
+
+    private IEnumerable<string> NamespaceSegments
+    {
+        get
+        {
+            var type = Full.Split('<', 2)[0];
+            var end = type.LastIndexOf('.');
+            return end < 0 ? [] : type[..end].Split('.');
+        }
+    }
+}

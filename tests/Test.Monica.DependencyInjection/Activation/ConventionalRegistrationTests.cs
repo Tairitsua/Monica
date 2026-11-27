@@ -6,6 +6,7 @@ using Monica.Core.Results;
 using Monica.DependencyInjection.Abstractions;
 using Monica.DependencyInjection.Annotations;
 using Monica.DependencyInjection.Facades;
+using Monica.DependencyInjection.Models;
 using Monica.Modules;
 using Xunit;
 
@@ -70,9 +71,37 @@ public sealed class ConventionalRegistrationTests
             && descriptor.IsAutoRegistered);
     }
 
-    private static IHost BuildHost(bool enableDiagnostics)
+    [Fact]
+    public async Task Diagnostics_WhenRegistrationsOverlap_ShouldKeepDirectProvenanceAndExactKeyIdentity()
+    {
+        using var host = BuildHost(enableDiagnostics: true, beforeMonica: services =>
+        {
+            services.AddSingleton<IConventionNamedService, ConventionNamedService>();
+            services.AddKeyedSingleton<IKeyedOnlyService, KeyedOnlyService>(42);
+            services.AddKeyedSingleton<IKeyedOnlyService, KeyedOnlyService>("42");
+        });
+
+        var result = await host.Services.GetRequiredService<DependencyInjectionDiagnosticsFacade>().GetSnapshotAsync();
+        result.Status.Should().Be(ResultStatus.Ok);
+        var descriptors = result.Data!.Descriptors;
+        var conventions = descriptors.Where(d => d.ServiceType.EndsWith($".{nameof(IConventionNamedService)}", StringComparison.Ordinal)).ToArray();
+        conventions.Should().HaveCount(2);
+        conventions[0].IsAutoRegistered.Should().BeFalse();
+        conventions[1].IsDirectConventionMatch.Should().BeTrue();
+        conventions[1].Activation.Should().Be(DependencyInjectionActivation.Forward);
+        conventions[0].ServiceIdentityIndex.Should().Be(conventions[1].ServiceIdentityIndex);
+        conventions[1].AutoRegistration!.ExposedServices.Should().Contain(e =>
+            e.ServiceType.EndsWith($".{nameof(IConventionNamedService)}", StringComparison.Ordinal) && e.ServiceIdentityIndex == conventions[1].ServiceIdentityIndex);
+
+        var sameLabel = descriptors.Where(d => d.ServiceType.EndsWith($".{nameof(IKeyedOnlyService)}", StringComparison.Ordinal) && d.ServiceKey == "42").ToArray();
+        sameLabel.Should().HaveCount(2);
+        sameLabel.Select(d => d.ServiceIdentityIndex).Should().OnlyHaveUniqueItems();
+    }
+
+    private static IHost BuildHost(bool enableDiagnostics, Action<IServiceCollection>? beforeMonica = null)
     {
         var builder = Host.CreateApplicationBuilder();
+        beforeMonica?.Invoke(builder.Services);
         builder.AddMonica(monica =>
         {
             monica.ConfigureTypeDiscovery(options => options

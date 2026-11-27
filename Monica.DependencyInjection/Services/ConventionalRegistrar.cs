@@ -97,7 +97,7 @@ internal sealed class ConventionalRegistrar(
                 exposedServiceType.ServiceType,
                 exposedServiceType.ServiceKey,
                 isKeyedService: exposedServiceType.ServiceKey is not null);
-            var serviceDescriptor = CreateServiceDescriptor(
+            var (serviceDescriptor, activation) = CreateServiceDescriptor(
                 shape,
                 exposedServiceType.ServiceKey,
                 exposedServiceType.ServiceType,
@@ -113,6 +113,7 @@ internal sealed class ConventionalRegistrar(
             {
                 diagnosticsRegistry!.RecordConventionalRegistration(
                     serviceDescriptor,
+                    activation,
                     type,
                     lifetime.Value,
                     lifetimeSource,
@@ -262,7 +263,7 @@ internal sealed class ConventionalRegistrar(
     /// <param name="allExposingServiceTypes">All service types being exposed.</param>
     /// <param name="lifetime">The lifetime of the service.</param>
     /// <returns>A <see cref="ServiceDescriptor"/> for the service.</returns>
-    private static ServiceDescriptor CreateServiceDescriptor(
+    private static (ServiceDescriptor Descriptor, DependencyInjectionActivation Activation) CreateServiceDescriptor(
         BusinessTypeShape implementationShape,
         object? serviceKey,
         Type exposingServiceType,
@@ -288,7 +289,7 @@ internal sealed class ConventionalRegistrar(
             );
             if (redirectedType != null)
             {
-                return serviceKey == null
+                var descriptor = serviceKey == null
                     ? ServiceDescriptor.Describe(
                         exposingServiceType,
                         provider => provider.GetService(redirectedType)!,
@@ -308,14 +309,18 @@ internal sealed class ConventionalRegistrar(
                         },
                         lifetime
                     );
+                return (descriptor, DependencyInjectionActivation.Forward);
             }
         }
-        return CreateDirectServiceDescriptor(
+        var direct = CreateDirectServiceDescriptor(
             implementationType,
             serviceKey,
             exposingServiceType,
             lifetime,
             requiresCachedServiceProviderAccess);
+        return (direct, requiresCachedServiceProviderAccess
+            ? DependencyInjectionActivation.MonicaActivated
+            : DependencyInjectionActivation.Direct);
     }
 
     private static bool RequiresCachedServiceProviderAccess(BusinessTypeShape implementationShape)

@@ -1,0 +1,312 @@
+@using Microsoft.Extensions.Options
+@using Monica.Modules
+@using Monica.UI.Shared.Components.Navigation
+@using Monica.UI.Shared.Services
+@inject IStringLocalizer<DependencyInjectionResource> L
+@inject MoTimeFormatter Time
+@inject IOptions<ModuleShellUIOption> Shell
+@inject ISnackbar Snackbar
+@inject IJSRuntime JS
+@inject NavigationManager Navigation
+@inject DependencyInjectionPageSession Session
+@implements IDisposable
+
+<PageTitle>@Title</PageTitle>
+<div class="mo-workbench-container">
+    <div class="di-page mo-page-shell mo-page-shell--workbench" @ref="_root" aria-busy="@((Session.Busy || !_ready) ? "true" : null)">
+        <MoPageMasthead Title="@Title" Icon="@PageIcon" HeadingId="di-page-title">
+            <Meta>
+                @if (Session.Snapshot is { } snapshot)
+                {
+                    var attention = snapshot.Implementations.Count(i => i.NeedsAttention);
+                    var role = snapshot.Implementations.Length == 0 ? MoVisualRole.Neutral : attention == 0
+                        ? MoVisualRole.Success : snapshot.Implementations.Any(i => i.Matches(ConventionFinding.NotRegistered) ||
+                            i.Matches(ConventionFinding.BypassesActivation)) ? MoVisualRole.Error : MoVisualRole.Warning;
+                    <span class="mo-vl-status mo-vl-status--pill @role.ToCssClass()">
+                        <span class="mo-vl-status-dot" aria-hidden="true"></span>
+                        @(snapshot.Implementations.Length == 0 ? L["Workbench:Status:None"] : attention switch
+                        {
+                            0 => L["Workbench:Status:Calm"],
+                            1 => L["Workbench:Status:AttentionOne"],
+                            _ => L["Workbench:Status:Attention", attention]
+                        })
+                    </span>
+                    <span class="di-chip is-outline mono">@L["Workbench:Host", Shell.Value.GetAppId()]</span>
+                    <span class="di-chip is-outline di-tip" tabindex="0" title="@L["Workbench:FixedTip"]"><MoIcon Icon="@MoIcons.Lock" Size="12px" />@L["Workbench:Fixed"]</span>
+                }
+            </Meta>
+            <Actions>
+                @if (Session.Snapshot is { } snapshot)
+                {
+                    <div class="di-stamp">
+                        <span>@(Session.Failed ? L["Workbench:MaterializedStale"] : L["Workbench:Materialized"])</span>
+                        <b>@Time.FormatTime(Session.Failed ? Session.ReadAt : snapshot.Raw.CapturedAt)</b>
+                    </div>
+                    <button class="di-btn" type="button" disabled="@Session.Busy" @onclick="RefreshAsync">
+                        <MoIcon Icon="@MoIcons.Refresh" Size="16px" />@L["Workbench:Refresh"]
+                    </button>
+                    <button class="di-btn is-primary" type="button" @onclick="ExportAsync"><MoIcon Icon="@MoIcons.Download" Size="16px" />@L["Workbench:Export"]</button>
+                }
+                else if (_ready && Session.Failed)
+                {
+                    <button class="di-btn is-primary" type="button" disabled="@Session.Busy" @onclick="RefreshAsync">
+                        <MoIcon Icon="@MoIcons.Refresh" Size="16px" />@L["Workbench:Retry"]
+                    </button>
+                }
+            </Actions>
+        </MoPageMasthead>
+        <MoWorkbenchNavigation Compact="true" Label="@L["Workbench:NavLabel"]">
+            <a href="@CompositionPath" aria-current="@(!Services ? "page" : null)"><MoIcon Icon="@MoIcons.Workflow" />@L["Workbench:CompositionNav"]</a>
+            <a href="@ServicesPath" aria-current="@(Services ? "page" : null)"><MoIcon Icon="@MoIcons.ListTree" />@L["Workbench:ServicesTitle"]</a>
+        </MoWorkbenchNavigation>
+        @if (Session.Snapshot is { } model)
+        {
+            @if (Session.Failed)
+            {
+                <MoSemanticCallout Severity="MoVisualRole.Warning" Title="@L["Workbench:StaleTitle"]">@L["Workbench:Stale", Time.FormatTime(Session.ReadAt)]</MoSemanticCallout>
+            }
+            @if (Services)
+            {
+                <DependencyInjectionServiceRegistry Model="model" Filter="@CreateRegistryFilter(model)" Change="ChangeFilter"
+                                                    OpenIdentity="OpenIdentity" />
+            }
+            else
+            {
+                <DependencyInjectionComposition Model="model" Filter="@FindingFilter" Query="@Get("q")"
+                                                Change="ChangeFilter" OpenImplementation="OpenImplementation"
+                                                OpenIdentity="OpenIdentity" OpenRange="OpenRange" />
+            }
+            <DependencyInjectionEvidence Model="model" ImplementationType="@Get("impl")" ServiceType="@Get("service")"
+                                         ServiceKey="@Get("key")" IdentityIndex="@ReadInt(Get("identity"))"
+                                         OpenIdentity="OpenIdentity" OpenImplementation="OpenImplementation" Close="CloseEvidence" />
+        }
+        else if (!_ready || Session.Busy)
+        {
+            <section class="mo-vl-panel di-skeleton">
+                <MoContentState Loading="true" Compact="true">
+                    <span class="di-skel is-wide" aria-hidden="true"></span>
+                    <span class="di-skel" aria-hidden="true"></span>
+                    <span class="di-skel is-bar" aria-hidden="true"></span>
+                    <p>@L["Workbench:Loading"]</p>
+                </MoContentState>
+            </section>
+            <div class="mo-vl-panel di-skeleton" aria-hidden="true"><span class="di-skel"></span><span class="di-skel"></span><span class="di-skel is-short"></span></div>
+        }
+        else
+        {
+            <section class="mo-vl-panel">
+                <MoContentState Class="di-failed" role="@(Session.Unavailable ? "status" : "alert")">
+                    <span class="mo-vl-tile @(Session.Unavailable ? "mo-vl-role--neutral" : "mo-vl-role--error")">
+                        <MoIcon Icon="@(Session.Unavailable ? MoIcons.Plug : MoIcons.Error)" Size="18px" />
+                    </span>
+                    @if (Session.Unavailable)
+                    {
+                        <h2>@L["Workbench:UnavailableTitle"]</h2>
+                        <p><MoRichFinding Template="@L["Workbench:Unavailable"]" Values="UnavailableHint" /></p>
+                        <pre class="di-code">monica.AddDependencyInjection()
+    .EnableAutoRegistrationDiagnostics();</pre>
+                    }
+                    else
+                    {
+                        <h2>@L["Workbench:LoadFailedTitle"]</h2>
+                        <p>@L["Workbench:LoadFailed"]</p>
+                    }
+                </MoContentState>
+            </section>
+        }
+    </div>
+</div>
+
+@code {
+    internal const string CompositionPath = "/dependency-injection";
+    internal const string ServicesPath = "/dependency-injection/services";
+    private static readonly RenderFragment[] UnavailableHint = [@<code>EnableAutoRegistrationDiagnostics()</code>];
+    private static readonly JsonSerializerOptions ExportOptions = new(JsonSerializerDefaults.Web)
+    {
+        WriteIndented = true,
+        Converters = { new JsonStringEnumConverter() }
+    };
+
+    [Parameter] public bool Services { get; set; }
+
+    private Dictionary<string, StringValues> _query = [];
+    private bool _ready, _disposed, _restoreEvidenceFocus;
+    private ElementReference _root;
+
+    private string Title => Services ? L["Workbench:ServicesTitle"] : L["Workbench:CompositionTitle"];
+    private string PageIcon => Services ? MoIcons.ListTree : MoIcons.Workflow;
+    private bool EvidenceOpen => Get("impl") is not null || Get("service") is not null;
+    private ConventionFinding FindingFilter => FindingFilters.FirstOrDefault(f => f.Url == Get("finding")).Value;
+
+    protected override void OnInitialized()
+    {
+        ReadRoute(Navigation.Uri);
+        Navigation.LocationChanged += OnLocationChanged;
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            await Session.InitializeAsync();
+            if (!_disposed)
+            {
+                _ready = true;
+                StateHasChanged();
+            }
+        }
+        else if (_restoreEvidenceFocus && !_disposed)
+        {
+            _restoreEvidenceFocus = false;
+            await SetEvidenceFocusAsync("restoreEvidenceOpener");
+        }
+    }
+
+    private async Task RefreshAsync()
+    {
+        await Session.RefreshAsync();
+        if (_disposed)
+        {
+            return;
+        }
+
+        if (Session.Failed)
+        {
+            Snackbar.Add(Session.Snapshot is null ? L["Workbench:LoadFailed"] : L["Workbench:RefreshFailed"], Severity.Warning);
+        }
+        else if (Session.Snapshot is { } model)
+        {
+            Snackbar.Add(L["Workbench:Reread", Time.FormatTime(model.Raw.CapturedAt)], Severity.Success);
+        }
+    }
+
+    private async Task ExportAsync()
+    {
+        if (Session.Snapshot is not { } model)
+        {
+            return;
+        }
+
+        try
+        {
+            await using var module = await JS.InvokeAsync<IJSObjectReference>("import", "./_content/Monica.UI/js/module-workbench-file.js");
+            if (_disposed)
+            {
+                return;
+            }
+
+            await module.InvokeVoidAsync("downloadJson", $"dependency-injection-{model.Raw.CapturedAt:yyyyMMdd-HHmmss}.json",
+                JsonSerializer.Serialize(model.Raw, ExportOptions));
+            if (!_disposed)
+            {
+                Snackbar.Add(L["Workbench:Exported", model.Descriptors.Length], Severity.Success);
+            }
+        }
+        catch (JSDisconnectedException) { }
+        catch (JSException)
+        {
+            if (!_disposed)
+            {
+                Snackbar.Add(L["Workbench:ExportFailed"], Severity.Error);
+            }
+        }
+    }
+
+    private string? Get(string key) => _query.TryGetValue(key, out var value) ? value.FirstOrDefault() : null;
+    private static int? ReadInt(string? value) => int.TryParse(value, NumberStyles.None, CultureInfo.InvariantCulture, out var n) ? n : null;
+
+    private ServiceRegistryFilter CreateRegistryFilter(DependencyInjectionWorkbenchSnapshot model)
+    {
+        var from = ReadInt(Get("from"));
+        var to = ReadInt(Get("to"));
+        if (from > to || from is null || to is null || from >= model.Descriptors.Length)
+        {
+            from = to = null;
+        }
+        else
+        {
+            to = Math.Min(to.Value, model.Descriptors.Length - 1);
+        }
+
+        var markers = Get("markers")?.Split(',', StringSplitOptions.RemoveEmptyEntries) ?? [];
+        return new(
+            Get("q")?.Trim() ?? "",
+            Get("source") is "auto" or "other" ? Get("source") : null,
+            MarkerFilters.Where(m => markers.Contains(m.Url, StringComparer.OrdinalIgnoreCase))
+                .Aggregate((ServiceMarkers)0, (value, m) => value | m.Value),
+            Enum.TryParse<ServiceLifetime>(Get("lifetime"), out var lifetime) && Lifetimes.Contains(lifetime) ? lifetime : null,
+            Enum.TryParse<DependencyInjectionDescriptorImplementationKind>(Get("kind"), out var kind) && Kinds.Contains(kind) ? kind : null,
+            from, to, Get("sort") is "name" or "count" ? Get("sort") : null, Math.Max(1, ReadInt(Get("page")) ?? 1));
+    }
+
+    private void OnLocationChanged(object? sender, LocationChangedEventArgs change)
+        => _ = InvokeAsync(() =>
+        {
+            if (!_disposed)
+            {
+                var wasOpen = EvidenceOpen;
+                ReadRoute(change.Location);
+                _restoreEvidenceFocus = wasOpen && !EvidenceOpen;
+                StateHasChanged();
+            }
+        });
+
+    private void ReadRoute(string uri) => _query = QueryHelpers.ParseQuery(Navigation.ToAbsoluteUri(uri).Query);
+
+    private void ChangeFilter(IReadOnlyDictionary<string, object?> change) => Patch(change);
+
+    private async Task OpenImplementation(string implementation)
+    {
+        if (!EvidenceOpen) { await SetEvidenceFocusAsync("rememberEvidenceOpener"); }
+        Patch(new Dictionary<string, object?>
+        {
+            ["impl"] = implementation, ["service"] = null, ["key"] = null, ["identity"] = null
+        }, push: true);
+    }
+
+    private async Task OpenIdentity(ServiceIdentity identity)
+    {
+        if (!EvidenceOpen) { await SetEvidenceFocusAsync("rememberEvidenceOpener"); }
+        var ambiguous = Session.Snapshot!.Identities.Values.Count(id => id.Type == identity.Type && id.Key == identity.Key) > 1;
+        Patch(new Dictionary<string, object?>
+        {
+            ["impl"] = null, ["service"] = identity.Type, ["key"] = identity.Key,
+            ["identity"] = ambiguous ? identity.Index : null
+        }, push: true);
+    }
+
+    private void CloseEvidence() => Patch(new Dictionary<string, object?>
+    {
+        ["impl"] = null, ["service"] = null, ["key"] = null, ["identity"] = null
+    });
+
+    private void OpenRange((int From, int To) range) => Navigation.NavigateTo(
+        Navigation.GetUriWithQueryParameters(Navigation.ToAbsoluteUri(ServicesPath).AbsoluteUri,
+            new Dictionary<string, object?> { ["from"] = range.From, ["to"] = range.To }));
+
+    private async Task SetEvidenceFocusAsync(string operation)
+    {
+        try
+        {
+            await using var module = await JS.InvokeAsync<IJSObjectReference>("import", DependencyInjectionTape.ModulePath);
+            if (!_disposed) { await module.InvokeVoidAsync(operation, _root); }
+        }
+        catch (JSDisconnectedException) { }
+    }
+
+    private void Patch(IReadOnlyDictionary<string, object?> parameters, bool push = false)
+    {
+        if (_disposed) { return; }
+        var next = Navigation.GetUriWithQueryParameters(parameters);
+        if (next != Navigation.Uri)
+        {
+            Navigation.NavigateTo(next, replace: !push);
+        }
+    }
+
+    public void Dispose()
+    {
+        _disposed = true;
+        Navigation.LocationChanged -= OnLocationChanged;
+    }
+}
