@@ -15,7 +15,7 @@ public enum MoVisualRole
     /// <summary>A distinct contributing category, such as a second meter segment.</summary>
     Info,
 
-    /// <summary>A third category when Info is already used and the theme supplies a solid secondary.</summary>
+    /// <summary>The theme's secondary palette accent.</summary>
     Secondary,
 
     /// <summary>An actual success state.</summary>
@@ -26,6 +26,9 @@ public enum MoVisualRole
 
     /// <summary>An actual failure state.</summary>
     Error,
+
+    /// <summary>A third categorical role supplied by the theme independently of its secondary accent.</summary>
+    Third,
 }
 
 /// <summary>
@@ -44,6 +47,7 @@ public static class MoVisualRoleExtensions
         MoVisualRole.Success => "mo-vl-role--success",
         MoVisualRole.Warning => "mo-vl-role--warning",
         MoVisualRole.Error => "mo-vl-role--error",
+        MoVisualRole.Third => "mo-vl-role--third",
         _ => "mo-vl-role--primary",
     };
 }

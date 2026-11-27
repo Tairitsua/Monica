@@ -1,0 +1,49 @@
+@inherits SignalRWorkspaceView
+
+<div class="sr-spread">
+    <div class="sr-spread-head"><div><h3>@T("Workspace:SdChartTitle")</h3><p>@T("Workspace:SdChartSubtitle")</p></div><div class="mo-vl-segment" role="group" aria-label="@T("Workspace:DurationScale")"><button aria-pressed="@Aria(!Linear)" @onclick='() => Context.Set("scale", null)'>@T("Workspace:SdScaleLog")</button><button aria-pressed="@Aria(Linear)" @onclick='() => Context.Set("scale", "linear")'>@T("Workspace:SdScaleLinear")</button></div></div>
+    <div class="mo-vl-legend"><span><i class="sr-sw-ring mo-vl-role--info"></i>@T("Workspace:SdLegendAvg")</span><span><i class="mo-vl-swatch mo-vl-swatch--diamond mo-vl-role--primary"></i>@T("Workspace:SdLegendLast")</span><span>@Swatch(MoVisualRole.Warning)@T("Workspace:SdLegendSpike")</span><span>@Swatch(MoVisualRole.Error)@T("Workspace:SdReasons:Failed")</span><span><i class="mo-vl-swatch sr-hatch"></i>@T("Workspace:SdLegendInflightOnly")</span></div>
+    <div class="sr-spread-axis"><span class="sr-spread-axis-label">@T("Workspace:SdAxisMethod")</span><div class="sr-spread-ticks">@foreach (var tick in Ticks) { <span class="mono" style="left:@Pct(Position(tick))">@TickLabel(tick)</span> }</div><span class="sr-spread-axis-meta">@T("Workspace:SdAxisMeta")</span></div>
+    <SignalRKeyboardRegion Class="sr-spread-lanes" Selector=".sr-lane-btn">
+        @foreach (var method in Rows)
+        {
+            var observed = SignalRDiagnosticRules.HasObservation(method);
+            var role = method.FailedCount > 0 ? MoVisualRole.Error : SignalRDiagnosticRules.HasSpike(method) ? MoVisualRole.Warning : method.PendingSendCount > 0 ? MoVisualRole.Info : MoVisualRole.Success;
+            <div class="sr-lane" @key="Key(method)"><button class="sr-lane-btn @Role(role) @(_active == Key(method) ? "is-focused" : null)" tabindex="@(Key(Active ?? method) == Key(method) ? 0 : -1)" @onfocus="() => _active = Key(method)" @onmouseenter="() => _active = Key(method)" @onclick='() => Context.Set("method", Key(method), true)'>
+                <div class="sr-lane-name"><strong>@method.MethodName</strong><small class="mono">@method.HubName @if (method.PendingSendCount > 0) { <span class="sr-ink-info">· @T("Workspace:SdTotals:Pending") @method.PendingSendCount</span> } @if (method.FailedCount > 0) { <span class="sr-ink-err">· @T("Workspace:SdTotals:Failed") @method.FailedCount</span> }</small></div>
+                <div class="sr-lane-track" aria-hidden="true">@foreach (var tick in Ticks) { <i class="sr-gridline" style="left:@Pct(Position(tick))"></i> }<i class="sr-threshold" style="left:@Pct(Position(1000))"></i>
+                    @if (observed)
+                    {
+                        <span class="sr-range-bar @Role(role)" style="left:@Pct(Math.Min(Position(method.AverageDurationMilliseconds), Position(method.MaxDurationMilliseconds)));width:@Pct(Math.Max(.8, Math.Abs(Position(method.MaxDurationMilliseconds) - Position(method.AverageDurationMilliseconds))))"></span>
+                        <i class="sr-dot-avg @Role(role)" style="left:@Pct(Position(method.AverageDurationMilliseconds))"></i><i class="sr-cap-max @Role(role)" style="left:@Pct(Position(method.MaxDurationMilliseconds))"></i><i class="sr-diamond-last mo-vl-role--primary" style="left:@Pct(Position(method.LastDurationMilliseconds))"></i>
+                    }
+                    else { <span class="sr-unobs-bar sr-hatch"></span> }
+                </div>
+                <div class="sr-lane-meta mono"><b class="@(SignalRDiagnosticRules.HasSpike(method) ? "sr-ink-warn" : null)">@Ms(method.MaxDurationMilliseconds, observed)</b><small>@T("Workspace:TargetRows", method.TargetMetricCount)</small></div>
+            </button></div>
+        }
+        <span class="sr-threshold-flag mono" style="--thr:@Pct(Position(1000))" aria-hidden="true">@T("Workspace:SdThresholdLabel")</span>
+    </SignalRKeyboardRegion>
+    <div class="sr-spread-readout" aria-live="polite">
+        @if (Active is { } active)
+        {
+            var observed = SignalRDiagnosticRules.HasObservation(active);
+            <span class="mono"><strong>@Key(active)</strong></span><span>@T("Workspace:SdLegendLast"): <b class="mono">@Ms(active.LastDurationMilliseconds, observed)</b></span><span>@T("Workspace:SdLegendAvg"): <b class="mono">@Ms(active.AverageDurationMilliseconds, observed)</b></span><span>@T("Workspace:Max"): <b class="mono @(SignalRDiagnosticRules.HasSpike(active) ? "sr-ink-warn" : null)">@Ms(active.MaxDurationMilliseconds, observed)</b></span><span>@T("Workspace:SdTotals:Started"): <b class="mono">@active.StartedCount.ToString("N0")</b></span><span>@T("Workspace:SdTotals:Failed"): <b class="mono @(active.FailedCount > 0 ? "sr-ink-err" : null)">@active.FailedCount</b></span>
+        }
+        else { <span class="sr-muted">@T("Workspace:SdReadoutIdle")</span> }
+    </div>
+</div>
+
+@code {
+    /// <summary>The filtered method population represented by these duration lanes.</summary>
+    [Parameter, EditorRequired] public IReadOnlyList<SignalRSendMethodMetricInfo> Rows { get; set; } = [];
+    private string? _active;
+    private SignalRSendMethodMetricInfo? Active => Rows.FirstOrDefault(method => Key(method) == _active) ?? Rows.FirstOrDefault();
+    private bool Linear => Context.Get("scale") == "linear";
+    private double Maximum => Math.Max(1200, Rows.Select(method => method.MaxDurationMilliseconds).DefaultIfEmpty(100).Max());
+    private double LogMaximum => Math.Log10(Math.Max(10000, Math.Pow(10, Math.Ceiling(Math.Log10(Maximum)))));
+    private IEnumerable<double> Ticks => Linear ? [0, Math.Round(Maximum * .25), Math.Round(Maximum * .5), Math.Round(Maximum * .75), Math.Round(Maximum)] : LogMaximum >= 4 ? [0.1, 1, 10, 100, 1000, 10000] : [0.1, 1, 10, 100, 1000];
+    private double Position(double ms) => Math.Clamp(Linear ? ms / (Maximum * 1.05) * 100 : (Math.Log10(Math.Max(.1, ms)) + 1) / (LogMaximum + 1) * 100, 0, 100);
+    private static string Pct(double value) => value.ToString("0.#####", CultureInfo.InvariantCulture) + "%";
+    private static string TickLabel(double value) => value >= 1000 ? $"{value / 1000:0.###}s" : $"{value:0.###}ms";
+}

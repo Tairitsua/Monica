@@ -1,0 +1,102 @@
+@inherits SignalRWorkspaceView
+
+@if (Snapshot is not { IsEnabled: true })
+{
+    <section class="mo-vl-surface sr-gate"><MoContentState><span class="mo-vl-tile mo-vl-role--neutral"><MoIcon Icon="@MoIcons.RadioOff" /></span><h2>@T("Workspace:SdDisabledTitle")</h2><p>@T("Workspace:SdDisabledBody")</p></MoContentState></section>
+}
+else if (Methods.Count == 0)
+{
+    <section class="mo-vl-surface sr-gate"><MoContentState><span class="mo-vl-tile mo-vl-role--success"><MoIcon Icon="@MoIcons.HeartPulse" /></span><h2>@T("Workspace:SdEmptyTitle")</h2><p>@T("Workspace:SdEmptyBody")</p></MoContentState></section>
+}
+else
+{
+    <section class="mo-vl-surface sr-sig">
+        <div class="sr-decision"><div class="sr-decision-value"><p class="sr-display-label">@T("Workspace:SdDisplayLabel")</p><MoDisplayValue Compact="true" Value="@Attention.ToString()" Unit="@T("Workspace:SdDisplayUnit", Methods.Count)" />
+            <div class="sr-reasons">
+                @foreach (var item in ReasonOptions)
+                {
+                    var count = Methods.Count(method => MatchesFocus(method, item.Key));
+                    <span class="@(count == 0 ? "is-zero" : null)">@Swatch(item.Role)@T(item.Label) <b class="mono">@count</b></span>
+                }
+            </div>
+        </div><div class="sr-lede">
+            @if (Attention == 0)
+            {
+                var busiest = Methods.MaxBy(method => method.CompletedCount)!;
+                <p><MoRichFinding Template="@T("Workspace:SdFindingCalm")" Values="@([Mark(T("Workspace:SdObservedFindingLabel", Methods.Count), MoVisualRole.Success), Mark(T("Workspace:SdCompletedFindingLabel", Snapshot.TotalCompletedCount.ToString("N0")), MoVisualRole.Success), InspectMark(busiest.MethodName, MoVisualRole.Third, "method", Key(busiest)), Plain(busiest.CompletedCount.ToString("N0"))])" /></p>
+            }
+            else
+            {
+                @if (Methods.Where(method => method.PendingSendCount > 0).MaxBy(method => method.PendingSendCount) is { } pending)
+                {
+                    <MoRichFinding Template="@T("Workspace:SdFindingPending")" Values="@([Mark(T("Workspace:SdPendingFindingLabel", Snapshot.PendingSendCount), MoVisualRole.Info), InspectMark(pending.MethodName, MoVisualRole.Info, "method", Key(pending))])" />
+                }
+                @if (Methods.Where(method => method.FailedCount > 0).MaxBy(method => method.FailedCount) is { } failed)
+                {
+                    <MoRichFinding Template="@T("Workspace:SdFindingFailed")" Values="@([Mark(T("Workspace:SdFailedFindingLabel", Snapshot.TotalFailedCount), MoVisualRole.Error), Plain(Methods.Count(method => method.FailedCount > 0).ToString()), InspectMark(failed.MethodName, MoVisualRole.Error, "method", Key(failed)), Plain(failed.FailedCount.ToString())])" />
+                }
+                @if (Methods.Where(SignalRDiagnosticRules.HasSpike).MaxBy(method => method.AverageDurationMilliseconds > 0 ? method.MaxDurationMilliseconds / method.AverageDurationMilliseconds : 0) is { } spike)
+                {
+                    <MoRichFinding Template="@T("Workspace:SdFindingSpike")" Values="@([InspectMark(spike.MethodName, MoVisualRole.Warning, "method", Key(spike)), Mark(Ms(spike.MaxDurationMilliseconds), MoVisualRole.Warning), Plain((spike.AverageDurationMilliseconds > 0 ? Math.Round(spike.MaxDurationMilliseconds / spike.AverageDurationMilliseconds) : 0).ToString())])" />
+                }
+            }
+        </div></div>
+        <div class="sr-scope-bar"><p class="sr-scope-note"><MoIcon Icon="@MoIcons.Info" Size="15px" /><span>@T("Workspace:SdScopeNote")</span></p>@if (!Snapshot.IncludesTargetIdentifiers) { <SignalRBadge Text="@T("Workspace:IdentifiersRedacted")" Icon="@MoIcons.Shield" /> }</div>
+        <dl class="sr-facts">
+            @foreach (var item in Counters)
+            {
+                <div class="sr-fact @Role(item.Role)"><dt>@Swatch(item.Role)@T(item.Label)</dt><dd>@item.Value.ToString("N0")</dd><small class="mono">@T(item.Sub)</small></div>
+            }
+        </dl>
+        @if (Visible.Count > 0) { <SignalRDurationSpread Rows="Visible" /> }
+    </section>
+    <section class="mo-vl-surface sr-ledger-surface" aria-label="@T("Workspace:SdTableTitle")">
+        <header class="mo-vl-surface-heading"><span class="mo-vl-tile mo-vl-role--third"><MoIcon Icon="@MoIcons.Table" Size="16px" /></span><div class="sr-surface-title"><h2>@T("Workspace:SdTableTitle")</h2><p>@T("Workspace:SdTableRanking", Visible.Count, Filtered.Count)</p></div>@if (Filtered.Count > 10) { <div class="sr-aside"><button class="sr-btn sr-btn-outline sr-btn-sm" @onclick='() => Context.Set("all", ShowAll ? null : "1")'>@(ShowAll ? T("Workspace:SdShowTop") : T("Workspace:SdShowAll", Filtered.Count))</button></div> }</header>
+        <div class="sr-toolbar"><div class="mo-vl-chips" role="group" aria-label="@T("Workspace:SdTableTitle")">
+            <MoFilterChip Pill="true" Label="@T("Workspace:SdFocusChips:All")" Count="BaseRows.Count" Role="MoVisualRole.Primary" Selected="@(Focus.Length == 0)" SelectedChanged='() => Context.Set("focus", null)' />
+            @foreach (var item in FocusOptions)
+            {
+                <MoFilterChip Pill="true" Class="mo-vl-chip--instrument" Label="@T(item.Label)" Count="@(BaseRows.Count(method => MatchesFocus(method, item.Key)))" Role="item.Role" ShowDot="true" Selected="@(Focus == item.Key)" SelectedChanged='() => Context.Set("focus", Focus == item.Key ? null : item.Key)' />
+            }
+        </div><div class="sr-toolbar-end">
+            @if (Hubs.Count > 1)
+            {
+                <div class="sr-hub-filter"><MudSelect T="string" Value="@Hub" ValueChanged='value => Context.Set("hub", value)' Variant="Variant.Outlined" Margin="Margin.Dense" aria-label="@T("Workspace:HubFilter")" OpenIcon="@MoIcons.ChevronDown" CloseIcon="@MoIcons.ChevronUp"><MudSelectItem Value="@string.Empty">@T("Workspace:SdFilterHubAll")</MudSelectItem>@foreach (var hub in Hubs) { <MudSelectItem Value="@hub">@hub</MudSelectItem> }</MudSelect></div>
+            }
+            <div class="sr-search"><MoIcon Icon="@MoIcons.Search" Size="14px" /><input type="search" spellcheck="false" aria-label="@T("Workspace:SdSearchPlaceholder")" placeholder="@T("Workspace:SdSearchPlaceholder")" value="@Query" @oninput='args => Context.Set("q", args.Value?.ToString())' /></div>
+        </div></div>
+        @if (Visible.Count == 0) { <MoContentState><p>@T("Workspace:SdNoMatch")</p><button class="sr-btn sr-btn-outline sr-btn-sm" @onclick="Reset">@T("Workspace:ResetFilters")</button></MoContentState> }
+        else
+        {
+            <div class="sr-table-wrap"><table class="sr-table sr-sends-table"><thead><tr><th>@T("Workspace:SdCols:Method")</th><th>@T("Workspace:SdCols:Status")</th><th class="is-num">@T("Workspace:SdTotals:Pending")</th><th class="is-num">@T("Workspace:SdTotals:Started")</th><th class="is-num">@T("Workspace:SdTotals:Failed")</th><th class="is-num">@T("Workspace:AverageMax")</th><th class="is-num">@T("Workspace:SdCols:Targets")</th><th>@T("Workspace:SdCols:LastSeen")</th></tr></thead><tbody>
+                @foreach (var method in Visible)
+                {
+                    var observed = SignalRDiagnosticRules.HasObservation(method);
+                    <tr @key="Key(method)"><td data-label="@T("Workspace:SdCols:Method")" class="is-name"><button class="sr-row-link" @onclick='() => Context.Set("method", Key(method), true)'><b>@method.MethodName</b><small class="mono">@method.HubName</small></button></td><td data-label="@T("Workspace:SdCols:Status")"><SignalRBadge Status="true" Text="@T($"Workspace:SdReasons:{SignalRDiagnosticRules.Standing(method)}")" Role="@SignalRDiagnosticRules.SendRole(method)" /></td><td data-label="@T("Workspace:SdTotals:Pending")" class="is-num @(method.PendingSendCount > 0 ? "sr-ink-info" : null)">@method.PendingSendCount</td><td data-label="@T("Workspace:SdTotals:Started")" class="is-num">@method.StartedCount.ToString("N0")</td><td data-label="@T("Workspace:SdTotals:Failed")" class="is-num @(method.FailedCount > 0 ? "sr-ink-err" : null)">@method.FailedCount</td><td data-label="@T("Workspace:AverageMax")" class="is-num"><span class="sr-dur-pair"><span>@Ms(method.AverageDurationMilliseconds, observed)</span><b class="@(SignalRDiagnosticRules.HasSpike(method) ? "sr-ink-warn" : null)">@Ms(method.MaxDurationMilliseconds, observed)</b></span></td><td data-label="@T("Workspace:SdCols:Targets")" class="is-num"><button class="sr-btn sr-btn-sm mo-vl-soft-action mo-vl-role--third" @onclick='() => Context.Set("method", Key(method), true)'>@method.TargetMetricCount<MoIcon Icon="@MoIcons.ChevronRight" Size="13px" /></button></td><td data-label="@T("Workspace:SdCols:LastSeen")" class="mono sr-time-cell">@if (method.LastCompletedAtUtc is { } at) { <time datetime="@at.ToString("O")">@UiTime.Format(at)</time> } else { <span class="sr-muted">@T("Workspace:NotObserved")</span> }</td></tr>
+                }
+            </tbody></table></div>
+        }
+    </section>
+}
+
+@code {
+    private SignalRSendDiagnosticsSnapshot? Snapshot => S.SendDiagnostics;
+    private List<SignalRSendMethodMetricInfo> Methods => Snapshot?.MethodMetrics ?? [];
+    private string Focus => Context.Get("focus");
+    private string Query => Context.Get("q");
+    private string Hub => Context.Get("hub");
+    private bool ShowAll => Context.Get("all") == "1";
+    private List<string> Hubs => Methods.Select(method => method.HubName).Distinct(StringComparer.Ordinal).Order(StringComparer.Ordinal).ToList();
+    private List<SignalRSendMethodMetricInfo> BaseRows => Methods.Where(method => (Hub.Length == 0 || method.HubName == Hub) && SignalRDiagnosticRules.Matches(method, Query)).ToList();
+    private List<SignalRSendMethodMetricInfo> Filtered => BaseRows.Where(method => MatchesFocus(method, Focus)).OrderByDescending(method => method.PendingSendCount).ThenByDescending(method => method.MaxDurationMilliseconds).ThenBy(method => method.HubName, StringComparer.Ordinal).ThenBy(method => method.MethodName, StringComparer.Ordinal).ToList();
+    private List<SignalRSendMethodMetricInfo> Visible => Filtered.Take(ShowAll ? int.MaxValue : 10).ToList();
+    private static bool MatchesFocus(SignalRSendMethodMetricInfo method, string focus) => focus switch
+    {
+        "attention" => SignalRDiagnosticRules.NeedsAttention(method), "inflight" => method.PendingSendCount > 0,
+        "failed" => method.FailedCount > 0, "spike" => SignalRDiagnosticRules.HasSpike(method), "healthy" => !SignalRDiagnosticRules.NeedsAttention(method), _ => true
+    };
+    private static readonly (string Key, string Label, MoVisualRole Role)[] FocusOptions = [("attention", "Workspace:SdFocusChips:Attention", MoVisualRole.Warning), ("inflight", "Workspace:SdFocusChips:Inflight", MoVisualRole.Info), ("failed", "Workspace:SdFocusChips:Failed", MoVisualRole.Error), ("spike", "Workspace:SdFocusChips:Spike", MoVisualRole.Warning)];
+    private static readonly (string Key, string Label, MoVisualRole Role)[] ReasonOptions = [("inflight", "Workspace:SdReasons:Inflight", MoVisualRole.Info), ("failed", "Workspace:SdReasons:Failed", MoVisualRole.Error), ("spike", "Workspace:SdReasons:Spike", MoVisualRole.Warning), ("healthy", "Workspace:SdReasons:Healthy", MoVisualRole.Success)];
+    private (string Label, string Sub, long Value, MoVisualRole Role)[] Counters => [("Workspace:SdTotals:Pending", "Workspace:SdTotalsSub:Pending", Snapshot!.PendingSendCount, Snapshot.PendingSendCount > 0 ? MoVisualRole.Info : MoVisualRole.Neutral), ("Workspace:SdTotals:Started", "Workspace:SdTotalsSub:Started", Snapshot.TotalStartedCount, MoVisualRole.Third), ("Workspace:SdTotals:Completed", "Workspace:SdTotalsSub:Completed", Snapshot.TotalCompletedCount, MoVisualRole.Success), ("Workspace:SdTotals:Failed", "Workspace:SdTotalsSub:Failed", Snapshot.TotalFailedCount, Snapshot.TotalFailedCount > 0 ? MoVisualRole.Error : MoVisualRole.Neutral)];
+    private void Reset() => Context.Set(new Dictionary<string, object?> { ["hub"] = null, ["focus"] = null, ["q"] = null });
+}

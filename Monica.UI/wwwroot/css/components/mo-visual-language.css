@@ -2,6 +2,7 @@
 .mo-vl-role--primary { --mo-vl-role: var(--mud-palette-primary); }
 .mo-vl-role--info { --mo-vl-role: var(--mud-palette-info); }
 .mo-vl-role--secondary { --mo-vl-role: var(--mud-palette-secondary); }
+.mo-vl-role--third { --mo-vl-role: var(--mo-color-role-third); }
 .mo-vl-role--success { --mo-vl-role: var(--mud-palette-success); }
 .mo-vl-role--warning { --mo-vl-role: var(--mud-palette-warning); }
 .mo-vl-role--error { --mo-vl-role: var(--mud-palette-error); }
@@ -21,7 +22,7 @@
 .mo-vl-masthead--sealed .mo-vl-title { margin: 0; font-size: 28px; font-weight: 650; letter-spacing: -.025em; overflow-wrap: anywhere; }
 .mo-vl-masthead--sealed .mo-vl-crumb { font-size: 12.5px; letter-spacing: 0; }
 .mo-vl-masthead--sealed .mo-vl-meta { gap: 8px 10px; margin-top: 4px; font-size: 12.5px; }
-.mo-vl-masthead__seal { display: grid; flex: none; place-items: center; width: 52px; height: 52px; border-radius: 14px; color: var(--mud-palette-dark-text); background: var(--mud-palette-dark); }
+.mo-vl-masthead__seal { display: grid; flex: none; place-items: center; width: var(--mo-vl-masthead-seal-size, 52px); height: var(--mo-vl-masthead-seal-size, 52px); border-radius: 14px; color: var(--mud-palette-dark-text); background: var(--mud-palette-dark); }
 .mo-vl-masthead__seal--accent { background: color-mix(in srgb, var(--mud-palette-primary) 11%, var(--mud-palette-surface)); color: var(--mud-palette-primary); }
 .mo-vl-masthead__identity { flex: 1 1 28rem; min-width: 0; }
 .mo-vl-crumb { margin: 0; color: color-mix(in srgb, var(--mud-palette-text-secondary) 65%, var(--mud-palette-text-primary)); font-size: .75rem; font-weight: 500; letter-spacing: .06em; }

@@ -1,174 +1,44 @@
-@using Monica.UI.Shared.Components.States
-@using Monica.SignalR.UISignalR.Models
-@using Monica.UI.Shared.Components.Dialogs
-@inject IStringLocalizer<SignalRResource> L
+@inherits SignalRWorkspaceView
+@inject SignalRInvocationArgumentParser Parser
+@inject Monica.SignalR.Facades.SignalRFacade Facade
 
-<section class="signalr-method-listener" aria-label="@L["UISignalR:MethodListener:Title"]" aria-busy="@(_isUpdating ? "true" : "false")">
-    <header class="signalr-listener-heading">
-        <span>@L["UISignalR:MethodListener:Scope"]</span>
-        <h2>@L["UISignalR:MethodListener:Title"]</h2>
-        <p>@L["UISignalR:MethodListener:ContractHelp"]</p>
-    </header>
-
-    <div class="signalr-listener-summary">
-        <span>@L["UISignalR:MethodListener:EnabledSummary", EnabledMethods.Count, HubMethods.Count]</span>
-        <span>@L["UISignalR:MethodListener:TotalReceived", HubMethods.Sum(method => method.ReceivedCount)]</span>
-    </div>
-    <div class="signalr-listener-actions">
-        <MudButton Variant="Variant.Outlined" Color="Color.Primary" StartIcon="@MoIcons.TextSearch"
-                   OnClick="OpenManageDialog" Disabled="@(HubMethods.Count == 0)">
-            @L["UISignalR:MethodListener:Manage"]
-        </MudButton>
-        <MudButton Variant="Variant.Outlined" Color="Color.Default" OnClick="DisableAllListenersAsync"
-                   Disabled="@(!IsConnected || _isUpdating || EnabledMethods.Count == 0)">
-            @L["UISignalR:MethodListener:DisableAll"]
-        </MudButton>
-    </div>
-    @if (!IsConnected)
-    {
-        <p class="signalr-listener-connect-help">@L["UISignalR:MethodListener:ConnectHelp"]</p>
-    }
-    @if (_isUpdating)
-    {
-        <p class="signalr-listener-progress" role="status">@L["UISignalR:MethodListener:Updating"]</p>
-    }
-
-    @if (HubMethods.Count == 0)
-    {
-        <div class="signalr-listener-empty"><MoContentState Compact="true">@L["UISignalR:MethodListener:Empty"]</MoContentState></div>
-    }
-    else if (EnabledMethods.Count == 0)
-    {
-        <div class="signalr-listener-empty"><MoContentState Compact="true">@L["UISignalR:MethodListener:EmptyEnabled"]</MoContentState></div>
-    }
+<div class="sr-callbacks">
+    <MoSemanticCallout Severity="MoVisualRole.Neutral" Title="@T("Workspace:CallbackScope")">@T("Workspace:CbContractHelp")</MoSemanticCallout>
+    <div class="sr-cb-toolbar"><div class="mo-vl-chips"><MoFilterChip Pill="true" Label="@T("Workspace:CbFilterAll")" Count="S.HubMethods.Count" Role="MoVisualRole.Primary" Selected="@(!OnlyEnabled)" SelectedChanged='() => Context.Set("enabled", null)' /><MoFilterChip Pill="true" Label="@T("Workspace:CbFilterEnabled")" Count="Enabled" Role="MoVisualRole.Info" Selected="OnlyEnabled" SelectedChanged='() => Context.Set("enabled", "1")' /></div><div class="sr-cb-actions"><button class="sr-btn sr-btn-outline sr-btn-sm" disabled="@(!S.ConnectionState.IsConnected || Enabled == S.HubMethods.Count)" @onclick="EnableAll">@T("Workspace:CbEnableAll")</button><button class="sr-btn sr-btn-outline sr-btn-sm" disabled="@(!S.ConnectionState.IsConnected || Enabled == 0)" @onclick="DisableAll">@T("Workspace:CbDisableAll")</button><button class="sr-btn sr-btn-sm mo-vl-soft-action mo-vl-role--info" disabled="@(!S.ConnectionState.IsConnected || Enabled == 0 || _probing)" title="@T("Workspace:CbSimPushTip")" @onclick="Probe"><MoIcon Icon="@MoIcons.Zap" Size="13px" />@T("Workspace:CbSimPush")</button></div></div>
+    <div class="sr-search"><MoIcon Icon="@MoIcons.Search" Size="14px" /><input type="search" placeholder="@T("Workspace:CbSearchPlaceholder")" aria-label="@T("Workspace:CbSearchPlaceholder")" value="@Query" @oninput='args => Context.Set("callbackQ", args.Value?.ToString())' /></div>
+    @if (!S.ConnectionState.IsConnected) { <p class="sr-connect-hint"><MoIcon Icon="@MoIcons.Info" Size="14px" />@T("Workspace:CbConnectHelp")</p> }
+    @if (Filtered.Count == 0) { <MoContentState Compact="true">@T(OnlyEnabled ? "Workspace:CbEmptyEnabled" : "Workspace:InvNoMatch")</MoContentState> }
     else
     {
-        <ul class="signalr-listener-list">
-            @foreach (var method in EnabledMethods)
+        <ul class="sr-cb-list">
+            @foreach (var method in Filtered)
             {
-                <li @key="method.Name" class="signalr-listener-row">
-                    <div class="signalr-listener-identity">
-                        <h3>@method.DisplayName</h3>
-                        <code>@FormatSignature(method)</code>
-                        <span>@L["UISignalR:MethodListener:ReceivedCount", method.ReceivedCount]</span>
-                    </div>
-                    <MudIconButton Icon="@MoIcons.Close" Size="Size.Small" Color="Color.Default" Class="signalr-listener-remove"
-                                   Disabled="@(!IsConnected || _isUpdating)" OnClick="@(() => ToggleMethodListenerAsync(method, false))"
-                                   title="@L["UISignalR:MethodListener:StopListening"]"
-                                   aria-label="@($"{L["UISignalR:MethodListener:StopListening"]}: {method.Name}")" />
-                </li>
+                <li class="sr-cb-row @(method.IsListening ? "is-on" : null)" @key="method.Name"><label class="sr-cb-check"><input type="checkbox" checked="@method.IsListening" disabled="@(!S.ConnectionState.IsConnected)" @onchange="args => Toggle(method, args.Value is true)" /><div class="sr-cb-copy"><strong>@method.Name</strong>@if (Catalog?.Methods.FirstOrDefault(item => item.Name == method.Name)?.Description is { Length: > 0 } description && description != method.Name) { <span class="sr-cb-desc">@description</span> }<code class="mono sr-break">@Signature(method, true)</code></div></label><SignalRBadge Text="@T("Workspace:CbReceived", method.ReceivedCount)" Role="@(method.ReceivedCount > 0 ? MoVisualRole.Info : MoVisualRole.Neutral)" /></li>
             }
         </ul>
     }
-
-    <MudDialog @bind-Visible="_manageDialogVisible" Options="_dialogOptions" ContentClass="pa-0">
-        <TitleContent><MoDialogHeading Text="@L["UISignalR:MethodListener:DialogTitle"]" /></TitleContent>
-        <DialogContent>
-            <div class="signalr-listener-dialog-body" aria-busy="@(_isUpdating ? "true" : "false")">
-                <div class="signalr-listener-dialog-summary">
-                    <span>@L["UISignalR:MethodListener:EnabledSummary", EnabledMethods.Count, HubMethods.Count]</span>
-                    <span>@L["UISignalR:MethodListener:TotalReceived", HubMethods.Sum(method => method.ReceivedCount)]</span>
-                </div>
-                <p>@L["UISignalR:MethodListener:ContractHelp"]</p>
-                <div class="signalr-listener-search">
-                    <MudTextField T="string" Value="@_searchText" ValueChanged="ChangeSearchAsync"
-                                  Immediate="true" Clearable="true" Variant="Variant.Outlined" Margin="Margin.Dense"
-                                  Label="@L["UISignalR:MethodListener:SearchPlaceholder"]"
-                                  Adornment="Adornment.Start" AdornmentIcon="@MoIcons.Search" ClearIcon="@MoIcons.Close" />
-                </div>
-                <div class="signalr-listener-dialog-actions">
-                    <MudButton Variant="Variant.Outlined" Color="Color.Primary" OnClick="EnableAllListenersAsync"
-                               Disabled="@(!IsConnected || _isUpdating || EnabledMethods.Count == HubMethods.Count)">
-                        @L["UISignalR:MethodListener:EnableAll"]
-                    </MudButton>
-                    <MudButton Variant="Variant.Outlined" Color="Color.Default" OnClick="DisableAllListenersAsync"
-                               Disabled="@(!IsConnected || _isUpdating || EnabledMethods.Count == 0)">
-                        @L["UISignalR:MethodListener:DisableAll"]
-                    </MudButton>
-                </div>
-                @if (!IsConnected)
-                {
-                    <p class="signalr-listener-connect-help">@L["UISignalR:MethodListener:ConnectHelp"]</p>
-                }
-                @if (_isUpdating)
-                {
-                    <p class="signalr-listener-progress" role="status">@L["UISignalR:MethodListener:Updating"]</p>
-                }
-                @if (FilteredHubMethods.Count == 0)
-                {
-                    <div class="signalr-listener-empty"><MoContentState Compact="true">@L["UISignalR:MethodListener:SearchEmpty"]</MoContentState></div>
-                }
-                else
-                {
-                    <ul class="signalr-listener-dialog-list">
-                        @foreach (var method in FilteredHubMethods)
-                        {
-                            <li @key="method.Name" class="signalr-listener-choice">
-                                <MudCheckBox T="bool" Value="@GetListenerValue(method)" Label="@method.DisplayName"
-                                             Color="Color.Primary" Disabled="@(!IsConnected || _isUpdating)"
-                                             ValueChanged="@((bool listening) => ToggleMethodListenerAsync(method, listening))" CheckedIcon="@MoIcons.SquareCheck" UncheckedIcon="@MoIcons.Square" IndeterminateIcon="@MoIcons.SquareMinus" />
-                                <code>@L["UISignalR:MethodListener:Parameters", FormatSignature(method)]</code>
-                                <span>@L["UISignalR:MethodListener:ReceivedCount", method.ReceivedCount]</span>
-                            </li>
-                        }
-                    </ul>
-                }
-            </div>
-        </DialogContent>
-        <DialogActions><MudButton OnClick="CloseManageDialog" Color="Color.Default">@L["UISignalR:MethodListener:DialogClose"]</MudButton></DialogActions>
-    </MudDialog>
-</section>
+</div>
 
 @code {
-    /// <summary>Gets or sets method metadata and committed listener flags from the browser session owner.</summary>
-    [Parameter] public List<HubMethodInfo> HubMethods { get; set; } = [];
-    /// <summary>Gets or sets whether the current browser session can change callback registrations.</summary>
-    [Parameter] public bool IsConnected { get; set; }
-    /// <summary>Requests one listener change; the JavaScript client owns adoption of the resulting flag.</summary>
-    [Parameter] public EventCallback<(HubMethodInfo method, bool isListening)> OnToggleMethodListener { get; set; }
-    /// <summary>Requests registration of every available callback name.</summary>
-    [Parameter] public EventCallback OnEnableAllListeners { get; set; }
-    /// <summary>Requests removal of every committed callback registration.</summary>
-    [Parameter] public EventCallback OnDisableAllListeners { get; set; }
-
-    private readonly DialogOptions _dialogOptions = new() { MaxWidth = MaxWidth.Medium, FullWidth = true, CloseButton = true, CloseOnEscapeKey = true };
-    private bool _manageDialogVisible;
-    private bool _isUpdating;
-    private string _searchText = string.Empty;
-    private string? _pendingMethodName;
-    private bool _pendingListenerValue;
-    private IReadOnlyList<HubMethodInfo> EnabledMethods => HubMethods.Where(method => method.IsListening).ToList();
-    private IReadOnlyList<HubMethodInfo> FilteredHubMethods => HubMethods.Where(method => string.IsNullOrWhiteSpace(_searchText)
-        || method.Name.Contains(_searchText, StringComparison.OrdinalIgnoreCase)
-        || method.DisplayName.Contains(_searchText, StringComparison.OrdinalIgnoreCase)
-        || FormatSignature(method).Contains(_searchText, StringComparison.OrdinalIgnoreCase)).ToList();
-
-    private static string FormatSignature(HubMethodInfo method) => $"{method.Name}({string.Join(", ", method.Args.Select(argument => $"{argument.TypeName} {argument.Name}"))})";
-    private bool GetListenerValue(HubMethodInfo method) => _isUpdating && method.Name == _pendingMethodName ? _pendingListenerValue : method.IsListening;
-    private void OpenManageDialog() => _manageDialogVisible = true;
-    private void CloseManageDialog() => _manageDialogVisible = false;
-    private Task ChangeSearchAsync(string value) { _searchText = value ?? string.Empty; return Task.CompletedTask; }
-    private Task ToggleMethodListenerAsync(HubMethodInfo method, bool listening) => UpdateListenersAsync(() => OnToggleMethodListener.InvokeAsync((method, listening)), method.Name, listening);
-    private Task EnableAllListenersAsync() => UpdateListenersAsync(() => OnEnableAllListeners.InvokeAsync());
-    private Task DisableAllListenersAsync() => UpdateListenersAsync(() => OnDisableAllListeners.InvokeAsync());
-
-    private async Task UpdateListenersAsync(Func<Task> action, string? methodName = null, bool pendingValue = false)
+    private bool _probing;
+    private bool OnlyEnabled => Context.Get("enabled") == "1";
+    private string Query => Context.Get("callbackQ");
+    private int Enabled => S.HubMethods.Count(method => method.IsListening);
+    private List<HubMethodInfo> Filtered => S.HubMethods.Where(method => (!OnlyEnabled || method.IsListening) && (string.IsNullOrWhiteSpace(Query) || Signature(method).Contains(Query.Trim(), StringComparison.OrdinalIgnoreCase) || method.DisplayName.Contains(Query.Trim(), StringComparison.OrdinalIgnoreCase))).ToList();
+    private Task Toggle(HubMethodInfo method, bool enabled) => Context.Run(async () => { await S.ToggleMethodListenerAsync(method, enabled); });
+    private Task EnableAll() => Context.Run(async () => { await S.EnableAllListenersAsync(); });
+    private Task DisableAll() => Context.Run(async () => { await S.DisableAllListenersAsync(); });
+    private Task Probe() => Context.Run(async () =>
     {
-        if (!IsConnected || _isUpdating) return;
-        _isUpdating = true;
-        _pendingMethodName = methodName;
-        _pendingListenerValue = pendingValue;
+        if (_probing || !S.ConnectionState.IsConnected || S.HubMethods.FirstOrDefault(method => method.IsListening) is not { } method) return;
+        _probing = true;
         try
         {
-            // Commit the disabled pending input before dispatch, including callbacks that fail synchronously.
-            // Returning to the owner's flag then refreshes MudCheckBox's child-originated value without changing the model.
-            await InvokeAsync(StateHasChanged);
-            await action();
+            var result = await Facade.SendDebugCallbackAsync(S.ConnectedHubRoute, S.ConnectionState.ConnectionId, method.Name,
+                method.Args.Select(arg => Parser.ConvertValue(string.Empty, arg.TypeName)).ToArray());
+            if (result.IsFailure()) throw new InvalidOperationException(result.Message);
+            await S.LoadSendDiagnosticsAsync();
         }
-        finally
-        {
-            _pendingMethodName = null;
-            _isUpdating = false;
-        }
-    }
+        finally { _probing = false; }
+    });
 }

@@ -1,0 +1,43 @@
+@inherits SignalRWorkspaceView
+
+<div class="sr-tenure">
+    <div class="sr-spread-head"><div><h3>@T("Workspace:CnTimelineTitle")</h3><p>@T("Workspace:CnTimelineSubtitle")</p></div><div class="mo-vl-legend"><span>@Swatch(MoVisualRole.Primary)@T("Workspace:CnLegendBrowser")</span><span>@Swatch(MoVisualRole.Info)@T("Workspace:CnLegendMulti")</span><span>@Swatch(MoVisualRole.Success)@T("Workspace:CnLegendSingle")</span><span>@Swatch(MoVisualRole.Neutral)@T("Workspace:CnLegendUnauth")</span></div></div>
+    <div class="sr-tn-axis"><span class="sr-tn-axis-label">@T("Workspace:CnCols:User")</span><div class="sr-tn-ticks">@for (var index = 0; index <= 4; index++) { <span class="mono" style="left:@(index * 25)%">@UiTime.Format(Tick(index), "HH:mm")</span> }</div><span class="sr-tn-axis-meta">@T("Workspace:Sessions")</span></div>
+    <SignalRKeyboardRegion Class="sr-tn-rows" Selector=".sr-tn-node">
+        @foreach (var group in Groups)
+        {
+            var first = group[0];
+            var hasBrowser = group.Any(connection => connection.ConnectionId == S.ConnectionState.ConnectionId);
+            var role = hasBrowser ? MoVisualRole.Primary : !first.IsAuthenticated ? MoVisualRole.Neutral : group.Count > 1 ? MoVisualRole.Info : MoVisualRole.Success;
+            <div class="sr-tn-row" @key="SignalRDiagnosticRules.UserKey(first)"><div class="sr-tn-user"><strong>@(first.UserName ?? T("Workspace:Auth:Unauthenticated"))</strong><small class="mono">@(first.UserId ?? first.ConnectionId)</small></div><div class="sr-tn-track">
+                @for (var index = 0; index <= 4; index++) { <i class="sr-gridline" style="left:@(index * 25)%"></i> }
+                @if (group.Count > 1) { <span class="sr-tn-span @Role(role)" style="left:@Pct(Position(first.ConnectionTime));width:@Pct(Math.Max(1, Position(group[^1].ConnectionTime) - Position(first.ConnectionTime)))"></span> }
+                @foreach (var connection in group)
+                {
+                    var connectionRole = connection.ConnectionId == S.ConnectionState.ConnectionId ? MoVisualRole.Primary : !connection.IsAuthenticated ? MoVisualRole.Neutral : group.Count > 1 ? MoVisualRole.Info : MoVisualRole.Success;
+                    var label = $"{connection.UserName ?? T("Workspace:Auth:Unauthenticated")} · {connection.ConnectionId} · {UiTime.Format(connection.ConnectionTime)}";
+                    <button type="button" class="sr-tn-node @Role(connectionRole) @(_active == connection.ConnectionId ? "is-focused" : null)" style="left:@Pct(Position(connection.ConnectionTime))" aria-label="@label" title="@label" @onfocus="() => _active = connection.ConnectionId" @onmouseenter="() => _active = connection.ConnectionId" @onclick='() => Context.Set("conn", connection.ConnectionId, true)'><i></i></button>
+                }
+            </div><div class="sr-tn-count"><SignalRBadge Text="@(hasBrowser ? T("Workspace:CnThisBrowser") : T("Workspace:CnMultiTag", group.Count))" Role="role" /></div></div>
+        }
+    </SignalRKeyboardRegion>
+    <div class="sr-spread-readout" aria-live="polite">
+        @if (Active is { } connection)
+        {
+            <span class="mono"><strong>@(connection.UserName ?? T("Workspace:Auth:Unauthenticated"))</strong></span><span class="mono">@connection.ConnectionId</span><span>@T("Workspace:CnCols:ConnectedAt"): <b class="mono">@UiTime.Format(connection.ConnectionTime)</b> (@Age(connection.ConnectionTime, S.ConnectedUsersCapturedAtUtc))</span><span>@T("Workspace:CnClaimsCount", connection.Claims.Count)</span>
+        }
+        else { <span class="sr-muted">@T("Workspace:CnTimelineIdle")</span> }
+    </div>
+</div>
+
+@code {
+    private string? _active;
+    private List<List<SignalRConnectedUserInfo>> Groups => SignalRDiagnosticRules.GroupConnections(S.ConnectedUsers, S.ConnectionState.ConnectionId);
+    private SignalRConnectedUserInfo? Active => S.ConnectedUsers.FirstOrDefault(connection => connection.ConnectionId == _active) ?? Groups.FirstOrDefault()?.FirstOrDefault();
+    private DateTime Minimum => S.ConnectedUsers.Select(connection => connection.ConnectionTime).DefaultIfEmpty(Captured.AddHours(-1)).Min();
+    private DateTime Captured => S.ConnectedUsersCapturedAtUtc ?? DateTime.UtcNow;
+    private DateTime Maximum => Captured > Minimum.AddMinutes(1) ? Captured : Minimum.AddMinutes(1);
+    private DateTime Tick(int index) => Minimum.AddTicks((Maximum - Minimum).Ticks / 4 * index);
+    private double Position(DateTime value) => Math.Clamp((value - Minimum).TotalMilliseconds / (Maximum - Minimum).TotalMilliseconds * 100, 2, 98);
+    private static string Pct(double value) => value.ToString("0.#####", CultureInfo.InvariantCulture) + "%";
+}

@@ -1,165 +1,47 @@
-@using Monica.UI.Shared.Components.States
-@inject Monica.UI.Shared.Services.MoTimeFormatter UiTime
-@using Monica.SignalR.UISignalR.Models
-@inject IStringLocalizer<SignalRResource> L
+@inherits SignalRWorkspaceView
+@inject NavigationManager Navigation
 
-<section class="signalr-message-log" aria-label="@L["UISignalR:MessageLog:Title"]">
-    <header class="signalr-trace-heading">
-        <div>
-            <span class="signalr-trace-scope">@L["UISignalR:MessageLog:Scope"]</span>
-            <h2>@L["UISignalR:MessageLog:Title"]</h2>
-        </div>
-        <MudButton Variant="Variant.Outlined" Color="Color.Default" Size="Size.Small"
-                   StartIcon="@MoIcons.ClearList" OnClick="ClearMessagesAsync"
-                   Disabled="@(Messages.Count == 0)">
-            @L["UISignalR:MessageLog:Clear"]
-        </MudButton>
-    </header>
-
-    <p class="signalr-trace-help">@L["UISignalR:MessageLog:Help"]</p>
-
-    <div class="signalr-trace-filters">
-        <div class="signalr-trace-search">
-            <MudTextField T="string" Value="@_searchText" ValueChanged="ChangeSearch"
-                          Immediate="true" Clearable="true" Variant="Variant.Outlined" Margin="Margin.Dense"
-                          Label="@L["UISignalR:MessageLog:SearchLabel"]"
-                          Adornment="Adornment.Start" AdornmentIcon="@MoIcons.Search" ClearIcon="@MoIcons.Close" />
-        </div>
-        <div class="signalr-trace-type">
-            <MudSelect T="MessageType?" Value="@_typeFilter" ValueChanged="ChangeTypeFilter"
-                       Variant="Variant.Outlined" Margin="Margin.Dense"
-                       Label="@L["UISignalR:MessageLog:TypeLabel"]" OpenIcon="@MoIcons.ChevronDown" CloseIcon="@MoIcons.ChevronUp">
-                <MudSelectItem T="MessageType?" Value="@(null)">@L["UISignalR:MessageLog:AllTypes"]</MudSelectItem>
-                @foreach (var type in Enum.GetValues<MessageType>())
-                {
-                    <MudSelectItem T="MessageType?" Value="@type">@GetMessageTypeLabel(type)</MudSelectItem>
-                }
-            </MudSelect>
-        </div>
-    </div>
-
-    @if (Messages.Count == 0)
+<section class="mo-vl-surface sr-trace" aria-label="@T("Workspace:TrTitle")">
+    <header class="mo-vl-surface-heading"><span class="mo-vl-tile mo-vl-role--info"><MoIcon Icon="@MoIcons.Terminal" Size="16px" /></span><div class="sr-surface-title"><h2>@T("Workspace:TrTitle")</h2><p>@T("Workspace:TrScope")</p></div><span class="sr-count">@S.Messages.Count</span><div class="sr-aside"><button class="sr-btn sr-btn-outline sr-btn-sm" disabled="@(S.Messages.Count == 0)" title="@T("Workspace:TrClearNote")" @onclick="Clear"><MoIcon Icon="@MoIcons.ClearList" Size="14px" />@T("Workspace:TrClear")</button></div></header>
+    <div class="sr-trace-controls"><div class="sr-search"><MoIcon Icon="@MoIcons.Search" Size="14px" /><input type="search" aria-label="@T("Workspace:TrSearchPlaceholder")" placeholder="@T("Workspace:TrSearchPlaceholder")" value="@Query" @oninput='args => Filter("traceQ", args.Value?.ToString())' /></div><div class="mo-vl-chips" role="group" aria-label="@T("Workspace:TrTitle")"><MoFilterChip Pill="true" Label="@T("Workspace:TrAllTypes")" Count="TextMatched.Count" Role="MoVisualRole.Primary" Selected="@(Type.Length == 0)" SelectedChanged='() => Filter("traceType", null)' />
+        @foreach (var type in TraceTypes)
+        {
+            <MoFilterChip Pill="true" Class="mo-vl-chip--instrument" Label="@T($"Workspace:TrTypes:{type}")" Count="@(TextMatched.Count(message => EffectiveType(message) == type))" Role="@SignalRDiagnosticRules.TraceRole(type)" ShowDot="true" Selected="@(Type == type)" SelectedChanged='() => Filter("traceType", Type == type ? null : type)' />
+        }
+    </div></div>
+    @if (S.Messages.Count == 0)
     {
-        <div class="signalr-trace-empty"><MoContentState Compact="true">@L["UISignalR:MessageLog:Empty"]</MoContentState></div>
+        <MoContentState Compact="true" Class="sr-trace-empty"><span class="mo-vl-tile mo-vl-role--neutral"><MoIcon Icon="@MoIcons.Messages" Size="18px" /></span><p>@T("Workspace:TrEmpty")</p>@if (!S.ConnectionState.IsConnected && S.AvailableHubs.Count > 0 && S.CanGenerateTestToken) { <button class="sr-btn sr-btn-sm mo-vl-soft-action mo-vl-role--primary" @onclick="TestConnect"><MoIcon Icon="@MoIcons.Flask" Size="14px" />@T("Workspace:WbTestUserConnect")</button> }</MoContentState>
     }
-    else if (FilteredMessages.Count == 0)
+    else if (Filtered.Count == 0)
     {
-        <div class="signalr-trace-empty"><MoContentState Compact="true">@L["UISignalR:MessageLog:NoMatches"]</MoContentState></div>
+        <MoContentState Compact="true" Class="sr-trace-empty"><p>@T("Workspace:TrNoMatch")</p><button class="sr-btn sr-btn-outline sr-btn-sm" @onclick="Reset">@T("Workspace:ResetFilters")</button></MoContentState>
     }
     else
     {
-        <ol class="signalr-trace-events">
-            @foreach (var message in VisibleMessages)
+        <ol class="sr-trace-list">
+            @foreach (var message in Filtered.Skip((Page - 1) * 20).Take(20))
             {
-                <li @key="message" class="signalr-trace-event @(IsError(message) ? "signalr-trace-event--error" : string.Empty)">
-                    <header class="signalr-trace-event-heading">
-                        <MudChip T="string" Size="Size.Small" Variant="Variant.Outlined"
-                                 Color="@GetMessageColor(message)" Icon="@GetMessageIcon(message.Type)" CheckedIcon="@MoIcons.Check" CloseIcon="@MoIcons.Close">
-                            @GetMessageTypeLabel(message.Type)
-                        </MudChip>
-                        <time datetime="@message.Timestamp.ToString("O")" title="@UiTime.Format(message.Timestamp)">
-                            @UiTime.FormatTime(message.Timestamp)
-                        </time>
-                        @if (!string.IsNullOrWhiteSpace(message.Source))
-                        {
-                            <span class="signalr-trace-source"><span>@L["UISignalR:MessageLog:Source"]</span> @message.Source</span>
-                        }
-                    </header>
-                    <p class="signalr-trace-content">@message.Content</p>
-                    @if (!string.IsNullOrEmpty(message.Details))
-                    {
-                        <div class="signalr-trace-details">
-                            <span>@L["UISignalR:MessageLog:Details"]</span>
-                            <pre>@message.Details</pre>
-                        </div>
-                    }
-                </li>
+                var type = EffectiveType(message);
+                <li class="sr-trace-item @(type == "Error" ? "is-err" : null)" @key="message.Id"><button type="button" class="sr-trace-btn" @onclick='() => Context.Set("event", message.Id, true)'><div class="sr-trace-meta"><SignalRBadge Text="@T($"Workspace:TrTypes:{type}")" Role="@SignalRDiagnosticRules.TraceRole(type)" Icon="@Icon(type)" /><time class="mono" datetime="@message.Timestamp.ToString("O")" title="@UiTime.Format(message.Timestamp)">@UiTime.FormatTime(message.Timestamp)</time><span class="sr-trace-src">@Source(message.Source)</span><MoIcon Icon="@MoIcons.ChevronRight" Size="14px" Class="sr-trace-chev" /></div><p class="sr-trace-text mono">@message.Content</p></button></li>
             }
         </ol>
-        <footer class="signalr-trace-footer">
-            <span>@L["UISignalR:MessageLog:Showing", (_page - 1) * PageSize + 1, Math.Min(_page * PageSize, FilteredMessages.Count), FilteredMessages.Count]</span>
-            @if (PageCount > 1)
-            {
-                <MudPagination Count="PageCount" Selected="_page" SelectedChanged="ChangePage"
-                               ShowFirstButton="true" ShowLastButton="true" BoundaryCount="0" MiddleCount="1"
-                               Size="Size.Small" Color="Color.Default" aria-label="@L["UISignalR:MessageLog:Pagination"]" FirstIcon="@MoIcons.FirstPage" BeforeIcon="@MoIcons.ChevronLeft" NextIcon="@MoIcons.ChevronRight" LastIcon="@MoIcons.LastPage" />
-            }
-        </footer>
+        <footer class="sr-trace-foot"><span class="sr-muted">@T("Workspace:TrShowing", (Page - 1) * 20 + 1, Math.Min(Page * 20, Filtered.Count), Filtered.Count)</span>@if (Filtered.Count > 20) { <div class="sr-pager-btns"><button class="sr-btn sr-btn-outline sr-btn-sm" disabled="@(Page <= 1)" @onclick='() => Context.Set("tracePage", (Page - 1).ToString())'>@T("Workspace:TrPrev")</button><button class="sr-btn sr-btn-outline sr-btn-sm" disabled="@(Page * 20 >= Filtered.Count)" @onclick='() => Context.Set("tracePage", (Page + 1).ToString())'>@T("Workspace:TrNext")</button></div> }</footer>
     }
 </section>
 
 @code {
-    /// <summary>Gets or sets the retained browser trace, ordered newest first by its state owner.</summary>
-    [Parameter] public List<SignalRMessage> Messages { get; set; } = [];
-
-    /// <summary>Requests that the state owner clear the trace and its received-message counter.</summary>
-    [Parameter] public EventCallback OnClearMessages { get; set; }
-
-    private const int PageSize = 20;
-    private string _searchText = string.Empty;
-    private MessageType? _typeFilter;
-    private int _page = 1;
-
-    private IReadOnlyList<SignalRMessage> FilteredMessages => Messages
-        .Where(message => (!_typeFilter.HasValue
-                           || message.Type == _typeFilter.Value
-                           || _typeFilter == MessageType.Error && IsError(message))
-                          && (string.IsNullOrWhiteSpace(_searchText)
-                              || message.Source.Contains(_searchText, StringComparison.OrdinalIgnoreCase)
-                              || message.Content.Contains(_searchText, StringComparison.OrdinalIgnoreCase)
-                              || message.Details.Contains(_searchText, StringComparison.OrdinalIgnoreCase)))
-        .ToList();
-
-    private int PageCount => Math.Max(1, (FilteredMessages.Count + PageSize - 1) / PageSize);
-    private IEnumerable<SignalRMessage> VisibleMessages => FilteredMessages.Skip((_page - 1) * PageSize).Take(PageSize);
-
-    /// <inheritdoc />
-    protected override void OnParametersSet() => _page = Math.Min(_page, PageCount);
-
-    private Task ClearMessagesAsync() => OnClearMessages.InvokeAsync();
-
-    private void ChangeSearch(string value)
-    {
-        _searchText = value ?? string.Empty;
-        _page = 1;
-    }
-
-    private void ChangeTypeFilter(MessageType? value)
-    {
-        _typeFilter = value;
-        _page = 1;
-    }
-
-    private void ChangePage(int page) => _page = Math.Clamp(page, 1, PageCount);
-    private static bool IsError(SignalRMessage message) => message.IsError || message.Type == MessageType.Error;
-
-    private string GetMessageTypeLabel(MessageType type) => type switch
-    {
-        MessageType.Sent => L["UISignalR:MessageLog:Types:Sent"].Value,
-        MessageType.Received => L["UISignalR:MessageLog:Types:Received"].Value,
-        MessageType.System => L["UISignalR:MessageLog:Types:System"].Value,
-        MessageType.Success => L["UISignalR:MessageLog:Types:Success"].Value,
-        MessageType.Error => L["UISignalR:MessageLog:Types:Error"].Value,
-        _ => L["UISignalR:MessageLog:Types:Info"].Value
-    };
-
-    private static string GetMessageIcon(MessageType type) => type switch
-    {
-        MessageType.Sent => MoIcons.Send,
-        MessageType.Received => MoIcons.Inbox,
-        MessageType.Success => MoIcons.Success,
-        MessageType.Error => MoIcons.Error,
-        _ => MoIcons.Info
-    };
-
-    private static Color GetMessageColor(SignalRMessage message) => IsError(message)
-        ? Color.Error
-        : message.Type switch
-        {
-            MessageType.Sent => Color.Primary,
-            MessageType.Received => Color.Info,
-            MessageType.Success => Color.Success,
-            MessageType.System or MessageType.Info => Color.Default,
-            _ => Color.Default
-        };
+    private static readonly string[] TraceTypes = ["Sent", "Received", "Success", "Error", "System", "Info"];
+    private string Query => Context.Get("traceQ");
+    private string Type => Context.Get("traceType");
+    private int Page => Math.Clamp(int.TryParse(Context.Get("tracePage"), out var page) ? page : 1, 1, Math.Max(1, (Filtered.Count + 19) / 20));
+    private List<SignalRMessage> TextMatched => S.Messages.Where(message => string.IsNullOrWhiteSpace(Query) || $"{message.Source} {message.Content} {message.Details}".Contains(Query.Trim(), StringComparison.OrdinalIgnoreCase)).ToList();
+    private List<SignalRMessage> Filtered => TextMatched.Where(message => Type.Length == 0 || EffectiveType(message) == Type).ToList();
+    private static string EffectiveType(SignalRMessage message) => message.IsError ? "Error" : message.Type.ToString();
+    private string Source(string value) => Enum.TryParse<MessageType>(value, out _) ? T($"Workspace:TrTypes:{value}") : value;
+    private static string Icon(string type) => type switch { "Sent" => MoIcons.Send, "Received" => MoIcons.Inbox, "Success" => MoIcons.Success, "Error" => MoIcons.Error, "System" => MoIcons.Radio, _ => MoIcons.Info };
+    private void Filter(string key, string? value) => Context.Set(new Dictionary<string, object?> { [key] = string.IsNullOrEmpty(value) ? null : value, ["tracePage"] = null });
+    private void Reset() => Context.Set(new Dictionary<string, object?> { ["traceType"] = null, ["traceQ"] = null, ["tracePage"] = null });
+    private void Clear() { S.ClearMessages(); Context.Set("tracePage", null); }
+    private Task TestConnect() => Context.Run(async () => { await S.TestUserConnectAsync(Navigation.BaseUri); });
 }

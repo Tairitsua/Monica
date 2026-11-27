@@ -1,0 +1,83 @@
+@inherits SignalRWorkspaceView
+
+@if (S.ConnectedUsers.Count == 0)
+{
+    <section class="mo-vl-surface sr-gate"><MoContentState><span class="mo-vl-tile mo-vl-role--neutral"><MoIcon Icon="@MoIcons.Users" /></span><h2>@T("Workspace:CnEmptyTitle")</h2><p>@T("Workspace:CnEmptyBody")</p><a class="sr-btn sr-btn-primary" href='@Context.Href("/signalr-debug")'>@T("Workspace:Nav:Workbench")</a></MoContentState></section>
+}
+else
+{
+    <section class="mo-vl-surface sr-sig"><div class="sr-decision"><div class="sr-decision-value"><p class="sr-display-label">@T("Workspace:CnDisplayLabel")</p><MoDisplayValue Compact="true" Value="@S.ConnectedUsers.Count.ToString()" Unit="@T("Workspace:CnDisplayUnit", DistinctUsers)" /><div class="sr-reasons">
+        <span class="@(MultiUsers == 0 ? "is-zero" : null)">@Swatch(MoVisualRole.Info)@T("Workspace:CnReasons:MultiUsers") <b class="mono">@MultiUsers</b></span><span class="@(Browser is null ? "is-zero" : null)">@Swatch(MoVisualRole.Primary)@T("Workspace:CnReasons:Browser") <b class="mono">@(Browser is null ? 0 : 1)</b></span><span class="@(Authenticated == 0 ? "is-zero" : null)">@Swatch(MoVisualRole.Success)@T("Workspace:CnReasons:Auth") <b class="mono">@Authenticated</b></span><span class="@(Unauthenticated == 0 ? "is-zero" : null)">@Swatch(MoVisualRole.Neutral)@T("Workspace:CnReasons:Unauth") <b class="mono">@Unauthenticated</b></span>
+    </div></div><p class="sr-lede">
+        @if (Groups.Where(group => group.Count > 1).OrderByDescending(group => group.Count).FirstOrDefault() is { } multi)
+        {
+            <MoRichFinding Template="@T("Workspace:CnFindingMulti")" Values="@([Mark(T("Workspace:CnMultiFindingLabel", MultiUsers), MoVisualRole.Info), InspectMark(multi[0].UserName ?? multi[0].UserId ?? multi[0].ConnectionId, MoVisualRole.Info, "conn", multi[0].ConnectionId), Plain(multi.Count.ToString()), Plain(UiTime.Format(multi[0].ConnectionTime))])" />
+        }
+        @if (Browser is { } browser)
+        {
+            <MoRichFinding Template="@T("Workspace:CnFindingBrowser")" Values="@([InspectMark(browser.UserName ?? browser.ConnectionId, MoVisualRole.Primary, "conn", browser.ConnectionId)])" />
+        }
+        else if (S.ConnectionState.IsConnected) { <MoValueMark Role="MoVisualRole.Warning">@T("Workspace:WbAnonymousTitle")</MoValueMark> }
+        @if (Unauthenticated > 0) { <MoRichFinding Template="@T("Workspace:CnFindingUnauth")" Values="@([Mark(T("Workspace:CnUnauthFindingLabel", Unauthenticated), MoVisualRole.Neutral)])" /> }
+        @if (MultiUsers == 0 && Browser is null && !S.ConnectionState.IsConnected && Unauthenticated == 0) { @T("Workspace:CnFindingSingle", DistinctUsers) }
+    </p></div><div class="sr-scope-bar"><p class="sr-scope-note"><MoIcon Icon="@MoIcons.Info" Size="15px" /><span>@T("Workspace:CnScopeNote")</span></p></div><SignalRConnectionTenure /></section>
+
+    <section class="mo-vl-surface sr-ledger-surface" aria-label="@T("Workspace:CnTableTitle")"><header class="mo-vl-surface-heading"><span class="mo-vl-tile mo-vl-role--primary"><MoIcon Icon="@MoIcons.Users" Size="16px" /></span><div class="sr-surface-title"><h2>@T("Workspace:CnTableTitle")</h2><p>@T("Workspace:CnMatchSummary", Filtered.Count, S.ConnectedUsers.Count)</p></div></header>
+        <div class="sr-toolbar"><div class="mo-vl-chips" role="group" aria-label="@T("Workspace:CnTableTitle")">
+            @foreach (var item in Filters)
+            {
+                <MoFilterChip Pill="true" Class="mo-vl-chip--instrument" Label="@T(item.Label)" Count="@(BaseRows.Count(connection => MatchesFilter(connection, item.Key)))" Role="item.Role" ShowDot="@(item.Key.Length > 0)" Selected="@(Filter == item.Key)" SelectedChanged='() => Change("filter", Filter == item.Key ? null : item.Key)' />
+            }
+        </div><div class="sr-toolbar-end"><div class="sr-search"><MoIcon Icon="@MoIcons.Search" Size="14px" /><input type="search" spellcheck="false" aria-label="@T("Workspace:CnSearchPlaceholder")" placeholder="@T("Workspace:CnSearchPlaceholder")" value="@Query" @oninput='args => Change("q", args.Value?.ToString())' /></div></div></div>
+        @if (Filtered.Count == 0) { <MoContentState><h3>@T("Workspace:CnNoMatch")</h3><p>@T("Workspace:CnNoMatchHelp")</p><button class="sr-btn sr-btn-outline sr-btn-sm" @onclick="Reset">@T("Workspace:ResetFilters")</button></MoContentState> }
+        else
+        {
+            <div class="sr-table-wrap"><table class="sr-table sr-conns-table"><thead><tr><th aria-sort="@SortAria("id")"><button class="sr-sort" @onclick='() => SortBy("id")'>@T("Workspace:CnCols:ConnId")@SortIcon("id")</button></th><th aria-sort="@SortAria("user")"><button class="sr-sort" @onclick='() => SortBy("user")'>@T("Workspace:CnCols:User")@SortIcon("user")</button></th><th aria-sort="@SortAria("time")"><button class="sr-sort" @onclick='() => SortBy("time")'>@T("Workspace:CnCols:ConnectedAt")@SortIcon("time")</button></th><th>@T("Workspace:CnCols:AuthClaims")</th><th class="is-num">@T("Workspace:CnCols:Actions")</th></tr></thead><tbody>
+                @foreach (var connection in Filtered.Skip((Page - 1) * Size).Take(Size))
+                {
+                    var sessions = UserSessions(connection);
+                    <tr class="@(connection.ConnectionId == S.ConnectionState.ConnectionId ? "is-browser-row" : null)" @key="connection.ConnectionId"><td data-label="@T("Workspace:CnCols:ConnId")"><div class="sr-conn-id-cell"><code class="mono sr-break">@connection.ConnectionId</code><MoCopyButton Value="@connection.ConnectionId" Label="@T("Workspace:Copy")" />@if (connection.ConnectionId == S.ConnectionState.ConnectionId) { <SignalRBadge Text="@T("Workspace:CnThisBrowser")" Role="MoVisualRole.Primary" /> }</div></td><td data-label="@T("Workspace:CnCols:User")" class="is-name"><div class="sr-user-cell"><b>@(connection.UserName ?? T("Workspace:None"))</b>@if (sessions > 1) { <SignalRBadge Text="@T("Workspace:CnMultiTag", sessions)" Role="MoVisualRole.Info" /> }</div><small class="mono sr-break">@(connection.UserId ?? T("Workspace:None"))</small></td><td data-label="@T("Workspace:CnCols:ConnectedAt")" class="sr-time-cell"><time class="mono" datetime="@connection.ConnectionTime.ToString("O")">@UiTime.Format(connection.ConnectionTime)</time><small class="sr-muted">@Age(connection.ConnectionTime, S.ConnectedUsersCapturedAtUtc)</small></td><td data-label="@T("Workspace:CnCols:AuthClaims")"><div class="sr-auth-cell"><SignalRBadge Status="true" Text="@T(connection.IsAuthenticated ? "Workspace:Auth:Authenticated" : "Workspace:Auth:Unauthenticated")" Role="@(connection.IsAuthenticated ? MoVisualRole.Success : MoVisualRole.Neutral)" /><span class="sr-muted mono">@T("Workspace:CnClaimsCount", connection.Claims.Count)</span></div></td><td data-label="@T("Workspace:CnCols:Actions")" class="is-num"><button class="sr-btn sr-btn-sm mo-vl-soft-action mo-vl-role--primary" @onclick='() => Context.Set("conn", connection.ConnectionId, true)'>@T("Workspace:CnInspect")<MoIcon Icon="@MoIcons.ChevronRight" Size="13px" /></button></td></tr>
+                }
+            </tbody></table></div>
+            <footer class="sr-table-foot"><span class="sr-muted">@T("Workspace:CnPageInfo", (Page - 1) * Size + 1, Math.Min(Page * Size, Filtered.Count), Filtered.Count)</span><div class="sr-pager-right"><div class="sr-size-pick"><span class="sr-muted">@T("Workspace:CnRowsPerPage")</span><MudSelect T="int" Value="@Size" ValueChanged='value => Change("size", value.ToString())' Variant="Variant.Outlined" Margin="Margin.Dense" aria-label="@T("Workspace:CnRowsPerPage")" OpenIcon="@MoIcons.ChevronDown" CloseIcon="@MoIcons.ChevronUp">@foreach (var size in new[] { 10, 20, 50 }) { <MudSelectItem Value="@size">@size</MudSelectItem> }</MudSelect></div>@if (Filtered.Count > Size) { <div class="sr-pager-btns"><button class="sr-btn sr-btn-outline sr-btn-sm" disabled="@(Page <= 1)" @onclick='() => Context.Set("page", (Page - 1).ToString())'>@T("Workspace:TrPrev")</button><button class="sr-btn sr-btn-outline sr-btn-sm" disabled="@(Page * Size >= Filtered.Count)" @onclick='() => Context.Set("page", (Page + 1).ToString())'>@T("Workspace:TrNext")</button></div> }</div></footer>
+        }
+    </section>
+}
+
+@code {
+    private List<List<SignalRConnectedUserInfo>> Groups => SignalRDiagnosticRules.GroupConnections(S.ConnectedUsers, S.ConnectionState.ConnectionId);
+    private int MultiUsers => Groups.Count(group => group.Count > 1);
+    private int Authenticated => S.ConnectedUsers.Count(connection => connection.IsAuthenticated);
+    private int Unauthenticated => S.ConnectedUsers.Count - Authenticated;
+    private int DistinctUsers => S.ConnectedUsers.Where(connection => connection.IsAuthenticated).Select(SignalRDiagnosticRules.UserKey).Distinct(StringComparer.Ordinal).Count();
+    private SignalRConnectedUserInfo? Browser => S.ConnectedUsers.FirstOrDefault(connection => connection.ConnectionId == S.ConnectionState.ConnectionId);
+    private int UserSessions(SignalRConnectedUserInfo connection) => S.ConnectedUsers.Count(item => SignalRDiagnosticRules.UserKey(item) == SignalRDiagnosticRules.UserKey(connection));
+    private string Query => Context.Get("q");
+    private string Filter => Context.Get("filter");
+    private string Sort => Context.Get("sort") is "id" or "user" ? Context.Get("sort") : "time";
+    private bool Ascending => Context.Get("dir") == "asc";
+    private int Size => int.TryParse(Context.Get("size"), out var size) && size is 10 or 20 or 50 ? size : 10;
+    private int Page => Math.Clamp(int.TryParse(Context.Get("page"), out var page) ? page : 1, 1, Math.Max(1, (Filtered.Count + Size - 1) / Size));
+    private List<SignalRConnectedUserInfo> BaseRows => S.ConnectedUsers.Where(connection => SignalRDiagnosticRules.Matches(connection, Query)).ToList();
+    private List<SignalRConnectedUserInfo> Filtered
+    {
+        get
+        {
+            var rows = BaseRows.Where(connection => MatchesFilter(connection, Filter));
+            var ordered = Sort switch
+            {
+                "id" => Ascending ? rows.OrderBy(connection => connection.ConnectionId, StringComparer.Ordinal) : rows.OrderByDescending(connection => connection.ConnectionId, StringComparer.Ordinal),
+                "user" => Ascending ? rows.OrderBy(connection => connection.UserName ?? connection.UserId, StringComparer.Ordinal) : rows.OrderByDescending(connection => connection.UserName ?? connection.UserId, StringComparer.Ordinal),
+                _ => Ascending ? rows.OrderBy(connection => connection.ConnectionTime) : rows.OrderByDescending(connection => connection.ConnectionTime)
+            };
+            return ordered.ThenBy(connection => connection.ConnectionId, StringComparer.Ordinal).ToList();
+        }
+    }
+    private bool MatchesFilter(SignalRConnectedUserInfo connection, string filter) => filter switch { "multi" => UserSessions(connection) > 1, "browser" => connection.ConnectionId == S.ConnectionState.ConnectionId, "auth" => connection.IsAuthenticated, "unauth" => !connection.IsAuthenticated, _ => true };
+    private static readonly (string Key, string Label, MoVisualRole Role)[] Filters = [("", "Workspace:CnFilterChips:All", MoVisualRole.Primary), ("multi", "Workspace:CnFilterChips:Multi", MoVisualRole.Info), ("browser", "Workspace:CnFilterChips:Browser", MoVisualRole.Primary), ("auth", "Workspace:CnFilterChips:Auth", MoVisualRole.Success), ("unauth", "Workspace:CnFilterChips:Unauth", MoVisualRole.Neutral)];
+    private void Change(string key, string? value) => Context.Set(new Dictionary<string, object?> { [key] = string.IsNullOrEmpty(value) ? null : value, ["page"] = null });
+    private void Reset() => Context.Set(new Dictionary<string, object?> { ["q"] = null, ["filter"] = null, ["page"] = null });
+    private void SortBy(string key) => Context.Set(new Dictionary<string, object?> { ["sort"] = key, ["dir"] = Sort == key && Ascending ? "desc" : "asc", ["page"] = null });
+    private string SortAria(string key) => Sort != key ? "none" : Ascending ? "ascending" : "descending";
+    private RenderFragment SortIcon(string key) => @<span>@if (Sort == key) { <MoIcon Icon="@(Ascending ? MoIcons.ArrowUp : MoIcons.ArrowDown)" Size="13px" /> }</span>;
+}

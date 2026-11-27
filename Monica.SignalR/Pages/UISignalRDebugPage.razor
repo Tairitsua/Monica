@@ -1,91 +1,112 @@
 @attribute [Route(PAGE_URL)]
+@attribute [Route(SENDS_URL)]
+@attribute [Route(CONNECTIONS_URL)]
+@inherits SignalRWorkspaceView
 @using Monica.SignalR.UISignalR.Components
-@using Monica.SignalR.UISignalR.Models
 @using Monica.SignalR.UISignalR.State
+@using Monica.SignalR.UISignalR.Support
+@using Monica.UI.Shared.Components.Visual
+@using Monica.UI.Shared.Components.Navigation
+@using Monica.UI.Shared.Components.States
 @using Microsoft.Extensions.Logging
+@using Microsoft.AspNetCore.Components.Routing
 @using System.Globalization
 @inject ISnackbar SnackBar
 @inject NavigationManager NavigationManager
 @inject SignalRDebugPageStateFactory PageStateFactory
-@inject IStringLocalizer<SignalRResource> L
 @inject ILogger<UISignalRDebugPage> Logger
 @implements IAsyncDisposable
 
-<PageTitle>@L["Pages:SignalRDebug:Title"]</PageTitle>
+<PageTitle>@T(TitleKey)</PageTitle>
 
-<div class="signalr-workbench mo-page-shell mo-page-shell--full-width">
-    <header class="signalr-workbench-header">
-        <div class="signalr-workbench-identity">
-            <span class="signalr-workbench-mark" aria-hidden="true"><MoIcon Icon="@MoIcons.Cable" Size="1.5rem" /></span>
-            <div>
-                <span class="signalr-workbench-eyebrow">@L["Pages:SignalRDebug:Eyebrow"]</span>
-                <h1>@L["Pages:SignalRDebug:Heading"]</h1>
-                <p>@L["Pages:SignalRDebug:Subtitle"]</p>
-            </div>
+<div class="signalr-family mo-workbench-container">
+    <CascadingValue Value="Context">
+        <div class="sr-page mo-page-shell mo-page-shell--workbench">
+            <MoPageMasthead Icon="@PageIcon" Title="@T(TitleKey)" Crumb="@T("Workspace:Eyebrow")" Class="sr-mh">
+                <TitleContent><span class="sr-masthead-title">@T(TitleKey)</span></TitleContent>
+                <Meta>
+                    <SignalRBadge Status="true" Text="@(InitialFailed ? T("Workspace:LoadFailedTitle") : InitialLoading ? T("Workspace:LoadingTitle") : T($"Workspace:Status:{PageState.ConnectionState.Status}"))"
+                                  Role="@(InitialFailed ? MoVisualRole.Error : Stale ? MoVisualRole.Warning : SignalRDiagnosticRules.StatusRole(PageState.ConnectionState.Status))" Live="@(PageState.ConnectionState.IsConnected && !Stale && !InitialFailed)" />
+                    <button type="button" class="mo-vl-capsule mo-vl-capsule--outline mono" title="@T("Workspace:Copy")" @onclick="CopyHostAsync"><MoIcon Icon="@MoIcons.Server" Size="13px" />@Environment.MachineName</button>
+                    <span class="mo-vl-capsule mo-vl-capsule--outline" title="@UiTime.TimeZone.Id">@T("Workspace:Tz") @UiTime.FormatZoneLabel(CapturedAt)</span>
+                </Meta>
+                <Actions>
+                    @if (!InitialLoading && !InitialFailed)
+                    {
+                        <div class="sr-stamp"><span>@T("Workspace:Captured")</span><time datetime="@CapturedAt?.ToString("O")">@UiTime.FormatTime(CapturedAt)</time></div>
+                    }
+                    <button type="button" class="sr-btn sr-btn-primary" disabled="@(_refreshing || InitialLoading)" @onclick="RefreshAsync"><MoIcon Icon="@MoIcons.Refresh" Size="15px" />@T(RefreshKey)</button>
+                </Actions>
+            </MoPageMasthead>
+
+            <MoWorkbenchNavigation Label="@T("Workspace:NavLabel")" Class="sr-wbn" Compact="true">
+                <a class="sr-wbn-link" href="@Context.Href(PAGE_URL)" aria-current="@(PageIndex == 0 ? "page" : null)"><MoIcon Icon="@MoIcons.Cable" /><span>@T("Workspace:Nav:Workbench")</span><span class="sr-wbn-badge @Role(SignalRDiagnosticRules.StatusRole(PageState.ConnectionState.Status))"><i class="sr-wbn-dot"></i>@T($"Workspace:Status:{PageState.ConnectionState.Status}")</span></a>
+                <a class="sr-wbn-link" href="@Context.Href(SENDS_URL)" aria-current="@(PageIndex == 1 ? "page" : null)"><MoIcon Icon="@MoIcons.HeartPulse" /><span>@T("Workspace:Nav:Sends")</span>@if (Loaded) { <span class="sr-wbn-badge @Role(SendBadgeRole)">@(PageState.SendDiagnostics!.IsEnabled ? Attention.ToString(CultureInfo.CurrentCulture) : T("Workspace:Off"))</span> }</a>
+                <a class="sr-wbn-link" href="@Context.Href(CONNECTIONS_URL)" aria-current="@(PageIndex == 2 ? "page" : null)"><MoIcon Icon="@MoIcons.Users" /><span>@T("Workspace:Nav:Connections")</span>@if (Loaded) { <span class="sr-wbn-badge @Role(PageState.ConnectedUsers.Any(user => user.ConnectionId == PageState.ConnectionState.ConnectionId) ? MoVisualRole.Primary : MoVisualRole.Neutral)">@PageState.ConnectedUsers.Count</span> }</a>
+            </MoWorkbenchNavigation>
+
+            @if (InitialLoading)
+            {
+                <section class="mo-vl-surface sr-gate"><MoContentState Loading="true"><span class="mo-vl-tile mo-vl-role--info"><MoIcon Icon="@MoIcons.Loader" /></span><h2>@T("Workspace:LoadingTitle")</h2><p>@T("Workspace:LoadingBody")</p></MoContentState></section>
+            }
+            else if (InitialFailed)
+            {
+                <section class="mo-vl-surface sr-gate" role="alert"><MoContentState><span class="mo-vl-tile mo-vl-role--error"><MoIcon Icon="@MoIcons.Error" /></span><h2>@T("Workspace:LoadFailedTitle")</h2><p>@T("Workspace:LoadFailedBody")</p><button class="sr-btn sr-btn-primary" @onclick="RefreshAsync">@T("Workspace:RefreshAll")</button></MoContentState></section>
+            }
+            else
+            {
+                @if (Stale)
+                {
+                    <MoSemanticCallout Severity="MoVisualRole.Warning" Title="@T("Workspace:StaleTitle")">@T("Workspace:StaleBody", UiTime.FormatTime(RetainedAt))</MoSemanticCallout>
+                }
+                @if (PageIndex == 0) { <SignalRBrowserWorkbench /> }
+                else if (PageIndex == 1) { <SignalRSendsWorkspace /> }
+                else { <SignalRConnectionsWorkspace /> }
+                <SignalREvidence />
+            }
         </div>
-        <dl class="signalr-workbench-summary" aria-label="@L["Pages:SignalRDebug:Summary:AriaLabel"]">
-            <div><dt>@L["Pages:SignalRDebug:Summary:Hubs"]</dt><dd>@(PageState.HubsLoaded ? PageState.AvailableHubs.Count.ToString(CultureInfo.CurrentCulture) : "—")</dd></div>
-            <div><dt>@L["Pages:SignalRDebug:Summary:Users"]</dt><dd>@(PageState.ConnectedUsersLoaded ? PageState.ConnectedUsers.Count.ToString(CultureInfo.CurrentCulture) : "—")</dd></div>
-            <div><dt>@L["Pages:SignalRDebug:Summary:Received"]</dt><dd>@PageState.ConnectionState.TotalReceivedMessages</dd></div>
-        </dl>
-    </header>
-
-    <div class="signalr-workbench-grid">
-        <aside class="signalr-session-rail" aria-label="@L["Pages:SignalRDebug:Sections:Connection"]">
-            <SignalRConnectionStatus ConnectionState="@PageState.ConnectionState" SelectedHubRoute="@PageState.SelectedHubRoute"
-                                     ActualConnectedHubRoute="@PageState.ConnectedHubRoute" IsServerSideAnonymous="@PageState.IsConnectionNotObserved" />
-            <SignalRConnectionConfig AccessToken="@PageState.AccessToken" AccessTokenChanged="@((string value) => PageState.AccessToken = value)"
-                                     SelectedHubRoute="@PageState.SelectedHubRoute" SelectedHubRouteChanged="PageState.SelectHubRoute"
-                                     AvailableHubs="@PageState.AvailableHubs" IsConnecting="@PageState.ConnectionState.IsConnecting"
-                                     IsConnected="@PageState.ConnectionState.IsConnected" CanGenerateTestToken="@PageState.CanGenerateTestToken"
-                                     DataLoaded="@PageState.HubsLoaded" IsLoading="@PageState.IsLoadingHubs" LoadFailed="@PageState.HubsLoadFailed"
-                                     CapturedAtUtc="@PageState.HubsCapturedAtUtc" OnConnect="ConnectAsync" OnTestUserConnect="TestUserConnectAsync"
-                                     OnDisconnect="DisconnectAsync" OnRefreshHubs="LoadHubsAsync" />
-            <div class="signalr-trace-settings">
-                <span class="signalr-workbench-eyebrow">@L["Pages:SignalRDebug:Settings:Eyebrow"]</span>
-                <MudSwitch T="bool" @bind-Value="PageState.VerboseLogging" Color="Color.Primary" Label="@L["Pages:SignalRDebug:Settings:VerboseLogging"]" />
-                <p>@L["Pages:SignalRDebug:Settings:VerboseLoggingHelper"]</p>
-            </div>
-        </aside>
-
-        <section class="signalr-tool-workspace" aria-label="@L["Pages:SignalRDebug:WorkspaceLabel"]">
-            <MudTabs Elevation="0" Rounded="false" KeepPanelsAlive="true" Class="signalr-task-tabs" PrevIcon="@MoIcons.ChevronLeft" NextIcon="@MoIcons.ChevronRight">
-                <MudTabPanel Text="@L["Pages:SignalRDebug:Tabs:Methods"]" Icon="@MoIcons.Terminal">
-                    <div class="signalr-contract-scope"><span>@L["Pages:SignalRDebug:MethodCatalog"]</span><code>@(string.IsNullOrEmpty(PageState.MethodCatalogHubRoute) ? L["UISignalR:Common:None"].Value : PageState.MethodCatalogHubRoute)</code></div>
-                    <div class="signalr-method-workspace">
-                        <SignalRMethodInvoker HubMethods="@PageState.HubMethods" IsConnected="@PageState.ConnectionState.IsConnected"
-                                              SelectedMethodName="@PageState.SelectedMethodName" SelectedMethodNameChanged="PageState.SelectMethod"
-                                              MethodParameters="@PageState.MethodParameters" OnInvokeMethod="InvokeMethodAsync" />
-                        <SignalRMethodListener HubMethods="@PageState.HubMethods" IsConnected="@PageState.ConnectionState.IsConnected"
-                                               OnToggleMethodListener="ToggleMethodListenerAsync" OnEnableAllListeners="EnableAllListenersAsync"
-                                               OnDisableAllListeners="DisableAllListenersAsync" />
-                    </div>
-                </MudTabPanel>
-                <MudTabPanel Text="@L["Pages:SignalRDebug:Tabs:Messages"]" Icon="@MoIcons.Messages">
-                    <div class="signalr-message-workspace">
-                        <SignalRMessageSender UserName="@PageState.UserName" UserNameChanged="@((string value) => PageState.UserName = value)"
-                                              Message="@PageState.Message" MessageChanged="@((string value) => PageState.Message = value)"
-                                              IsConnected="@PageState.ConnectionState.IsConnected" OnSendMessage="SendMessageAsync" />
-                        <SignalRMessageLog Messages="@PageState.Messages" OnClearMessages="ClearMessages" />
-                    </div>
-                </MudTabPanel>
-                <MudTabPanel Text="@L["Pages:SignalRDebug:Tabs:Connections"]" Icon="@MoIcons.Users">
-                    <SignalRConnectedUsers ConnectedUsers="@PageState.ConnectedUsers" OnRefreshClicked="LoadConnectedUsersAsync"
-                                          DataLoaded="@PageState.ConnectedUsersLoaded" IsLoading="@PageState.IsLoadingConnectedUsers"
-                                          LoadFailed="@PageState.ConnectedUsersLoadFailed" CapturedAtUtc="@PageState.ConnectedUsersCapturedAtUtc" />
-                </MudTabPanel>
-                <MudTabPanel Text="@L["Pages:SignalRDebug:Tabs:Sends"]" Icon="@MoIcons.HeartPulse">
-                    <SignalRSendDiagnostics Snapshot="@PageState.SendDiagnostics" OnRefreshClicked="LoadSendDiagnosticsAsync"
-                                            IsLoading="@PageState.IsLoadingSendDiagnostics" LoadFailed="@PageState.SendDiagnosticsLoadFailed" />
-                </MudTabPanel>
-            </MudTabs>
-        </section>
-    </div>
+    </CascadingValue>
 </div>
 
 @code {
     /// <summary>Gets the route of the browser-session SignalR workbench.</summary>
     public const string PAGE_URL = "/signalr-debug";
+    /// <summary>Gets the server-send diagnostics route.</summary>
+    public const string SENDS_URL = "/signalr-debug/sends";
+    /// <summary>Gets the tracked host-connections route.</summary>
+    public const string CONNECTIONS_URL = "/signalr-debug/connections";
+    private bool _initialized, _refreshing;
+    private int PageIndex => Context.Path == SENDS_URL ? 1 : Context.Path == CONNECTIONS_URL ? 2 : 0;
+    private string TitleKey => PageIndex == 1 ? "Workspace:Titles:Sends" : PageIndex == 2 ? "Workspace:Titles:Connections" : "Workspace:Titles:Workbench";
+    private string RefreshKey => PageIndex == 1 ? "Workspace:RefreshSends" : PageIndex == 2 ? "Workspace:RefreshConns" : "Workspace:RefreshAll";
+    private string PageIcon => PageIndex == 1 ? MoIcons.HeartPulse : PageIndex == 2 ? MoIcons.Users : MoIcons.Cable;
+    private bool Loaded => PageState.HubsLoaded && PageState.ConnectedUsersLoaded && PageState.SendDiagnostics is not null;
+    private bool InitialLoading => !_initialized;
+    private bool InitialFailed => _initialized && !Loaded;
+    private bool Stale => Loaded && (PageState.HubsLoadFailed || PageState.ConnectedUsersLoadFailed || PageState.SendDiagnosticsLoadFailed);
+    private DateTimeOffset? CapturedAt => (PageIndex == 1 ? PageState.SendDiagnostics?.SnapshotTimeUtc : PageIndex == 2 ? PageState.ConnectedUsersCapturedAtUtc : PageState.HubsCapturedAtUtc) is { } value ? new DateTimeOffset(value) : null;
+    private DateTimeOffset? RetainedAt => new[] { PageState.HubsLoadFailed ? PageState.HubsCapturedAtUtc : null, PageState.ConnectedUsersLoadFailed ? PageState.ConnectedUsersCapturedAtUtc : null, PageState.SendDiagnosticsLoadFailed ? PageState.SendDiagnostics?.SnapshotTimeUtc : null }.Min() is { } value ? new DateTimeOffset(value) : null;
+    private MoVisualRole SendBadgeRole => PageState.SendDiagnostics is not { IsEnabled: true } snapshot ? MoVisualRole.Neutral : snapshot.TotalFailedCount > 0 ? MoVisualRole.Error : snapshot.PendingSendCount > 0 ? MoVisualRole.Info : Attention > 0 ? MoVisualRole.Warning : MoVisualRole.Success;
+    [Inject] private IJSRuntime Js { get; set; } = null!;
+    private Task CopyHostAsync() => Js.InvokeVoidAsync("navigator.clipboard.writeText", Environment.MachineName).AsTask();
+    private Task RefreshAsync() => RunOperationAsync(async () =>
+    {
+        if (_refreshing) return;
+        _refreshing = true;
+        try { await PageState.LoadHubsAsync(); await PageState.LoadConnectedUsersAsync(); await PageState.LoadSendDiagnosticsAsync(); }
+        finally { _refreshing = false; _initialized = true; }
+        ApplySelection();
+    });
+    private void ApplySelection()
+    {
+        if (PageIndex != 0) return;
+        var hub = Context.Get("hub");
+        if (hub.Length > 0 && PageState.AvailableHubs.Any(item => item.Route == hub)) PageState.SelectHubRoute(hub);
+        var method = Context.Get("method");
+        if (string.IsNullOrEmpty(method) && string.IsNullOrEmpty(PageState.SelectedMethodName)) method = PageState.HubMethods.FirstOrDefault()?.Name ?? string.Empty;
+        if (method.Length > 0 && method != PageState.SelectedMethodName && PageState.HubMethods.Any(item => item.Name == method)) PageState.SelectMethod(method);
+    }
+    private void OnLocationChanged(object? sender, LocationChangedEventArgs args) => _ = RunOperationAsync(() => InvokeAsync(() => { ApplySelection(); StateHasChanged(); }));
 
     private readonly object _workSync = new();
     private readonly HashSet<Task> _operations = [];
@@ -97,84 +118,19 @@
     protected override void OnInitialized()
     {
         PageState = PageStateFactory.Create();
+        Context = new SignalRWorkspaceContext(PageState, NavigationManager, RunOperationAsync);
+        NavigationManager.LocationChanged += OnLocationChanged;
         PageState.StateChanged += OnStateChanged;
     }
 
     /// <inheritdoc />
     protected override Task OnAfterRenderAsync(bool firstRender) => firstRender
-        ? RunOperationAsync(PageState.InitializeAsync)
+        ? RunOperationAsync(async () => { try { await PageState.InitializeAsync(); } finally { _initialized = true; } ApplySelection(); await InvokeAsync(StateHasChanged); })
         : Task.CompletedTask;
 
-    private Task LoadHubsAsync() => RunOperationAsync(async () =>
+    private void NotifyFailure()
     {
-        if (!await PageState.LoadHubsAsync()) Notify("LoadHubsFailed", Severity.Error);
-    });
-
-    private Task LoadConnectedUsersAsync() => RunOperationAsync(async () =>
-    {
-        var success = await PageState.LoadConnectedUsersAsync();
-        Notify(success ? "LoadConnectedUsersSuccess" : "LoadConnectedUsersFailed", success ? Severity.Success : Severity.Error);
-    });
-
-    private Task LoadSendDiagnosticsAsync() => RunOperationAsync(async () =>
-    {
-        var success = await PageState.LoadSendDiagnosticsAsync();
-        Notify(success ? "LoadSendDiagnosticsSuccess" : "LoadSendDiagnosticsFailed", success ? Severity.Success : Severity.Error);
-    });
-
-    private Task ConnectAsync() => RunOperationAsync(async () =>
-    {
-        var success = await PageState.ConnectAsync(NavigationManager.BaseUri);
-        Notify(success ? "ConnectSuccess" : "ConnectFailed", success ? Severity.Success : Severity.Error);
-    });
-
-    private Task TestUserConnectAsync() => RunOperationAsync(async () =>
-    {
-        if (!PageState.CanGenerateTestToken)
-        {
-            Notify("TestTokenUnavailable", Severity.Warning);
-            return;
-        }
-        var success = await PageState.TestUserConnectAsync(NavigationManager.BaseUri);
-        Notify(success ? "TestUserConnectSuccess" : "ConnectFailed", success ? Severity.Success : Severity.Error, PageState.LastTestUserName ?? string.Empty);
-    });
-
-    private Task DisconnectAsync() => RunOperationAsync(async () =>
-    {
-        var success = await PageState.DisconnectAsync();
-        Notify(success ? "DisconnectSuccess" : "DisconnectFailed", success ? Severity.Info : Severity.Error);
-    });
-
-    private Task SendMessageAsync((string userName, string message) _) => RunOperationAsync(async () =>
-    {
-        if (!await PageState.SendMessageAsync()) Notify("SendMessageFailed", Severity.Error);
-    });
-
-    private Task InvokeMethodAsync((string methodName, List<MethodCallParameter> parameters) data) => RunOperationAsync(async () =>
-    {
-        var success = await PageState.InvokeSelectedMethodAsync();
-        Notify(success ? "InvokeMethodSuccess" : "InvokeMethodFailed", success ? Severity.Success : Severity.Error, data.methodName);
-    });
-
-    private Task ToggleMethodListenerAsync((HubMethodInfo method, bool isListening) data) => RunOperationAsync(async () =>
-    {
-        if (!await PageState.ToggleMethodListenerAsync(data.method, data.isListening)) Notify("ToggleListenerFailed", Severity.Error);
-    });
-
-    private Task EnableAllListenersAsync() => RunOperationAsync(async () =>
-        Notify("EnableListenersSuccess", Severity.Success, await PageState.EnableAllListenersAsync()));
-
-    private Task DisableAllListenersAsync() => RunOperationAsync(async () =>
-        Notify("DisableListenersSuccess", Severity.Success, await PageState.DisableAllListenersAsync()));
-
-    private void ClearMessages()
-    {
-        if (!_disposed) PageState.ClearMessages();
-    }
-
-    private void Notify(string key, Severity severity, params object[] arguments)
-    {
-        if (!_disposed) SnackBar.Add(L[$"Pages:SignalRDebug:Notifications:{key}", arguments].Value, severity);
+        if (!_disposed) SnackBar.Add(T("Pages:SignalRDebug:Notifications:OperationFailed"), Severity.Error);
     }
 
     private void OnStateChanged() => _ = RunOperationAsync(() => InvokeAsync(() =>
@@ -201,7 +157,7 @@
         catch (Exception exception)
         {
             Logger.LogError(exception, "The SignalR browser workbench operation failed.");
-            Notify("OperationFailed", Severity.Error);
+            NotifyFailure();
         }
     }
 
@@ -220,6 +176,7 @@
     private async Task RetireAsync()
     {
         _disposed = true;
+        NavigationManager.LocationChanged -= OnLocationChanged;
         PageState.StateChanged -= OnStateChanged;
         try { await PageState.DisposeAsync(); }
         finally

@@ -11,7 +11,7 @@ The visual instruments below live in `Monica.UI.Shared.Components.Visual`. Inspe
 | Emphasize a number or subject inside a finding | `MoValueMark` | Choose a `MoVisualRole`; use `Href` only for navigation. This is not a status label, filter toggle, or command button. |
 | Localized finding containing emphasized values or links | `MoRichFinding` | Supply one localized `Template` and ordered `Values` fragments. Keep language-specific word order in resources. |
 | One feature value and its unit | `MoDisplayValue` | Supply formatted `Value`, optional `Unit`, and a complete `AccessibleLabel` when the visual fragments need one reading. Set `Compact` for a proportional muted unit. The surrounding surface can supply `--mo-vl-display-size`. |
-| Page identity with context and actions | `MoPageMasthead` | Supply `Title`, optional `Icon` for the workspace seal, `SealAccent` for a soft primary seal, `Crumb`, `Meta`, and `Actions`; the page owns action hierarchy and links. |
+| Page identity with context and actions | `MoPageMasthead` | Supply `Title`, optional `Icon` for the workspace seal, `SealAccent` for a soft primary seal, `Crumb`, `Meta`, and `Actions`; the inherited `--mo-vl-masthead-seal-size` defaults to 52px and can be set to 48px in a narrow container; the page owns action hierarchy and links. |
 | Contiguous facts sharing a frame | `MoFactGrid` with `MoFact` | Supply localized labels and preformatted values; this is not a grid of independent cards. |
 | State explanation with an icon tile | `MoSemanticCallout` | Supply `Severity`, `Title`, and evidence in `ChildContent`; use it for a contextual note, not a toast or modal alert. |
 | State/category filter | `MoFilterChip` | Supply `Label`, `Selected`, `SelectedChanged`, optional `Count` and `ShowDot`; a real zero remains an operable filter. Use `Icon` for a category glyph or `mo-vl-chip--hatched` with `ShowDot` for an unreported state. `Pill=true` selects the compact capsule silhouette; the default remains rectangular. Use `mo-vl-chip--instrument` for a workbench filter rail or add `mo-vl-chip--diamond` when a diamond matches the plotted signal. |
@@ -29,6 +29,8 @@ Other reusable owners have distinct contracts:
 - `MoTimeFormatter` owns [timestamp display](time-display.md); precision and calendar semantics remain explicit.
 - `MoJson` owns [JSON viewing and editing](json.md), and `MoIcon` owns [icon rendering](icons.md).
 - Modal evidence inspectors use the [native side-sheet contract](#modal-evidence-side-sheets); navigation drawers retain their own layout owner.
+
+Use `MoVisualRole.Third` for a third categorical identity such as a hub contract, observed send method, or target selector. It reads the approved `--mo-color-role-third` token independently of the theme's Secondary accent. `Secondary` continues to use the actual secondary palette color. Status and failure judgments keep their own Success, Warning, Error, Info or Neutral roles.
 
 Use a `mo-workbench-container` around `mo-page-shell mo-page-shell--workbench` to measure breakpoints at the workspace’s available inline width before applying gutters. Chart rulers, tracks, and registry layouts can use the same `page` container. The workbench frame fills its owner on wide displays. Apply a reading width to the part containing prose when it needs a constraint.
 

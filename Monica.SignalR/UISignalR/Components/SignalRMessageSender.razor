@@ -1,140 +1,22 @@
-@inject IStringLocalizer<SignalRResource> L
+@inherits SignalRWorkspaceView
 
-<section class="signalr-message-sender" aria-label="@L["UISignalR:MessageSender:Title"]" aria-busy="@(_isSending ? "true" : "false")">
-    <header class="signalr-sender-heading">
-        <MoIcon Icon="@MoIcons.Send" Size="1.5rem" Style="color:var(--mud-palette-primary);" />
-        <h2>@L["UISignalR:MessageSender:Title"]</h2>
-    </header>
-
-    <div class="signalr-sender-contract">
-        <code>ReceiveTestMessage(userName, message)</code>
-        <p>@L["UISignalR:MessageSender:Contract"]</p>
-    </div>
-
-    <div class="signalr-sender-fields">
-        <div class="signalr-sender-field">
-            <MudTextField T="string" Value="@UserName" ValueChanged="OnUserNameChangedInternal"
-                          Immediate="true" Disabled="@_isSending" Variant="Variant.Outlined" Margin="Margin.Dense"
-                          Label="@L["UISignalR:MessageSender:UserNameLabel"]" />
-        </div>
-        <div class="signalr-sender-field">
-            <MudTextField T="string" Value="@Message" ValueChanged="OnMessageChangedInternal"
-                          Immediate="true" Disabled="@_isSending" Variant="Variant.Outlined" Margin="Margin.Dense" Lines="1"
-                          Label="@L["UISignalR:MessageSender:MessageLabel"]" OnKeyDown="OnMessageKeyDown" />
-        </div>
-    </div>
-
-    <div class="signalr-sender-footer">
-        <div class="signalr-sender-actions">
-            <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@MoIcons.Send"
-                       OnClick="SendMessageAsync" Disabled="@(!CanSend)">
-                @L[_isSending ? "UISignalR:MessageSender:Sending" : "UISignalR:MessageSender:Send"]
-            </MudButton>
-            <MudButton Variant="Variant.Outlined" Color="Color.Default" StartIcon="@MoIcons.Close"
-                       OnClick="ClearMessageAsync" Disabled="@(_isSending || string.IsNullOrWhiteSpace(Message))">
-                @L["UISignalR:MessageSender:Clear"]
-            </MudButton>
-        </div>
-        <p class="signalr-sender-help" role="status">
-            @L[IsConnected ? "UISignalR:MessageSender:DraftHelp" : "UISignalR:MessageSender:ConnectHelp"]
-        </p>
-    </div>
-</section>
+<SignalRKeyboardRegion Class="sr-quick" Selector="button">
+    <div class="sr-sig-box"><span class="sr-sig-label">ReceiveTestMessage</span><code class="mono">ReceiveTestMessage(string user, string message)</code><p class="sr-muted">@T("Workspace:QsContract")</p></div>
+    <div class="sr-field"><label for="sr-qs-user">@T("Workspace:QsUserLabel")</label><input id="sr-qs-user" class="sr-input" placeholder="@T("Workspace:QsUserPlaceholder")" @bind="S.UserName" @bind:event="oninput" /></div>
+    <div class="sr-field"><label for="sr-qs-msg">@T("Workspace:QsMsgLabel")</label><textarea id="sr-qs-msg" class="sr-input sr-textarea" rows="3" placeholder="@T("Workspace:QsMsgPlaceholder")" @bind="S.Message" @bind:event="oninput" @onkeydown="OnKeyDown"></textarea></div>
+    <p class="sr-muted">@T(S.ConnectionState.IsConnected ? "Workspace:QsDraftHelp" : "Workspace:QsConnectHelp")</p>
+    <div class="sr-form-actions"><button class="sr-btn sr-btn-primary" disabled="@(!CanSend)" @onclick="Send"><MoIcon Icon="@MoIcons.Send" Size="15px" />@T("Workspace:QsSend")</button><button class="sr-btn sr-btn-outline" disabled="@(_sending || string.IsNullOrEmpty(S.Message))" @onclick="() => S.Message = string.Empty">@T("Workspace:QsClear")</button></div>
+</SignalRKeyboardRegion>
 
 @code {
-    /// <summary>
-    /// User name passed as the first argument to the quick sender's hub method.
-    /// </summary>
-    [Parameter] public string UserName { get; set; } = "";
-
-    /// <summary>
-    /// Invoked when the user name changes.
-    /// </summary>
-    [Parameter] public EventCallback<string> UserNameChanged { get; set; }
-
-    /// <summary>
-    /// Message draft passed as the second argument to the quick sender's hub method.
-    /// </summary>
-    [Parameter] public string Message { get; set; } = "";
-
-    /// <summary>
-    /// Invoked when the draft changes, including an explicit clear action.
-    /// </summary>
-    [Parameter] public EventCallback<string> MessageChanged { get; set; }
-
-    /// <summary>
-    /// Whether the browser connection is available for sending.
-    /// </summary>
-    [Parameter] public bool IsConnected { get; set; }
-
-    /// <summary>
-    /// Sends the current arguments through ReceiveTestMessage(userName, message).
-    /// The draft is retained after this callback completes.
-    /// </summary>
-    [Parameter] public EventCallback<(string userName, string message)> OnSendMessage { get; set; }
-
-    private bool _isSending;
-
-    private bool CanSend => !_isSending && IsConnected && !string.IsNullOrWhiteSpace(Message);
-
-    /// <summary>
-    /// Message input box keyboard event
-    /// </summary>
-    /// <param name="e">Keyboard event parameters</param>
-    private async Task OnMessageKeyDown(KeyboardEventArgs e)
+    private bool _sending;
+    private bool CanSend => S.ConnectionState.IsConnected && !_sending && !string.IsNullOrWhiteSpace(S.Message);
+    private Task OnKeyDown(KeyboardEventArgs args) => args.Key == "Enter" && !args.ShiftKey ? Send() : Task.CompletedTask;
+    private Task Send() => Context.Run(async () =>
     {
-        if (e.Key == "Enter" && !e.ShiftKey)
-        {
-            await SendMessageAsync();
-        }
-    }
-
-    /// <summary>
-    /// Send message
-    /// </summary>
-    private async Task SendMessageAsync()
-    {
-        if (!CanSend)
-            return;
-
-        _isSending = true;
-        try
-        {
-            await OnSendMessage.InvokeAsync((UserName, Message));
-        }
-        finally
-        {
-            _isSending = false;
-        }
-    }
-
-    /// <summary>
-    /// Clear the message input box
-    /// </summary>
-    private async Task ClearMessageAsync()
-    {
-        if (_isSending)
-            return;
-
-        Message = "";
-        await MessageChanged.InvokeAsync(Message);
-    }
-
-    private async Task OnUserNameChangedInternal(string value)
-    {
-        if (_isSending)
-            return;
-
-        UserName = value;
-        await UserNameChanged.InvokeAsync(value);
-    }
-
-    private async Task OnMessageChangedInternal(string value)
-    {
-        if (_isSending)
-            return;
-
-        Message = value;
-        await MessageChanged.InvokeAsync(value);
-    }
+        if (!CanSend) return;
+        _sending = true;
+        try { await S.SendMessageAsync(); }
+        finally { _sending = false; }
+    });
 }

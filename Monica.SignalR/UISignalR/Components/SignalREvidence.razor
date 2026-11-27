@@ -1,0 +1,117 @@
+@inherits SignalRWorkspaceView
+
+<MoSideSheet Open="@HasSelection" OpenChanged="Dismiss" Title="@Title" Width="560px" Compact="true" CloseLabel="@T("Workspace:Close")">
+    <TitleContent>
+        <div class="sr-evidence sr-evidence-heading"><span class="mo-vl-tile @Role(EvidenceRole)"><MoIcon Icon="@EvidenceIcon" Size="18px" /></span><div><p>@T(EyebrowKey)</p><h2>@Title</h2></div></div>
+    </TitleContent>
+    <ChildContent>
+        <div class="sr-evidence">
+            @if (Kind == "conn")
+            {
+                @if (_frozen is not { } connection)
+                {
+                    <MoSemanticCallout Severity="MoVisualRole.Warning" Title="@T("Workspace:Sheet:ConnEyebrow")">@T("Workspace:Sheet:ConnNotFound")</MoSemanticCallout>
+                }
+                else
+                {
+                    <MoSemanticCallout Severity="MoVisualRole.Info" Title="@T("Workspace:Sheet:ConnFrozenTitle")" Icon="@MoIcons.Pin">@T("Workspace:Sheet:ConnFrozenBody", UiTime.Format(_frozenAt))</MoSemanticCallout>
+                    @if (!string.IsNullOrEmpty(connection.UserId)) { <div class="sr-sheet-actions"><a class="sr-evidence-action" href="@Context.Href($"/signalr-debug/sends?q={Uri.EscapeDataString(connection.UserId)}")"><MoIcon Icon="@MoIcons.HeartPulse" Size="14px" />@T("Workspace:Sheet:ConnGoSend")</a></div> }
+                    <section class="sr-sheet-sec"><h3>@T("Workspace:Sheet:ConnBasic")</h3><dl class="sr-evidence-kv">
+                        <div><dt>@T("Workspace:CnCols:ConnId")</dt><dd><code class="mono sr-break">@connection.ConnectionId</code><MoCopyButton Value="@connection.ConnectionId" Label="@T("Workspace:Copy")" /></dd></div>
+                        <div><dt>@T("Workspace:QsUserLabel")</dt><dd><strong>@(connection.UserName ?? T("Workspace:None"))</strong><MoCopyButton Value="@connection.UserName" Label="@T("Workspace:Copy")" /></dd></div>
+                        <div><dt>@T("Workspace:Sheet:ConnUserId")</dt><dd><code class="mono sr-break">@(connection.UserId ?? T("Workspace:None"))</code><MoCopyButton Value="@connection.UserId" Label="@T("Workspace:Copy")" /></dd></div>
+                        <div><dt>@T("Workspace:CnCols:AuthClaims")</dt><dd><SignalRBadge Status="true" Text="@T(connection.IsAuthenticated ? "Workspace:Auth:Authenticated" : "Workspace:Auth:Unauthenticated")" Role="@(connection.IsAuthenticated ? MoVisualRole.Success : MoVisualRole.Neutral)" /></dd></div>
+                        <div><dt>@T("Workspace:CnCols:ConnectedAt")</dt><dd><time class="mono" datetime="@connection.ConnectionTime.ToString("O")">@UiTime.Format(connection.ConnectionTime)</time><span class="sr-muted">@Age(connection.ConnectionTime, _frozenAt)</span></dd></div>
+                    </dl></section>
+                    <section class="sr-sheet-sec"><h3>@T("Workspace:Sheet:ConnClaims", connection.Claims.Count)</h3>
+                        @if (connection.Claims.Count == 0) { <MoSemanticCallout Severity="MoVisualRole.Neutral" Title="@T("Workspace:Sheet:ConnClaimsEmpty")">@T("Workspace:Sheet:ConnClaimsNote")</MoSemanticCallout> }
+                        else
+                        {
+                            <p class="sr-muted">@T("Workspace:Sheet:ConnClaimsNote")</p><dl class="sr-claims-list">@foreach (var claim in connection.Claims.OrderBy(claim => claim.Key, StringComparer.Ordinal)) { <div class="sr-claim-row"><dt class="mono">@claim.Key</dt><dd><code class="mono sr-break">@claim.Value</code><MoCopyButton Value="@claim.Value" Label="@T("Workspace:Copy")" /></dd></div> }</dl>
+                        }
+                    </section>
+                }
+            }
+            else if (Kind == "send")
+            {
+                @if (Method is not { } method)
+                {
+                    <MoSemanticCallout Severity="MoVisualRole.Warning" Title="@T("Workspace:Sheet:SendEyebrow")">@T("Workspace:Sheet:SendNotFound")</MoSemanticCallout>
+                }
+                else
+                {
+                    var observed = SignalRDiagnosticRules.HasObservation(method);
+                    <div class="sr-sheet-actions"><a class="sr-evidence-action is-primary" href="@WorkbenchLink(method)"><MoIcon Icon="@MoIcons.Play" Size="14px" />@T("Workspace:SdOpenInWorkbench")</a><MoCopyButton Value="@JsonSerializer.Serialize(method, new JsonSerializerOptions { WriteIndented = true })" Label="@T("Workspace:Copy")">@T("Workspace:Copy")</MoCopyButton></div>
+                    <section class="sr-sheet-sec"><h3>@T("Workspace:Sheet:SendSummary")</h3><dl class="sr-mini-facts"><div><dt>@T("Workspace:SdTotals:Pending")</dt><dd class="mono">@method.PendingSendCount</dd></div><div><dt>@T("Workspace:SdTotals:Started")</dt><dd class="mono">@method.StartedCount.ToString("N0")</dd></div><div><dt>@T("Workspace:SdTotals:Completed")</dt><dd class="mono sr-ink-ok">@method.CompletedCount.ToString("N0")</dd></div><div><dt>@T("Workspace:SdTotals:Failed")</dt><dd class="mono @(method.FailedCount > 0 ? "sr-ink-err" : null)">@method.FailedCount</dd></div></dl>
+                        <dl class="sr-evidence-kv"><div><dt>@T("Workspace:Hub")</dt><dd><b>@method.HubName</b></dd></div><div><dt>@T("Workspace:SdLegendLast")</dt><dd class="mono">@Ms(method.LastDurationMilliseconds, observed)</dd></div><div><dt>@T("Workspace:SdLegendAvg")</dt><dd class="mono">@Ms(method.AverageDurationMilliseconds, observed)</dd></div><div><dt>@T("Workspace:Sheet:SendMaxLabel")</dt><dd class="mono @(SignalRDiagnosticRules.HasSpike(method) ? "sr-ink-warn" : null)">@Ms(method.MaxDurationMilliseconds, observed)</dd></div><div><dt>@T("Workspace:SdLastStarted")</dt><dd class="mono">@UiTime.Format(method.LastStartedAtUtc)</dd></div><div><dt>@T("Workspace:SdLastCompleted")</dt><dd class="mono">@UiTime.Format(method.LastCompletedAtUtc)</dd></div></dl>
+                    </section>
+                    @if (S.SendDiagnostics is { IncludesTargetIdentifiers: false }) { <MoSemanticCallout Severity="MoVisualRole.Neutral" Title="@T("Workspace:IdentifiersRedacted")" Icon="@MoIcons.Shield">@T("Workspace:SdRedactedNote")</MoSemanticCallout> }
+                    <section class="sr-sheet-sec"><h3>@T("Workspace:Sheet:SendTargetsTitle", method.TargetMetrics.Count)</h3><p class="sr-muted">@T("Workspace:SdTargetScope")</p><ul class="sr-target-cards">
+                        @foreach (var target in method.TargetMetrics.Skip((TargetPage - 1) * 5).Take(5))
+                        {
+                            var hasObservation = target.CompletedCount + target.FailedCount > 0;
+                            <li class="sr-target-card"><div class="sr-target-card-head"><SignalRBadge Text="@T($"Workspace:SdTargetKinds:{target.TargetKind}")" Role="@SignalRDiagnosticRules.TargetRole(target.TargetKind)" />@if (target.PendingSendCount > 0) { <SignalRBadge Text="@($"{T("Workspace:SdTotals:Pending")} {target.PendingSendCount}")" Role="MoVisualRole.Info" /> }@if (target.FailedCount > 0) { <SignalRBadge Text="@($"{T("Workspace:SdTotals:Failed")} {target.FailedCount}")" Role="MoVisualRole.Error" /> }</div>
+                                <div class="sr-target-ident">
+                                    @if (target.TargetKind == SignalRSendTargetKind.All) { <span>@T("Workspace:SdTargetKinds:All")</span> }
+                                    else if (target.TargetIdentifiers.Count == 0) { <span class="sr-muted">@T("Workspace:SdTargetCount", T($"Workspace:SdTargetKinds:{target.TargetKind}"), target.TargetCount)</span> }
+                                    else if (target.TargetKind is SignalRSendTargetKind.User or SignalRSendTargetKind.Users)
+                                    {
+                                        <ul class="sr-user-id-list">@for (var index = 0; index < target.TargetIdentifiers.Count; index++) { var id = target.TargetIdentifiers[index]; var name = target.TargetIdentifierDisplayNames.ElementAtOrDefault(index); <li><div class="sr-user-id-copy">@if (string.IsNullOrEmpty(name)) { <SignalRBadge Text="@T("Workspace:Sheet:SendOfflineTag")" /> } else { <strong>@name</strong> }<code class="mono sr-break">@id</code></div><a class="sr-evidence-icon-action" href="@Context.Href($"/signalr-debug/connections?q={Uri.EscapeDataString(id)}")" title="@T("Workspace:SdCrossToConn")"><MoIcon Icon="@MoIcons.Users" Size="14px" /></a></li> }</ul>
+                                    }
+                                    else { <div class="sr-id-chips">@foreach (var id in target.TargetIdentifiers) { <span class="mo-vl-capsule mo-vl-capsule--outline mono">@id</span> }</div> }
+                                </div>
+                                <dl class="sr-target-stats"><div><dt>@T("Workspace:SdTotals:Started")</dt><dd class="mono">@target.StartedCount.ToString("N0")</dd></div><div><dt>@T("Workspace:SdTotals:Completed")</dt><dd class="mono">@target.CompletedCount.ToString("N0")</dd></div><div><dt>@T("Workspace:SdTotals:Failed")</dt><dd class="mono @(target.FailedCount > 0 ? "sr-ink-err" : null)">@target.FailedCount</dd></div><div><dt>@T("Workspace:SdLegendAvg")</dt><dd class="mono">@Ms(target.AverageDurationMilliseconds, hasObservation)</dd></div><div><dt>@T("Workspace:Sheet:SendMaxLabel")</dt><dd class="mono @(target.MaxDurationMilliseconds >= 1000 ? "sr-ink-warn" : null)">@Ms(target.MaxDurationMilliseconds, hasObservation)</dd></div><div><dt>@T("Workspace:SdLastCompleted")</dt><dd class="mono">@(target.LastCompletedAtUtc is { } finished ? UiTime.Format(finished) : T("Workspace:NotObserved"))</dd></div></dl>
+                            </li>
+                        }
+                    </ul>
+                    @if (method.TargetMetrics.Count > 5) { <div class="sr-pager"><span class="sr-muted">@T("Workspace:CnPageInfo", (TargetPage - 1) * 5 + 1, Math.Min(TargetPage * 5, method.TargetMetrics.Count), method.TargetMetrics.Count)</span><div class="sr-pager-btns"><button class="sr-evidence-action" disabled="@(TargetPage <= 1)" @onclick='() => Context.Set("targetPage", (TargetPage - 1).ToString())'>@T("Workspace:TrPrev")</button><button class="sr-evidence-action" disabled="@(TargetPage * 5 >= method.TargetMetrics.Count)" @onclick='() => Context.Set("targetPage", (TargetPage + 1).ToString())'>@T("Workspace:TrNext")</button></div></div> }
+                    </section>
+                }
+            }
+            else if (Kind == "event")
+            {
+                @if (Event is not { } entry) { <MoSemanticCallout Severity="MoVisualRole.Warning" Title="@T("Workspace:Sheet:EventEyebrow")">@T("Workspace:Sheet:EventNotFound")</MoSemanticCallout> }
+                else
+                {
+                    <div class="sr-sheet-actions"><MoCopyButton Value="@(string.IsNullOrEmpty(entry.Details) ? entry.Content : entry.Details)" Label="@T("Workspace:Copy")">@T("Workspace:Copy")</MoCopyButton></div><section class="sr-sheet-sec"><h3>@T("Workspace:Sheet:EventMeta")</h3><dl class="sr-evidence-kv"><div><dt>@T("Workspace:EventId")</dt><dd class="mono sr-break">@entry.Id</dd></div><div><dt>@T("Workspace:Sheet:EventType")</dt><dd><SignalRBadge Text="@T($"Workspace:TrTypes:{entry.Type}")" Role="@SignalRDiagnosticRules.TraceRole(entry.Type.ToString())" /></dd></div><div><dt>@T("Workspace:Sheet:EventSource")</dt><dd class="mono">@entry.Source</dd></div><div><dt>@T("Workspace:Captured")</dt><dd><time class="mono" datetime="@entry.Timestamp.ToString("O")">@UiTime.Format(entry.Timestamp)</time></dd></div></dl></section>
+                    <section class="sr-sheet-sec"><h3>@T("Workspace:Sheet:EventPayload")</h3><p class="sr-event-content mono">@entry.Content</p>
+                        @if (string.IsNullOrEmpty(entry.Details)) { <p class="sr-muted">@T("Workspace:Sheet:EventNoDetails")</p> }
+                        else if (IsJson(entry.Details)) { <MoJson Value="@entry.Details" ReadOnly="true" ShowLineNumbers="false" ShowToolbar="false" ShowStatus="false" WrapLines="true" MaxHeight="none" Label="@T("Workspace:Sheet:EventPayload")" /> }
+                        else { <pre class="sr-pre">@entry.Details</pre> }
+                    </section>
+                }
+            }
+        </div>
+    </ChildContent>
+</MoSideSheet>
+
+@code {
+    private string? _frozenId;
+    private SignalRConnectedUserInfo? _frozen;
+    private DateTime? _frozenAt;
+    private string Kind => Context.Get("event").Length > 0 ? "event" : Context.Get("conn").Length > 0 ? "conn" : Context.Path == "/signalr-debug/sends" && Context.Get("method").Length > 0 ? "send" : string.Empty;
+    private string Selection => Context.Get(Kind == "event" ? "event" : Kind == "conn" ? "conn" : "method");
+    private bool HasSelection => Kind.Length > 0;
+    private SignalRSendMethodMetricInfo? Method => S.SendDiagnostics?.MethodMetrics.FirstOrDefault(method => Key(method) == Selection || method.MethodName == Selection);
+    private SignalRMessage? Event => S.Messages.FirstOrDefault(entry => entry.Id == Selection);
+    private string EyebrowKey => Kind == "conn" ? "Workspace:Sheet:ConnEyebrow" : Kind == "send" ? "Workspace:Sheet:SendEyebrow" : "Workspace:Sheet:EventEyebrow";
+    private string Title => Kind == "conn" ? _frozen?.UserName ?? Selection : Kind == "send" ? Method?.MethodName ?? Selection : Event is { } entry ? T($"Workspace:TrTypes:{entry.Type}") : Selection;
+    private string EvidenceIcon => Kind == "conn" ? MoIcons.Users : Kind == "send" ? MoIcons.HeartPulse : MoIcons.Terminal;
+    private MoVisualRole EvidenceRole => Kind == "conn" ? _frozen?.ConnectionId == S.ConnectionState.ConnectionId ? MoVisualRole.Primary : _frozen?.IsAuthenticated == true ? MoVisualRole.Success : MoVisualRole.Neutral : Kind == "send" && Method is { } method ? SignalRDiagnosticRules.SendRole(method) : Event is { } entry ? SignalRDiagnosticRules.TraceRole(entry.Type.ToString()) : MoVisualRole.Primary;
+    private int TargetPage => Math.Clamp(int.TryParse(Context.Get("targetPage"), out var page) ? page : 1, 1, Math.Max(1, ((Method?.TargetMetrics.Count ?? 0) + 4) / 5));
+    protected override void OnParametersSet()
+    {
+        var id = Kind == "conn" ? Selection : null;
+        if (_frozenId == id) return;
+        _frozenId = id;
+        _frozen = S.ConnectedUsers.FirstOrDefault(connection => connection.ConnectionId == id) is { } found ? SignalRDiagnosticRules.Freeze(found) : null;
+        _frozenAt = S.ConnectedUsersCapturedAtUtc;
+    }
+    private void Dismiss(bool open) { if (!open) Context.Set(new Dictionary<string, object?> { ["conn"] = null, ["event"] = null, ["method"] = Context.Path == "/signalr-debug/sends" ? null : Context.Get("method"), ["targetPage"] = null }); }
+    private string WorkbenchLink(SignalRSendMethodMetricInfo method)
+    {
+        var hub = S.AvailableHubs.FirstOrDefault(hub => hub.HubName == method.HubName);
+        return Context.Href($"/signalr-debug?method={Uri.EscapeDataString(method.MethodName)}" + (hub is null ? string.Empty : $"&hub={Uri.EscapeDataString(hub.Route)}"));
+    }
+    private static bool IsJson(string value) { try { using var document = JsonDocument.Parse(value); return true; } catch (JsonException) { return false; } }
+}

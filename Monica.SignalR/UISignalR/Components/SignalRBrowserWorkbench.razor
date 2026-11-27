@@ -1,0 +1,121 @@
+@inherits SignalRWorkspaceView
+@inject NavigationManager Navigation
+
+@if (S.AvailableHubs.Count == 0)
+{
+    <section class="mo-vl-surface sr-gate"><MoContentState><span class="mo-vl-tile mo-vl-role--neutral"><MoIcon Icon="@MoIcons.Cable" /></span><h2>@T("Workspace:NoHubsTitle")</h2><p>@T("Workspace:NoHubsBody")</p><button class="sr-btn sr-btn-primary" @onclick="() => Context.Run(async () => { await S.LoadHubsAsync(); })">@T("Workspace:RefreshHubs")</button></MoContentState></section>
+}
+else
+{
+    <section class="mo-vl-surface sr-sig">
+        <div class="sr-decision">
+            <div class="sr-decision-value">
+                <p class="sr-display-label"><span>@T("Workspace:WbDisplayLabel")</span><span class="sr-muted mono">@T("Workspace:WbSessionMeta", S.AvailableHubs.Count, S.AvailableHubs.Sum(hub => hub.Methods.Count))</span></p>
+                <MoDisplayValue Compact="true" Value="@T($"Workspace:Status:{S.ConnectionState.Status}")" Unit="@(S.ConnectionState.IsConnected || S.ConnectionState.Status == "Reconnecting" ? S.ConnectedHubRoute : S.SelectedHubRoute)" Class="@($"sr-display-state {Role(SignalRDiagnosticRules.StatusRole(S.ConnectionState.Status))}")" />
+                <div class="sr-reasons">
+                    <span class="@(Enabled == 0 ? "is-zero" : null)">@Swatch(MoVisualRole.Info)@T("Workspace:WbReasons:Listeners") <b class="mono">@Enabled/@S.HubMethods.Count</b></span>
+                    <span class="@(Sent == 0 ? "is-zero" : null)">@Swatch(MoVisualRole.Primary)@T("Workspace:WbReasons:Sent") <b class="mono">@Sent</b></span>
+                    <span class="@(S.ConnectionState.TotalReceivedMessages == 0 ? "is-zero" : null)">@Swatch(MoVisualRole.Info)@T("Workspace:WbReasons:Received") <b class="mono">@S.ConnectionState.TotalReceivedMessages</b></span>
+                    <span class="@(Errors == 0 ? "is-zero" : null)">@Swatch(MoVisualRole.Error)@T("Workspace:WbReasons:Errors") <b class="mono">@Errors</b></span>
+                </div>
+            </div>
+            <p class="sr-lede">
+                @if (S.ConnectionState.IsConnected)
+                {
+                    <MoRichFinding Template="@T("Workspace:WbConnectedLead")" Values="@([Mark($"{Catalog?.HubName} ({S.ConnectedHubRoute})", MoVisualRole.Third), InspectMark(T("Workspace:WbCallbackFindingLabel", Enabled, S.HubMethods.Count), MoVisualRole.Info, "tool", "callbacks")])" />
+                    @if (S.IsConnectionNotObserved) { <MoRichFinding Template="@T("Workspace:WbConnectedMissing")" Values="@([Mark(T("Workspace:WbNotObservedShort"), MoVisualRole.Warning)])" /> }
+                    else { <MoRichFinding Template="@T("Workspace:WbConnectedMatch")" Values="@([InspectMark(S.ConnectionState.ConnectionId[..Math.Min(10, S.ConnectionState.ConnectionId.Length)] + "…", MoVisualRole.Success, "conn", S.ConnectionState.ConnectionId)])" /> }
+                    @if (Errors > 0) { <MoRichFinding Template="@T("Workspace:WbConnectedErrors")" Values="@([Mark(T("Workspace:WbErrorFindingLabel", Errors), MoVisualRole.Error)])" /> }
+                    @if (Attention > 0) { <MoRichFinding Template="@T("Workspace:WbSendAttention")" Values="@([Mark(T("Workspace:WbAttentionFindingLabel", Attention), MoVisualRole.Warning, "/signalr-debug/sends")])" /> }
+                    else { @T("Workspace:SentenceEnd") }
+                }
+                else if (S.ConnectionState.Status == "Reconnecting")
+                {
+                    <MoRichFinding Template="@T("Workspace:WbFindingReconnecting")" Values="@([Mark(S.ConnectedHubRoute, MoVisualRole.Third), Mark(S.ConnectedUsers.Count.ToString(), MoVisualRole.Primary, "/signalr-debug/connections")])" />
+                }
+                else
+                {
+                    <MoRichFinding Template="@T("Workspace:WbFindingDisconnected")" Values="@([Mark(T("Workspace:WbMappedFindingLabel", S.AvailableHubs.Count, S.AvailableHubs.Sum(hub => hub.Methods.Count)), MoVisualRole.Third), Mark(T("Workspace:WbConnectionsFindingLabel", S.ConnectedUsers.Count), MoVisualRole.Primary, "/signalr-debug/connections")])" />
+                    @if (Attention > 0) { <MoRichFinding Template="@T("Workspace:WbDisconnectedAttention")" Values="@([Mark(T("Workspace:WbAttentionFindingLabel", Attention), MoVisualRole.Warning, "/signalr-debug/sends")])" /> }
+                    else { @T("Workspace:WbDisconnectedCalm") }
+                }
+            </p>
+        </div>
+        <div class="sr-conduit" role="region" aria-label="@T("Workspace:WbConduitLabel")">
+            <div class="sr-conduit-top">
+                <div class="sr-node sr-node--browser">
+                    <div class="sr-node-head">
+                        <span class="sr-node-icon @Role(SignalRDiagnosticRules.StatusRole(S.ConnectionState.Status))"><MoIcon Icon="@MoIcons.Monitor" Size="16px" /></span>
+                        <div><span class="sr-node-kicker">@T("Workspace:WbBrowserNode")</span><strong class="mono">@(string.IsNullOrEmpty(S.ConnectionState.ConnectionId) ? T($"Workspace:Status:{S.ConnectionState.Status}") : S.ConnectionState.ConnectionId)</strong></div>
+                        @if (!string.IsNullOrEmpty(S.ConnectionState.ConnectionId)) { <MoCopyButton Value="@S.ConnectionState.ConnectionId" Label="@T("Workspace:Copy")" /> }
+                    </div>
+                    <div class="sr-node-meta">
+                        @if (S.ConnectionState.IsConnected) { <SignalRBadge Text="@T(S.IsConnectionNotObserved ? "Workspace:WbNotObservedShort" : "Workspace:WbObservedInRegistry")" Role="@(S.IsConnectionNotObserved ? MoVisualRole.Warning : MoVisualRole.Success)" Hatch="S.IsConnectionNotObserved" Icon="@MoIcons.ShieldCheck" /> }
+                        @if (S.LastTestUserName is not null && S.ConnectionState.IsConnected) { <SignalRBadge Text="@S.LastTestUserName" Role="MoVisualRole.Primary" /> }
+                        <label class="sr-switch" title="@T("Workspace:WbVerboseHelp")"><input type="checkbox" @bind="S.VerboseLogging" /><span class="sr-switch-track" aria-hidden="true"></span><span>@T("Workspace:WbVerbose")</span></label>
+                    </div>
+                </div>
+                <div class="sr-wire @(S.ConnectionState.IsConnected ? "is-live" : S.ConnectionState.Status == "Reconnecting" ? "is-warn" : "is-idle")">
+                    <div class="sr-wire-metrics"><span class="sr-wire-pill mo-vl-role--primary"><MoIcon Icon="@MoIcons.ArrowUpRight" Size="12px" />@T("Workspace:WbReasons:Sent") <b class="mono">@Sent</b></span><span class="sr-wire-pill mo-vl-role--info"><MoIcon Icon="@MoIcons.ArrowDownLeft" Size="12px" />@T("Workspace:WbReasons:Received") <b class="mono">@S.ConnectionState.TotalReceivedMessages</b></span></div>
+                    <div class="sr-wire-line"><span class="sr-wire-route mono">@(S.ConnectionState.IsConnected || S.ConnectionState.Status == "Reconnecting" ? S.ConnectedHubRoute : T("Workspace:WbNoActiveHub"))</span></div>
+                    @if (S.ConnectionState.IsConnected && S.SelectedHubRoute != S.ConnectedHubRoute) { <p class="sr-wire-mismatch"><MoIcon Icon="@MoIcons.Warning" Size="13px" />@T("Workspace:WbDraftSwitchNotice", S.SelectedHubRoute)</p> }
+                </div>
+                <div class="sr-node sr-node--hub">
+                    <div class="sr-conduit-controls">
+                        <div class="sr-field"><label>@T(S.ConnectionState.IsConnected ? "Workspace:WbDraftHub" : "Workspace:WbHubNode")</label>
+                            <MudSelect T="string" Value="@S.SelectedHubRoute" ValueChanged="ChangeHub" Variant="Variant.Outlined" Margin="Margin.Dense" Class="sr-native-select" aria-label="@T("Workspace:WbHubNode")" OpenIcon="@MoIcons.ChevronDown" CloseIcon="@MoIcons.ChevronUp">
+                                @foreach (var hub in S.AvailableHubs) { <MudSelectItem Value="@hub.Route">@hub.HubName (@hub.Route)</MudSelectItem> }
+                            </MudSelect>
+                        </div>
+                        <div class="sr-field"><div class="sr-field-head"><label for="sr-token-input">@T("Workspace:WbTokenLabel")</label><div class="sr-field-tools"><button class="sr-mini-btn" @onclick="() => _showToken = !_showToken"><MoIcon Icon="@(_showToken ? MoIcons.EyeOff : MoIcons.Eye)" Size="12px" />@T(_showToken ? "Workspace:WbTokenHide" : "Workspace:WbTokenShow")</button>@if (!string.IsNullOrEmpty(S.AccessToken)) { <MoCopyButton Value="@S.AccessToken" Label="@T("Workspace:Copy")" /> }</div></div><input id="sr-token-input" class="sr-input mono" type="@(_showToken ? "text" : "password")" autocomplete="off" placeholder="@T("Workspace:WbTokenPlaceholder")" @bind="S.AccessToken" @bind:event="oninput" /></div>
+                    </div>
+                    <div class="sr-conduit-actions">
+                        <button class="sr-btn sr-btn-primary" disabled="@Busy" @onclick="() => Connect(false)"><MoIcon Icon="@MoIcons.Cable" Size="15px" />@T(S.ConnectionState.IsConnected ? "Workspace:WbReconnect" : "Workspace:WbConnect")</button>
+                        @if (S.CanGenerateTestToken) { <button class="sr-btn mo-vl-soft-action mo-vl-role--primary" disabled="@Busy" title="@T("Workspace:WbTestUserHelper")" @onclick="() => Connect(true)"><MoIcon Icon="@MoIcons.Flask" Size="15px" />@T("Workspace:WbTestUserConnect")</button> }
+                        <button class="sr-btn sr-btn-outline" disabled="@(!S.ConnectionState.IsConnected || _connecting)" @onclick="Disconnect"><MoIcon Icon="@MoIcons.Unplug" Size="15px" />@T("Workspace:WbDisconnect")</button>
+                    </div>
+                    @if (!S.CanGenerateTestToken) { <p class="sr-muted">@T("Workspace:WbTestUserUnavailable")</p> }
+                </div>
+            </div>
+            @if (S.ConnectionState.Status == "Reconnecting") { <div class="sr-conduit-notice"><MoSemanticCallout Severity="MoVisualRole.Warning" Title="@T("Workspace:WbReconnectingTitle")">@T("Workspace:WbReconnectingBody")</MoSemanticCallout></div> }
+            @if (S.IsConnectionNotObserved) { <div class="sr-conduit-notice"><MoSemanticCallout Severity="MoVisualRole.Warning" Title="@T("Workspace:WbAnonymousTitle")">@T("Workspace:WbAnonymousBody")</MoSemanticCallout></div> }
+        </div>
+    </section>
+    <div class="sr-wb-grid">
+        <section class="mo-vl-surface sr-desk" aria-label="@T("Workspace:DeskTitle")">
+            <header class="mo-vl-surface-heading sr-desk-head"><span class="mo-vl-tile mo-vl-role--third"><MoIcon Icon="@MoIcons.Code" Size="16px" /></span><div class="sr-surface-title"><h2>@T("Workspace:DeskTitle")</h2><p class="mono">@T("Workspace:DeskCatalogScope", S.MethodCatalogHubRoute)</p></div><div class="sr-aside"><div class="mo-vl-segment" role="group" aria-label="@T("Workspace:DeskTitle")">
+                <button aria-pressed="@Aria(Tool == "invoke")" @onclick='() => Context.Set("tool", null)'><MoIcon Icon="@MoIcons.Terminal" Size="14px" />@T("Workspace:DeskTabs:Invoke")</button>
+                <button aria-pressed="@Aria(Tool == "callbacks")" @onclick='() => Context.Set("tool", "callbacks")'><MoIcon Icon="@MoIcons.Radio" Size="14px" />@T("Workspace:DeskTabs:Callbacks") <span class="sr-seg-n mono">@Enabled/@S.HubMethods.Count</span></button>
+                <button aria-pressed="@Aria(Tool == "quick")" @onclick='() => Context.Set("tool", "quick")'><MoIcon Icon="@MoIcons.Send" Size="14px" />@T("Workspace:DeskTabs:Quick")</button>
+            </div></div></header>
+            <div class="mo-vl-surface-body">
+                @if (Tool == "invoke") { <SignalRMethodInvoker /> }
+                else if (Tool == "callbacks") { <SignalRMethodListener /> }
+                else { <SignalRMessageSender /> }
+            </div>
+        </section>
+        <SignalRMessageLog />
+    </div>
+}
+
+@code {
+    private bool _showToken, _connecting;
+    private int Enabled => S.HubMethods.Count(method => method.IsListening);
+    private int Sent => S.Messages.Count(message => message.Type == MessageType.Sent);
+    private int Errors => S.Messages.Count(message => message.Type == MessageType.Error || message.IsError);
+    private bool Busy => _connecting || S.ConnectionState.IsConnecting || S.ConnectionState.Status is "Connecting" or "Disconnecting" || string.IsNullOrEmpty(S.SelectedHubRoute);
+    private string Tool => Context.Get("tool") is "callbacks" or "quick" ? Context.Get("tool") : "invoke";
+    private void ChangeHub(string route) { S.SelectHubRoute(route); Context.Set("hub", route); }
+    private Task Connect(bool test) => Context.Run(async () =>
+    {
+        if (_connecting) return;
+        _connecting = true;
+        try
+        {
+            if (S.ConnectionState.IsConnected) await S.DisconnectAsync();
+            if (test) await S.TestUserConnectAsync(Navigation.BaseUri); else await S.ConnectAsync(Navigation.BaseUri);
+        }
+        finally { _connecting = false; }
+    });
+    private Task Disconnect() => Context.Run(async () => { await S.DisconnectAsync(); });
+}

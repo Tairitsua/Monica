@@ -1,0 +1,20 @@
+<span class="@(Status ? "mo-vl-status mo-vl-status--pill" : "sr-pill") @Role.ToCssClass() @(Hatch ? "is-hatch" : null) @(Live ? "mo-vl-status--live" : null)">
+    @if (Status) { <i class="mo-vl-status-dot" aria-hidden="true"></i> }
+    @if (Icon is not null) { <MoIcon Icon="@Icon" Size="12px" /> }
+    @Text
+</span>
+
+@code {
+    /// <summary>The localized state or target label.</summary>
+    [Parameter, EditorRequired] public string Text { get; set; } = string.Empty;
+    /// <summary>The domain meaning of this state.</summary>
+    [Parameter] public MoVisualRole Role { get; set; } = MoVisualRole.Neutral;
+    /// <summary>Shows the status square and capsule rather than a compact tag.</summary>
+    [Parameter] public bool Status { get; set; }
+    /// <summary>Adds a live observation halo to the status square.</summary>
+    [Parameter] public bool Live { get; set; }
+    /// <summary>Marks a registry absence with a dashed evidence boundary.</summary>
+    [Parameter] public bool Hatch { get; set; }
+    /// <summary>An optional state icon.</summary>
+    [Parameter] public string? Icon { get; set; }
+}

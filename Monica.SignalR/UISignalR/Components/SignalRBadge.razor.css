@@ -1,0 +1,2 @@
+.sr-pill { display:inline-flex; align-items:center; gap:5px; min-height:22px; padding:0 8px; border-radius:4px; background:color-mix(in srgb,var(--mo-vl-role) 11%,var(--mud-palette-surface)); color:color-mix(in srgb,var(--mo-vl-role) 66%,var(--mud-palette-text-primary)); font-size:11.5px; font-weight:500; white-space:nowrap; }
+.is-hatch { border:1px dashed color-mix(in srgb,var(--mo-vl-role) 55%,transparent); }

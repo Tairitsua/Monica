@@ -1,0 +1,41 @@
+@implements IAsyncDisposable
+@inject IJSRuntime Js
+
+<div class="@Class" @ref="_root">@ChildContent</div>
+
+@code {
+    /// <summary>The feature-owned geometry class for this keyboard region.</summary>
+    [Parameter] public string? Class { get; set; }
+    /// <summary>Native operable nodes navigated with arrows and Home/End.</summary>
+    [Parameter] public string Selector { get; set; } = "button";
+    /// <summary>The instrument or editor content.</summary>
+    [Parameter, EditorRequired] public RenderFragment? ChildContent { get; set; }
+    private ElementReference _root;
+    private Task? _initialization;
+    private IJSObjectReference? _module, _region;
+    private bool _retired;
+
+    protected override Task OnAfterRenderAsync(bool firstRender) => firstRender ? _initialization = InitializeAsync() : Task.CompletedTask;
+    private async Task InitializeAsync()
+    {
+        try
+        {
+            _module = await Js.InvokeAsync<IJSObjectReference>("import", "./_content/Monica.SignalR/UISignalR/signalr-workspace.js");
+            if (!_retired) _region = await _module.InvokeAsync<IJSObjectReference>("wireKeyboard", _root, Selector);
+        }
+        catch (JSDisconnectedException) { }
+        catch (OperationCanceledException) when (_retired) { }
+    }
+    public async ValueTask DisposeAsync()
+    {
+        _retired = true;
+        try
+        {
+            if (_initialization is not null) await _initialization;
+            if (_region is not null) { await _region.InvokeVoidAsync("dispose"); await _region.DisposeAsync(); }
+            if (_module is not null) await _module.DisposeAsync();
+        }
+        catch (JSDisconnectedException) { }
+        catch (OperationCanceledException) { }
+    }
+}

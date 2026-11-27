@@ -61,11 +61,17 @@ public class ModuleSignalRUI : MonicaModule<ModuleSignalRUIOption>, IUIModule
 
                 registry.RegisterLocalizedPage<UISignalRDebugPage, SignalRResource>(
                     UISignalRDebugPage.PAGE_URL,
-                    "Pages:SignalRDebug:Title",
-                    MoIcons.Settings,
+                    "Workspace:Titles:Workbench",
+                    MoIcons.Cable,
                     category,
                     addToNav: true,
                     navOrder: 20);
+                registry.RegisterLocalizedPage<UISignalRDebugPage, SignalRResource>(
+                    UISignalRDebugPage.SENDS_URL, "Workspace:Titles:Sends", MoIcons.HeartPulse,
+                    category, addToNav: true, navOrder: 21);
+                registry.RegisterLocalizedPage<UISignalRDebugPage, SignalRResource>(
+                    UISignalRDebugPage.CONNECTIONS_URL, "Workspace:Titles:Connections", MoIcons.Users,
+                    category, addToNav: true, navOrder: 22);
             }));
     }
 }
