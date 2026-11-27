@@ -5,9 +5,9 @@ description: Apply the shared Monica application specification and the repositor
 
 # Monica Application
 
-Use this skill before application design, implementation, refactoring, or review, including when entering through a granular application skill. Read the [shared specification](references/00-application-specification.md) and [unified domain/role architecture](references/03-unified-architecture.md), then the repository-designated `<project>-application-spec` skill and the references relevant to the affected boundary. That project skill owns the application's actual architecture and adopted conventions.
+Use this skill before application design, implementation, refactoring, or review, including when entering through a granular application skill. Read the [shared specification](references/00-application-specification.md) and [unified domain/role architecture](references/03-unified-architecture.md), then the repository-designated `<project>-application-spec` skill and the references relevant to the affected boundary. Apply its adopted project-specific development rules alongside the shared defaults.
 
-Compose existing Building Blocks and documented infrastructure capabilities first. A new business flow or a combination without an exact example is ordinary implementation when each building block preserves its approved responsibility and contracts. Read [specification evolution](references/01-specification-evolution.md) when that composition exposes a concrete rule conflict or an uncovered architectural contract. Use the [project specification contract and template](references/02-project-specification-skill.md) when adopting or maintaining a repository specification. A missing project specification does not authorize inventing its architecture; inspect the source and prepare a concrete adoption proposal while continuing work within already approved patterns.
+Compose existing Building Blocks and documented infrastructure capabilities first. A new business flow or a combination without an exact example is ordinary implementation when each building block preserves its approved responsibility and contracts. Read [specification evolution](references/01-specification-evolution.md) when that composition exposes a concrete rule conflict or an uncovered architectural contract. Use the [project specification contract and template](references/02-project-specification-skill.md) when adopting or maintaining a repository specification. A missing project specification does not authorize inventing its architecture; use the shared defaults and inspect the source. Create the minimal entrypoint when adopting the project skill.
 
 ## Routing
 
@@ -26,4 +26,4 @@ Compose existing Building Blocks and documented infrastructure capabilities firs
 
 ## Apply the Specification
 
-Use the unified domain/role layout and the deployment placement adopted by the project specification; do not choose a new deployment model for an ordinary feature. Load the matching architecture and building block references before changing their contracts. Reconcile affected project-specification facts and approved rules with the implementation in the same change. Record the rationale beside a rule; use Git history and existing project decision records for its evolution.
+Use the unified domain/role layout and check actual deployment placement in host composition and configuration. Update the project skill when a project-specific development rule changes. Ordinary features use the existing rules.

@@ -1,6 +1,6 @@
 # Database layout and migrations
 
-Use this contract when placing migration projects, sharing a database across domains, or changing an application's physical database layout. The [unified architecture](03-unified-architecture.md) owns domain and role boundaries. The project specification records concrete context, schema, history and deployment choices; an environment cutover remains a separately reviewed operation.
+Use this contract when placing migration projects, sharing a database across domains, or changing an application's physical database layout. The [unified architecture](03-unified-architecture.md) owns domain and role boundaries. Inspect context and schema mappings in the migration projects and use deployment assets for environment cutovers.
 
 ## Ownership and source layout
 
@@ -38,7 +38,7 @@ Folder names within an existing assembly may remain unchanged. A layout cleanup 
 
 Prefer one relational database when isolation, capacity and operational ownership permit it. Sharing a database does not permit direct access to another domain's repositories or tables. Both combined and split role deployments retain the same domain contracts.
 
-Prefer one physical application database when local atomic collaboration is required. A project may place business tables in the default namespace or in stable per-domain schemas within that database. Record the chosen mapping in the project specification and keep it independent of environment, role, AppId and instance. Use descriptive business names and retain semantic distinctions even when schemas prevent collisions. Put marked infrastructure tables in `infra` when the provider supports an independent schema within the same database; otherwise use the default namespace without adding a prefix. Explicitly independent APIs may use different databases and commit independently. Change existing namespaces only through a deliberate project contract and data-preserving migration plan.
+Prefer one physical application database when local atomic collaboration is required. A project may place business tables in the default namespace or in stable per-domain schemas within that database. Keep the chosen mapping independent of environment, role, AppId and instance. Use descriptive business names and retain semantic distinctions even when schemas prevent collisions. Put marked infrastructure tables in `infra` when the provider supports an independent schema within the same database; otherwise use the default namespace without adding a prefix. Explicitly independent APIs may use different databases and commit independently. Change existing namespaces only through a deliberate project contract and data-preserving migration plan.
 
 Use [Monica infrastructure table layout](../../monica-infra-persistence/references/infrastructure-table-layout.md) for explicitly marked technical tables and per-context history. It does not rewrite business mappings or consolidate databases. Verify tables, indexes, sequences, foreign keys, views, raw SQL, bulk operations and every existing shard. Resolve physical names from EF metadata and provider quoting instead of switching connection-level search paths between calls.
 
@@ -105,7 +105,7 @@ Strict model drift checking is part of the release gate. An existing application
 
 ## Consolidation and rollback
 
-A database merge is a data and deployment cutover, not just an EF migration. Keep ordinary schema evolution in the domain migration projects. Put the reviewed one-time export/import, history relocation, validation and rollback procedure in the application's existing deployment assets, with the chosen target layout in its project specification. Do not create UAT-only copies of domain migrations.
+A database merge is a data and deployment cutover, not just an EF migration. Keep ordinary schema evolution in the domain migration projects. Put the reviewed one-time export/import, history relocation, validation and rollback procedure in the application's existing deployment assets alongside the intended target layout. Do not create UAT-only copies of domain migrations.
 
 The plan must inventory same-named objects, current/history data, sharded tables, generated sequences, configuration, scheduler state, Inbox receipts and Outbox delivery state. Restore backups into isolated targets for rehearsal. Copying several live databases at unrelated instants is not a consistent application snapshot; a simple cutover quiesces all writers, autonomous work and input consumers before taking the final copies. Preserve offsets and durable identities. Prove dump/restore compatibility with the actual provider, available disk space and restore duration before estimating the outage.
 
@@ -115,8 +115,8 @@ Update every source of database selection together, including environment files,
 
 Retain the original databases and deployment inputs during the agreed rollback window. Before new writes, reverting to the frozen originals can be straightforward. After new writes, switching a connection back would lose those writes: stop ingress and use a rehearsed data reconciliation or recovery plan. Neither an EF `Down` nor a configuration rollback is a general database-merge rollback.
 
-## Project specification checklist
+## Verify the migration layout
 
-Record the actual domain → context → migration assembly → schema/history mapping, physical shared-table owners, current/history placement, scoped connection ownership, provider/version source, runner entrypoint, strict flags, installation path and verification commands. Link to operational assets instead of duplicating credentials or environment runbooks. Mark unimplemented layout changes as proposals or migration gaps, never as current deployment facts.
+Verify each context against its migration assembly, schema, history and physical table owner. Check the actual runner and deployment inputs before applying a migration. A project-specific rule for placing future migrations belongs in the project spec when the shared convention leaves a choice open.
 
 EF reference behavior: [separate migration projects](https://learn.microsoft.com/en-us/ef/core/managing-schemas/migrations/projects), [custom history tables](https://learn.microsoft.com/en-us/ef/core/managing-schemas/migrations/history-table), [applying migrations](https://learn.microsoft.com/en-us/ef/core/managing-schemas/migrations/applying), and [cross-context transactions](https://learn.microsoft.com/en-us/ef/core/saving/transactions#cross-context-transaction). Product ownership and deployment requirements above are Monica application conventions; provider-specific support still requires verification.

@@ -6,4 +6,4 @@ The role project already expresses the application boundary; remove redundant Ap
 
 Preserve generated interface names, published request namespaces, routes and durable identities. WorkloadOwner may preserve an already issued scheduler owner, independently of the new AppId placement. Do not copy active integrations into every role or introduce a Monica module per business feature.
 
-Adopt combined placement first where appropriate, verify local operations and selected workload behavior, then consider split placement separately. Migrate actual domain migrations to the top-level Migrations home while preserving their assembly/context identities. Record remaining source drift in the project specification rather than describing the legacy structure as a second new-project convention.
+Adopt combined placement first where appropriate, verify local operations and selected workload behavior, then consider split placement separately. Migrate actual domain migrations to the top-level Migrations home while preserving their assembly/context identities.

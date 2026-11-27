@@ -4,7 +4,7 @@
 
 ## Required Decisions
 
-Resolve these facts from the project specification, existing annotations, and actual requirements before writing annotations:
+Resolve these facts from existing annotations, requirements and applicable local conventions:
 
 - `$RequirementId$`: a stable requirement identifier owned by the application or its workflow system.
 - `$SubdomainTag$`: the bounded context or subdomain tag.
@@ -19,7 +19,7 @@ Leave `Owner` unset while the application does not use ownership mapping. If the
 
 ## Catalog Language
 
-Resolve the metadata language and its configuration source from the project's application specification before writing human-readable metadata. It governs the title and `Description` even though the values are C# strings: `zh-CN` uses Chinese and `en-US` uses English. If no workspace language is configured, follow the application's existing catalog convention. English requirements for conversation, code comments, XML documentation or framework guidance do not override the application catalog language.
+Resolve the catalog language from the workspace configuration and any adopted local convention before writing human-readable metadata. It governs the title and `Description` even though the values are C# strings: `zh-CN` uses Chinese and `en-US` uses English. If no workspace language is configured, follow the application's existing catalog convention. English requirements for conversation, code comments, XML documentation or framework guidance do not override the application catalog language.
 
 Keep `Owner`, tags, requirement IDs, namespaces and CLR type names stable. Localize the human title and responsibility without translating these identities.
 

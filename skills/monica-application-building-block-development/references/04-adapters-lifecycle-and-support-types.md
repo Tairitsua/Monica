@@ -1,6 +1,6 @@
 # Adapters, Lifecycle Building Blocks, and Support Types
 
-These choices supplement the [building block catalog](00-building-block-overview.md) within the unified domain/role architecture. The project specification records their concrete placement and adopted conventions. Native discovery support does not authorize using an adapter to bypass domain invariants or inventing a new role.
+These choices supplement the [building block catalog](00-building-block-overview.md) within the unified domain/role architecture. Apply any project-specific convention for these types. Native discovery support does not authorize using an adapter to bypass domain invariants or inventing a new role.
 
 ## Bounded CRUD
 

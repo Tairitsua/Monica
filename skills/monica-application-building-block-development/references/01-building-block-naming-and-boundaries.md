@@ -33,7 +33,7 @@ Naming checks are disabled until the host enables `Naming.Enabled`. A rule inher
 
 ## Additional Support-Type Conventions
 
-These names describe support types; they do not create additional discovered kinds. Adopt concrete placement in the project specification and use [adapter/support rules](04-adapters-lifecycle-and-support-types.md) where relevant.
+These names describe support types; they do not create additional discovered kinds. Use any adopted local placement convention and use [adapter/support rules](04-adapters-lifecycle-and-support-types.md) where relevant.
 
 | Support type | Recommended naming | Purpose |
 | --- | --- | --- |

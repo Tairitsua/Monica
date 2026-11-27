@@ -5,11 +5,11 @@ description: Apply Monica application testing rules when naming or migrating tes
 
 # Monica Application Unit Testing
 
-Load `$monica-application` and the repository-designated project specification before test design or edits, including direct invocation of this skill. Use its validation contract and adopted architecture/unit rules. The [shared specification](../monica-application/references/00-application-specification.md) defines rule strength; use [specification evolution](../monica-application/references/01-specification-evolution.md) before introducing a new testing or execution model.
+Load `$monica-application` and the repository-designated project specification before test design or edits, including direct invocation of this skill. Apply any adopted local test convention and use the repository's verification instructions. The [shared specification](../monica-application/references/00-application-specification.md) defines rule strength; use [specification evolution](../monica-application/references/01-specification-evolution.md) before introducing a new testing or execution model.
 
 Test business behavior through a complete Monica host when composition matters. Each scenario owns its host and database; registrations are finalized before build. Arrange, act and assert use independent scopes.
 
-For domain, role, shared-library, host, and test-support naming or migration, read [test project ownership and naming](references/project-naming.md). The project specification owns the concrete migration map.
+For domain, role, shared-library, host, and test-support naming or migration, read [test project ownership and naming](references/project-naming.md).
 
 ## Repository Test Infrastructure First
 

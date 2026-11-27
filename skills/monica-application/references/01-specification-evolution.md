@@ -1,6 +1,6 @@
 # Evolve an Application Specification
 
-Use this reference when source facts drift or a requirement cannot be met within the existing architectural contracts. Approval of a feature authorizes implementation through compliant Building Block composition. It authorizes an architectural deviation only when the human's decision identifies that deviation and its scope.
+Use this reference when an adopted rule changes or a requirement cannot be met within the existing architectural contracts. Approval of a feature authorizes implementation through compliant Building Block composition. It authorizes an architectural deviation only when the human's decision identifies that deviation and its scope.
 
 ## Try Existing Composition First
 
@@ -16,10 +16,10 @@ Business changes such as returning an acceptance acknowledgement before processi
 
 | Change | Action |
 | --- | --- |
-| Verified factual correction, such as a moved file, an existing dependency, or a renamed domain within approved patterns | Correct the project specification autonomously with source/test evidence. Preserve the distinction between current facts and approved intent. |
-| New concrete units or a new combination of approved roles and capabilities, including documented execution and transaction choices | Implement and validate it within the authorized behavior. No new specification, architectural approval, or Workflow Change is required merely for the combination. Update existing project facts or behavioral requirements only where they become inaccurate. |
+| A recorded local rule cites a moved type or an obsolete example | Correct that entry using source or test evidence. Other file moves require no spec edit. |
+| New concrete units or a new combination of approved roles and capabilities, including documented execution and transaction choices | Implement and validate it within the authorized behavior. No new specification, architectural approval, or Workflow Change is required merely for the combination. Update the owning behavioral requirements when the agreed behavior changes. |
 | A new architectural responsibility, layer, dependency direction, reusable base family, framework execution contract, or local deviation from a mandatory shared/project rule | Establish why existing composition cannot meet the requirement, then prepare the smallest rule change and obtain a human decision before adopting it. |
-| Existing implementation outside the approved specification | Describe the known migration gap and its evidence. Do not silently rewrite a rule to bless the drift or spread it to new code. |
+| Existing implementation outside the approved specification | Apply the approved rule to new work. Track any remediation with the work that will fix it. |
 
 A new concrete subclass in an already adopted base family is routine implementation. Adding a reusable product base family is an architecture change even if its code is short. A fact correction must not erase the rule the source currently violates.
 
@@ -34,7 +34,7 @@ The human chooses adoption, revision, or rejection. Record the approved scope, r
 ## Update the Correct Owner
 
 - Generalizable Monica application patterns belong in the relevant shared skill and its examples/tests.
-- Application topology, conventions, specializations, and local deviations belong in the project specification skill.
+- Adopted project-specific coding conventions, specializations and scoped exceptions belong in the project skill.
 - A project-only exception does not change the shared default. State exactly which rule it deviates from, which projects/types may use it, and what remains required in that scope.
 
-Once approved, update the owning specification and affected implementation, routes, examples, and verification together. Keep the rationale next to the rule. Summarize only unresolved migration gaps as current gaps; durable change history belongs in existing history rather than accumulating session narratives in the skill.
+Once approved, update the owning specification and affected implementation, routes, examples, and verification together. Keep the rationale next to the rule. Replace superseded rules in place and remove entries that no longer express a current difference.

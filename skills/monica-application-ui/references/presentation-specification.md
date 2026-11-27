@@ -54,4 +54,4 @@ A business decision or atomic cross-context operation remains a backend use case
 
 Reuse Monica's foundation for themes, icons, browser preferences and overlays. `ModuleUIHost` owns hosting and route discovery; `ModuleShellUI` is optional operational navigation. Product pages can use their own layout while registered diagnostic destinations use the Shell. Native `@layout` takes precedence. Providers belong once above the router, not in each layout.
 
-The repository application specification records the actual presentation projects, feature ownership, route/layout choices, caller and tenant model, invocation profile, backend dependencies and migration gaps. See the [reference application](../../../examples/Monica.ReferenceApplication/README.md) for a working composition without business UI modules.
+Inspect presentation projects, routes and host configuration for the current composition. Record a project-specific UI convention only when it changes how future features are implemented. See the [reference application](../../../examples/Monica.ReferenceApplication/README.md) for a working composition without business UI modules.

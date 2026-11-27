@@ -1226,7 +1226,7 @@
           },
           {
             "id": "reconcile-project-application-specification",
-            "text": "Reconcile impacted project application specification facts and rules with the implementation in the same change. Keep rule rationale with the rule and use Git/history or existing project decision evidence.",
+            "text": "Keep only adopted project-specific development rules in the project application specification. Update or remove an entry when that convention changes. Ordinary features and business details need no spec entry.",
             "labels": {
               "en-US": {
                 "title": "Keep project specs current",
@@ -1234,7 +1234,7 @@
               },
               "zh-CN": {
                 "title": "同步项目规范",
-                "description": "实现变化时，一并维护受影响的项目规范。"
+                "description": "仅在项目特有开发约定变化时更新对应条目。"
               }
             }
           }

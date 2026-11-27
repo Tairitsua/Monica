@@ -24,7 +24,7 @@ A scenario protecting a cross-domain use case belongs to the production project 
 
 Keep the directory name, `.csproj` stem, `AssemblyName`, and `RootNamespace` equal to the complete test project name. Prefer SDK defaults when they already produce that identity. Namespaces below the root follow the test folders. Preserve the production project's spelling, including specialized role segments and casing.
 
-The repository chooses one test root, such as `tests/` or `src/Tests/`; its project specification records the choice. Keep runnable projects flat beneath it:
+Use the repository's test root, such as `tests/` or `src/Tests/`. Keep runnable projects flat beneath it:
 
 ```text
 src/Tests/
@@ -55,10 +55,10 @@ Reuse the repository's existing support library while migrating its name. Rename
 
 ## Migrate existing projects
 
-1. Inventory each test class's protected behavior and actual production owner. Record mixed-owner projects explicitly in the project specification.
+1. Inventory each test class's protected behavior and actual production owner. Identify mixed-owner projects while planning the move.
 2. Rename a single-owner project to the exact target. Split mixed-owner projects, and merge duplicate projects for the same owner while preserving distinct behavior coverage. A filename replacement is not an ownership review.
 3. Update the directory, project identity, namespaces, solution entries, project references, friend-assembly declarations, test discovery settings, CI selectors, and documented commands together. Preserve production namespaces and durable runtime identities.
 4. Preserve `REQ` identities and verify `Unit` links. A `Unit` trait names the production project and runtime key, so a test-only rename does not itself require changing that value. Keep ambiguous class-to-unit associations explicit.
 5. Compare discovered test cases before and after movement, accounting for renamed fully qualified names. Do not treat missing or skipped tests as successful migration. Build the affected solution and run the covering projects using the repository's verification policy.
 
-The project specification owns concrete old-to-new mappings and unresolved migration gaps. New work follows the target convention; existing names remain evidence of work still to migrate, not additional supported naming styles.
+Keep old-to-new mappings with the migration work. Use the target convention for new test projects.
