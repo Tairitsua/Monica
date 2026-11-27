@@ -61,65 +61,7 @@
     .di-page ::deep .di-reasons li, .di-page ::deep .di-advisory { max-width: none; }
 }
 
-/* Tape */
-.di-page ::deep .di-tape { display: flex; flex-direction: column; gap: 12px; padding: 18px 22px 14px; }
-.di-page ::deep .di-tape-head { display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: 8px 24px; }
-.di-page ::deep .di-tape-head h3 { font-size: 14px; font-weight: 600; }
-.di-page ::deep .di-tape-head p { max-width: 70ch; color: var(--mud-palette-text-secondary); font-size: 12.5px; }
-.di-page ::deep .di-tape-head .legend { gap: 6px 14px; font-size: 11.5px; }
-.di-page ::deep .di-sw-other { display: inline-block; width: 10px; height: 10px; border-radius: 3px; background: color-mix(in srgb, var(--mud-palette-text-secondary) 18%, var(--mud-palette-surface)); }
-.di-page ::deep .di-sw-arc { display: inline-block; width: 16px; height: 8px; border: 1.75px solid var(--di-role); border-bottom: 0; border-radius: 8px 8px 0 0; }
-.di-page ::deep .di-sw-arc.is-dashed { border-style: dashed; }
 .di-page ::deep .di-sw-adv { display: inline-block; flex: none; width: 3px; height: 10px; border-radius: 1px; background: color-mix(in srgb, var(--mud-palette-warning) 62%, var(--mud-palette-surface)); }
-.di-page ::deep .di-tape-body { position: relative; width: 100%; min-width: 0; touch-action: pan-y; user-select: none; }
-.di-page ::deep .di-tape-svg { position: absolute; inset: 0; display: block; overflow: visible; }
-.di-page ::deep .di-t-label { fill: var(--mud-palette-text-secondary); font: 500 11px var(--mo-font-family-body); }
-.di-page ::deep .di-t-seg { fill: color-mix(in srgb, var(--mud-palette-text-secondary) 7%, var(--mud-palette-surface)); }
-.di-page ::deep .di-t-seg.is-alt { fill: color-mix(in srgb, var(--mud-palette-text-secondary) 12%, var(--mud-palette-surface)); }
-.di-page ::deep .di-t-seg.is-focus { fill: color-mix(in srgb, var(--mud-palette-primary) 12%, var(--mud-palette-surface)); stroke: var(--mud-palette-primary); stroke-width: 1.5; }
-.di-page ::deep .di-t-segtext { fill: var(--mud-palette-text-primary); font: 550 11.5px var(--mo-font-family-body); }
-.di-page ::deep .di-t-segn { fill: var(--mud-palette-text-secondary); font: 500 11px var(--mo-font-family-mono); }
-.di-page ::deep .di-t-segn.is-mid { text-anchor: middle; }
-.di-page ::deep .di-t-grid { stroke: var(--mud-palette-divider); stroke-dasharray: 2 3; }
-.di-page ::deep .di-t-other { fill: color-mix(in srgb, var(--mud-palette-text-secondary) 14%, var(--mud-palette-surface)); }
-.di-page ::deep .di-t-auto { fill: var(--di-role); }
-.di-page ::deep .di-t-adv { fill: color-mix(in srgb, var(--di-role) 62%, var(--mud-palette-surface)); }
-.di-page ::deep .di-t-lane { fill: var(--mud-palette-background-gray); }
-.di-page ::deep .di-t-lt { fill: color-mix(in srgb, var(--di-role) 78%, var(--mud-palette-surface)); }
-.di-page ::deep .di-t-range { fill: color-mix(in srgb, var(--di-role) 14%, transparent); stroke: var(--di-role); stroke-width: 1; }
-.di-page ::deep .di-t-arc path { fill: none; stroke: var(--di-role); stroke-width: 1.75; }
-.di-page ::deep .di-t-arc path.is-dashed { stroke-dasharray: 4 3; }
-.di-page ::deep .di-t-arc circle { fill: var(--di-role); }
-.di-page ::deep .di-t-arc circle.is-from { fill: var(--mud-palette-surface); stroke: var(--di-role); stroke-width: 1.5; }
-.di-page ::deep .di-t-diamond { fill: var(--di-role); stroke: var(--mud-palette-surface); stroke-width: 1.5; }
-.di-page ::deep .di-t-cross { stroke: var(--mud-palette-primary); stroke-width: 1; }
-.di-page ::deep .di-t-axis { stroke: var(--mud-palette-lines-inputs); }
-.di-page ::deep .di-t-tick { fill: color-mix(in srgb, var(--mud-palette-text-secondary) 84%, var(--mud-palette-surface)); font: 500 11px var(--mo-font-family-mono); text-anchor: middle; }
-.di-page ::deep .di-t-tick.is-mid { fill: var(--mud-palette-text-secondary); }
-.di-page ::deep .di-t-binbg { fill: color-mix(in srgb, var(--mud-palette-error) 5%, var(--mud-palette-surface)); }
-.di-page ::deep .di-t-hatch { stroke: color-mix(in srgb, var(--mud-palette-text-secondary) 40%, transparent); stroke-width: 1.5; }
-.di-page ::deep .di-t-bin { stroke: color-mix(in srgb, var(--mud-palette-error) 30%, transparent); stroke-width: 1; }
-.di-page ::deep .di-tape-hit { position: absolute; cursor: crosshair; }
-.di-page ::deep .di-seg-strip { position: absolute; inset: 0 0 auto 0; height: 0; }
-.di-page ::deep .di-seg-btn { position: absolute; top: 0; border-radius: 4px; }
-.di-page ::deep .di-seg-btn:hover { background: color-mix(in srgb, var(--mud-palette-primary) 7%, transparent); }
-.di-page ::deep .di-seg-btn:focus-visible { outline: 2px solid var(--mud-palette-primary); outline-offset: 1px; }
-.di-page ::deep .di-arc-btn { position: absolute; width: 18px; height: 18px; border-radius: 50%; background: transparent; }
-.di-page ::deep .di-arc-btn.is-separated::before {
-    content: ""; position: absolute; inset: 6px; border-radius: 50%; background: var(--di-role);
-}
-.di-page ::deep .di-t-arc-leader { stroke: var(--di-role); stroke-width: 1; stroke-dasharray: 2 3; }
-.di-page ::deep .di-arc-btn:hover, .di-page ::deep .di-arc-btn:focus-visible { background: color-mix(in srgb, var(--di-role) 18%, transparent); box-shadow: 0 0 0 1.5px var(--di-role); outline: none; }
-.di-page ::deep .di-bin-btn { position: relative; display: flex; width: 100%; align-items: center; gap: 4px; min-height: 18px; padding: 0 5px; overflow: hidden; border-radius: 4px;
-    background: color-mix(in srgb, var(--di-role) 13%, var(--mud-palette-surface)); color: color-mix(in srgb, var(--di-role) 76%, var(--mud-palette-text-primary)); font-size: 11px; font-weight: 600; white-space: nowrap; }
-.di-page ::deep .di-bin-btn span { overflow: hidden; text-overflow: ellipsis; }
-.di-page ::deep .di-bin-btn .mo-icon { flex: none; }
-.di-page ::deep .di-bin-btn:hover { background: color-mix(in srgb, var(--di-role) 20%, var(--mud-palette-surface)); }
-.di-page ::deep .di-tape-caption { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 14px; min-height: 30px; padding: 6px 10px; border-radius: 8px; background: var(--mud-palette-background-gray); }
-.di-page ::deep .di-tape-caption p { flex: 1 1 280px; min-width: 0; color: var(--mud-palette-text-secondary); font-size: 11.5px; overflow-wrap: anywhere; }
-.di-page ::deep .di-tape-actions { display: inline-flex; flex-wrap: wrap; gap: 6px; }
-.di-page ::deep .di-tape-hint { color: color-mix(in srgb, var(--mud-palette-text-secondary) 84%, var(--mud-palette-surface)); font-size: 11.5px; }
-@container page (max-width: 720px) { .di-page ::deep .di-tape { padding: 16px 16px 12px; } }
 
 /* ---------- Findings ledger ---------- */
 .di-page ::deep .di-findings { display: flex; flex-direction: column; }
@@ -137,19 +79,40 @@
 .di-page ::deep .di-flist { padding: 0 10px 12px; }
 .di-page ::deep .di-fgroup { display: flex; justify-content: space-between; gap: 8px; padding: 12px 10px 4px; color: var(--mud-palette-text-secondary); font-size: 11.5px; font-weight: 500; }
 .di-page ::deep .di-fgroup .n { color: color-mix(in srgb, var(--mud-palette-text-secondary) 84%, var(--mud-palette-surface)); font: 500 11px var(--mo-font-family-mono); }
-.di-page ::deep .di-frow { display: grid; grid-template-columns: 14px minmax(0, 1.25fr) minmax(0, 1fr) 150px 16px; align-items: center; gap: 14px; width: 100%; padding: 11px 10px; border-radius: 8px; text-align: left; transition: background-color .14s ease; }
+.di-page ::deep .di-frow { display: flex; min-width: 0; border-radius: 8px; }
+.di-page ::deep .di-frow-main {
+    display: grid;
+    grid-template-columns: 14px minmax(0, 1.25fr) minmax(0, 1fr) 150px 16px;
+    flex: 1 1 auto;
+    align-items: center;
+    gap: 14px;
+    min-width: 0;
+    padding: 11px 10px;
+    border-radius: 8px;
+    text-align: left;
+    transition: background-color .14s ease;
+}
+.di-page ::deep .di-frow-evidence {
+    align-self: center;
+    flex: 0 0 34px;
+    min-height: 34px;
+    margin-inline-end: 6px;
+    border-radius: 6px;
+}
+.di-page ::deep .di-frow-evidence:hover { background: var(--mud-palette-action-default-hover); }
+.di-page ::deep .di-frow-main[aria-controls]:hover > .mo-icon { color: var(--mud-palette-primary); }
 .di-page ::deep .di-flist li + li .di-frow { box-shadow: 0 -1px 0 var(--mud-palette-divider); }
-.di-page ::deep .di-frow:hover { background: color-mix(in srgb, var(--mud-palette-text-primary) 3%, var(--mud-palette-surface)); }
-.di-page ::deep .di-frow > .mo-icon { color: color-mix(in srgb, var(--mud-palette-text-secondary) 84%, var(--mud-palette-surface)); }
+.di-page ::deep .di-frow-main:hover { background: color-mix(in srgb, var(--mud-palette-text-primary) 3%, var(--mud-palette-surface)); }
+.di-page ::deep .di-frow button > .mo-icon { color: color-mix(in srgb, var(--mud-palette-text-secondary) 84%, var(--mud-palette-surface)); }
 .di-page ::deep .di-frow-id { display: flex; flex-direction: column; gap: 2px; min-width: 0; font-size: 13px; }
 .di-page ::deep .di-frow-id small { color: color-mix(in srgb, var(--mud-palette-text-secondary) 84%, var(--mud-palette-surface)); font-size: 11.5px; overflow-wrap: anywhere; }
 .di-page ::deep .di-frow-why { color: var(--mud-palette-text-secondary); font-size: 12.5px; overflow-wrap: anywhere; }
 .di-page ::deep .di-frow-tags { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 4px; }
 .di-page ::deep .di-none { min-height: 76px; gap: 8px; padding: 8px 20px 20px; color: var(--mud-palette-text-secondary); font-size: 13px; }
 @container page (max-width: 860px) {
-    .di-page ::deep .di-frow { grid-template-columns: 14px minmax(0, 1fr) 16px; gap: 4px 12px; }
+    .di-page ::deep .di-frow-main { grid-template-columns: 14px minmax(0, 1fr) 16px; gap: 4px 12px; }
     .di-page ::deep .di-frow-why, .di-page ::deep .di-frow-tags { grid-column: 2; justify-content: flex-start; }
-    .di-page ::deep .di-frow > .mo-icon { grid-column: 3; grid-row: 1; }
+    .di-page ::deep .di-frow-main > .mo-icon { grid-column: 3; grid-row: 1; }
     .di-page ::deep .di-search { flex: 1 1 100%; }
 }
 
@@ -324,7 +287,6 @@
     color: var(--mud-palette-text-primary); background: var(--mud-palette-surface);
     box-shadow: 0 0 0 1px var(--mud-palette-divider);
 }
-.di-page ::deep .di-bin-buttons { position: absolute; top: 90px; max-height: 82px; overflow: auto; display: grid; gap: 4px; }
 .di-page ::deep .di-skeleton .mo-content-state { min-height: 0; width: 100%; align-items: flex-start; padding: 0; }
 .di-page ::deep .di-failed h2 { font-size: 15px; font-weight: 600; }
 @container page (max-width: 860px) {

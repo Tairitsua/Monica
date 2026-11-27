@@ -217,11 +217,24 @@
     "Caption": {
       "Arc": "{0}: #{1} taken over by #{2}",
       "Range": "Selected #{0}–#{1} · {2} descriptors",
-      "Idle": "Hover or use the keyboard to read a descriptor; drag to select a range.",
+      "ArcRepeat": "{0}: registration #{1} repeated at #{2}",
+      "FindingArcs": "{0} registration arcs for {1}",
+      "Idle": "Hover to read a descriptor. Scroll over the tape to zoom horizontally or drag across the lanes to select a range.",
       "Descriptor": "#{0} · {1}{2} · {3} · {4}{5}",
       "ConventionalSuffix": " · convention",
       "Segment": "#{0}–#{1} · {2} · {3} descriptors{4} · {5}",
       "SegmentAuto": ", {0} conventional"
+    },
+    "Zoom": {
+      "Label": "Registration tape zoom",
+      "In": "Zoom in",
+      "Out": "Zoom out",
+      "Fit": "Fit all registrations",
+      "ClearHighlight": "Clear highlight"
+    },
+    "Findings": {
+      "Locate": "Locate {0} in registration order",
+      "OpenEvidence": "Open evidence for {0}"
     },
     "OpenRange": "Open in Service resolution",
     "ClearRange": "Clear selection",

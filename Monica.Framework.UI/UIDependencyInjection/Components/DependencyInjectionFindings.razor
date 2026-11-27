@@ -61,8 +61,16 @@
                     {
                         var reasons = Reasons.Where(implementation.Matches).ToArray();
                         var role = reasons.Length == 0 ? "role-neutral" : CssRole(FindingRole(reasons[0]));
-                        <li>
-                            <button type="button" class="di-frow @role" @onclick="() => OpenImplementation.InvokeAsync(implementation.Type)">
+                        var canLocate = RegistrationTape.HasArc(implementation);
+                        <li class="di-frow @role" @key="implementation.Type"
+                            @onmouseenter="() => PreviewAsync(implementation.Type, canLocate, false, true)"
+                            @onmouseleave="() => PreviewAsync(implementation.Type, canLocate, false, false)">
+                            <button type="button" class="di-frow-main"
+                                    title="@(canLocate ? L["Workbench:Findings:Locate", implementation.Display].Value : null)"
+                                    aria-controls="@(canLocate ? "di-registration-tape" : null)"
+                                    @onfocus="() => PreviewAsync(implementation.Type, canLocate, true, true)"
+                                    @onblur="() => PreviewAsync(implementation.Type, canLocate, true, false)"
+                                    @onclick="() => ActivateAsync(implementation.Type, canLocate)">
                                 <span class="di-frow-mark"><i class="swatch @(implementation.Descriptors.Length == 0 ? "is-hatch" : null)" aria-hidden="true"></i></span>
                                 <span class="di-frow-id">
                                     <DependencyInjectionTypeName Full="@implementation.Type" Display="@implementation.Display" />
@@ -79,8 +87,19 @@
                                         <span class="di-chip is-outline">@Reason(L, ConventionFinding.ConcreteOnly)</span>
                                     }
                                 </span>
-                                <MoIcon Icon="@MoIcons.ChevronRight" Size="15px" />
+                                <MoIcon Icon="@(canLocate ? MoIcons.Crosshair : MoIcons.ChevronRight)" Size="15px" />
                             </button>
+                            @if (canLocate)
+                            {
+                                <button type="button" class="di-frow-evidence"
+                                        title="@L["Workbench:Findings:OpenEvidence", implementation.Display]"
+                                        aria-label="@L["Workbench:Findings:OpenEvidence", implementation.Display]"
+                                        @onfocus="() => PreviewAsync(implementation.Type, true, true, true)"
+                                        @onblur="() => PreviewAsync(implementation.Type, true, true, false)"
+                                        @onclick="() => OpenImplementation.InvokeAsync(implementation.Type)">
+                                    <MoIcon Icon="@MoIcons.ChevronRight" Size="15px" />
+                                </button>
+                            }
                         </li>
                     }
                 </ul>
@@ -95,6 +114,14 @@
     [Parameter] public string? Query { get; set; }
     [Parameter, EditorRequired] public EventCallback<IReadOnlyDictionary<string, object?>> Change { get; set; }
     [Parameter, EditorRequired] public EventCallback<string> OpenImplementation { get; set; }
+    [Parameter, EditorRequired] public EventCallback<string> LocateFinding { get; set; }
+    [Parameter, EditorRequired] public EventCallback<(string Implementation, bool IsFocus, bool Active)> PreviewFinding { get; set; }
+
+    private Task PreviewAsync(string implementation, bool canLocate, bool isFocus, bool active)
+        => canLocate ? PreviewFinding.InvokeAsync((implementation, isFocus, active)) : Task.CompletedTask;
+
+    private Task ActivateAsync(string implementation, bool canLocate)
+        => canLocate ? LocateFinding.InvokeAsync(implementation) : OpenImplementation.InvokeAsync(implementation);
 
     private Task SetAsync(string key, string? value) => Change.InvokeAsync(new Dictionary<string, object?>
     {

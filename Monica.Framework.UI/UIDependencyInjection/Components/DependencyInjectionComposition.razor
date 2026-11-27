@@ -63,11 +63,13 @@
                 L["Workbench:Facts:AttributeSub", implementations.Count(i => i.Replaced), implementations.Count(i => i.Mode == DependencyInjectionAutoRegistrationMode.TryAdd)], "role-primary")
         </dl>
     }
-    <DependencyInjectionTape Model="Model" OpenImplementation="OpenImplementation" OpenIdentity="OpenIdentity" OpenRange="OpenRange" />
+    <DependencyInjectionTape @key="Model" @ref="_registrationTape" Model="Model"
+                             OpenImplementation="OpenImplementation" OpenIdentity="OpenIdentity" OpenRange="OpenRange" />
 </section>
 @if (implementations.Length > 0)
 {
-    <DependencyInjectionFindings Model="Model" Filter="Filter" Query="@Query" Change="Change" OpenImplementation="OpenImplementation" />
+    <DependencyInjectionFindings Model="Model" Filter="Filter" Query="@Query" Change="Change" OpenImplementation="OpenImplementation"
+                                 LocateFinding="LocateFindingAsync" PreviewFinding="PreviewFindingAsync" />
 }
 
 @code {
@@ -78,6 +80,14 @@
     [Parameter, EditorRequired] public EventCallback<string> OpenImplementation { get; set; }
     [Parameter, EditorRequired] public EventCallback<ServiceIdentity> OpenIdentity { get; set; }
     [Parameter, EditorRequired] public EventCallback<(int From, int To)> OpenRange { get; set; }
+
+    private DependencyInjectionTape? _registrationTape;
+
+    private Task LocateFindingAsync(string implementation)
+        => _registrationTape?.LocateFindingAsync(implementation) ?? Task.CompletedTask;
+
+    private Task PreviewFindingAsync((string Implementation, bool IsFocus, bool Active) change)
+        => _registrationTape?.PreviewFindingAsync(change) ?? Task.CompletedTask;
 
     private List<(string Template, RenderFragment[] Values)> FindingClauses(ConventionImplementation[] attention)
     {

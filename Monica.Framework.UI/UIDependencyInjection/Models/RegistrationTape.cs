@@ -15,7 +15,7 @@ internal sealed class RegistrationTape(DependencyInjectionWorkbenchSnapshot snap
     public Segment[] Segments { get; } = BuildSegments(snapshot.Descriptors);
     public Arc[] Arcs { get; } = snapshot.Implementations
         .SelectMany(i => i.Exposures
-            .Where(e => e.Finding != ConventionFinding.Attention && e.Own is not null && e.Winner is not null)
+            .Where(HasArc)
             .Select(e =>
             {
                 var from = e.Own!;
@@ -35,6 +35,11 @@ internal sealed class RegistrationTape(DependencyInjectionWorkbenchSnapshot snap
     public (int From, int To)[] Conventional { get; } = Runs(snapshot.Descriptors.Where(d => d.IsAutoRegistered));
     public (int From, int To)[][] Lifetimes { get; } = DependencyInjectionPresentation.Lifetimes
         .Select(l => Runs(snapshot.Descriptors.Where(d => d.Lifetime == l))).ToArray();
+
+    internal static bool HasArc(ConventionImplementation implementation) => implementation.Exposures.Any(HasArc);
+
+    private static bool HasArc(Exposure exposure)
+        => exposure.Finding != ConventionFinding.Attention && exposure.Own is not null && exposure.Winner is not null;
 
     private static (int From, int To)[] Runs(IEnumerable<DependencyInjectionDescriptorInfo> descriptors)
     {
