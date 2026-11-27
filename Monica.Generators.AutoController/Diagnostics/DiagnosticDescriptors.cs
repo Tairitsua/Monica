@@ -6,6 +6,11 @@ internal static class DiagnosticDescriptors
 {
     private const string CATEGORY = "RequestOwnedWebApi";
 
+    public static readonly DiagnosticDescriptor DirectHandlerDependency = Create(
+        "AC1029",
+        "Request handler used as a service dependency",
+        "Dispatch the request through its generated command or query API, or use the mediator for an unpublished request. Direct dependency on handler '{0}' bypasses dispatch.");
+
     public static readonly DiagnosticDescriptor InvalidRequestIntent = Create(
         "AC1028",
         "Endpoint request intent is missing or inconsistent",
