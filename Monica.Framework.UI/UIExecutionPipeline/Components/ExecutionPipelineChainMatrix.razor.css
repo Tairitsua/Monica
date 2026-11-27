@@ -42,9 +42,10 @@
 .ep-rows .ep-row { padding-left: 0; }
 .ep-rows .ep-label { padding-left: 30px; }
 .ep-row.is-selected { background: color-mix(in srgb, var(--mud-palette-text-primary) 4%, var(--mud-palette-surface)); box-shadow: inset 0 0 0 1.5px var(--mud-palette-text-primary); }
-.ep-row.is-faulted { background: color-mix(in srgb, var(--mud-palette-error) 5%, var(--mud-palette-surface)); box-shadow: inset 3px 0 0 var(--mud-palette-error); }
-.ep-row.is-building { background: color-mix(in srgb, var(--mud-palette-warning) 6%, var(--mud-palette-surface)); box-shadow: inset 3px 0 0 var(--mud-palette-warning); }
-.ep-row.is-faulted.is-selected, .ep-row.is-building.is-selected { box-shadow: inset 3px 0 0 var(--mo-vl-role, var(--mud-palette-error)), inset 0 0 0 1.5px var(--mud-palette-text-primary); }
+.ep-row.is-faulted { background: color-mix(in srgb, var(--mud-palette-error) 5%, var(--mud-palette-surface)); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--mud-palette-error) 38%, transparent); }
+.ep-row.is-building { background: color-mix(in srgb, var(--mud-palette-warning) 6%, var(--mud-palette-surface)); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--mud-palette-warning) 42%, transparent); }
+.ep-row.is-faulted.is-selected { box-shadow: inset 0 0 0 1.5px var(--mud-palette-error); }
+.ep-row.is-building.is-selected { box-shadow: inset 0 0 0 1.5px var(--mud-palette-warning); }
 
 /* A chain line: every cell draws its share of the line, a station marks an applied behavior. */
 .ep-cell { position: relative; display: grid; place-items: center; min-width: 0; }

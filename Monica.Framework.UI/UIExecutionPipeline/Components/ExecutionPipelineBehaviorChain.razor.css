@@ -88,10 +88,9 @@
 .execution-pipeline-behavior-chain__content {
     min-width: 0;
     padding: 16px 18px;
-    border: 1px solid var(--mud-palette-divider);
-    border-left: 2px solid color-mix(in srgb, var(--mud-palette-primary) 40%, var(--mud-palette-divider));
+    border: 1px solid color-mix(in srgb, var(--mud-palette-primary) 28%, var(--mud-palette-divider));
     border-radius: 6px;
-    background: color-mix(in srgb, var(--mud-palette-primary) 2%, var(--mud-palette-surface));
+    background: color-mix(in srgb, var(--mud-palette-primary) 3%, var(--mud-palette-surface));
 }
 
 .execution-pipeline-behavior-chain__type {

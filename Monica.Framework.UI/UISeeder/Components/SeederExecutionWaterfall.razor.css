@@ -165,8 +165,8 @@
     background: color-mix(in srgb, var(--mud-palette-text-primary) 3.5%, transparent);
 }
 .seeder-lane[data-selected="true"] {
-    background: color-mix(in srgb, var(--mud-palette-primary) 6%, transparent);
-    box-shadow: inset 3px 0 var(--mud-palette-primary);
+    background: color-mix(in srgb, var(--mud-palette-primary) 9%, var(--mud-palette-surface));
+    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--mud-palette-primary) 40%, transparent);
 }
 .seeder-lane[data-trace="upstream"] {
     background: color-mix(in srgb, var(--mud-palette-info) 6%, transparent);

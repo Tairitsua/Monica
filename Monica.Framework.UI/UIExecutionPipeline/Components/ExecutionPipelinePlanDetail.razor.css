@@ -76,10 +76,9 @@
 .execution-pipeline-plan-detail__error {
     min-width: 0;
     padding: 20px;
-    border: 1px solid color-mix(in srgb, var(--mud-palette-error) 30%, var(--mud-palette-divider));
-    border-left: 3px solid var(--mud-palette-error);
+    border: 1px solid color-mix(in srgb, var(--mud-palette-error) 38%, var(--mud-palette-divider));
     border-radius: 6px;
-    background: color-mix(in srgb, var(--mud-palette-error) 4%, var(--mud-palette-surface));
+    background: color-mix(in srgb, var(--mud-palette-error) 5%, var(--mud-palette-surface));
 }
 
 .execution-pipeline-plan-detail__error-heading {

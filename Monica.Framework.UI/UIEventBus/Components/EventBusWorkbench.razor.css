@@ -499,7 +499,7 @@
     padding: 7px 12px;
     border-radius: 6px;
     background: color-mix(in srgb, var(--mo-vl-role) 8%, var(--mud-palette-surface));
-    box-shadow: inset 2.5px 0 0 var(--mo-vl-role), inset 0 0 0 1px color-mix(in srgb, var(--mo-vl-role) 16%, transparent);
+    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--mo-vl-role) 28%, transparent);
     color: color-mix(in srgb, var(--mo-vl-role) 66%, var(--mud-palette-text-primary));
     font-size: 12px;
     line-height: 1.5;
@@ -508,7 +508,7 @@
 :is(.eb-page, .eb-overlay) ::deep .eb-tl-diag .i { flex: none; margin-top: 2px; }
 :is(.eb-page, .eb-overlay) ::deep .eb-tl-diag.mo-vl-role--neutral {
     background: var(--mud-palette-background-gray);
-    box-shadow: inset 2.5px 0 0 var(--mud-palette-lines-inputs), inset 0 0 0 1px var(--mud-palette-divider);
+    box-shadow: inset 0 0 0 1px var(--mud-palette-divider);
     color: var(--mud-palette-text-secondary);
 }
 :is(.eb-page, .eb-overlay) ::deep .eb-tl-empty { padding: 28px 20px; text-align: center; color: var(--mud-palette-text-secondary); font-size: 13px; }

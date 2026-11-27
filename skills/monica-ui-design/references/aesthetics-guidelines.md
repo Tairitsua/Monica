@@ -46,6 +46,7 @@ Verify the panel at the viewport edge with full viewport height after scrolling 
 
 - Map every color to a palette or approved token role and every font to the theme's interface, display or diagnostic role. Name prototype tokens after the `--mud-palette-*` and `--mo-*` variables they stand for.
 - Measure each new text and mark pair in both modes. When a pair fails, adjust its ink mix and keep the accepted fill.
+- Follow [selection and surface edge accents](../../monica-ui-development/references/monica-visual-language.md#selection-and-surface-edge-accents): never combine a thickened left/inline-start border (`>= 2px`) or `inset 2px+ 0 0` shadow with rounded corners (or with first/last rows clipped by a rounded `overflow: hidden` container) on selected items, cards, callouts, or form rows; use a uniform full-perimeter hairline ring with a soft tonal fill instead.
 - Keep assets local, vendoring libraries with their licenses and fonts as WOFF2, so the prototype runs offline.
 
 ## Verification

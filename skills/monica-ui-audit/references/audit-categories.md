@@ -124,6 +124,7 @@ Indicators:
 - Motion uses large travel, bouncing, repeated flourishes, continuous ambient effects, or ignores `prefers-reduced-motion`
 - A surface stacks unrelated decorative cues, or repeated strong treatments give every region equal prominence without serving the page's hierarchy
 - The same accent rail is repeated across unrelated card groups, replaces a clearer page-specific outline/icon/badge treatment, or appears where it encodes no additional status or category meaning
+- A rounded selectable item, card, callout, notice, or first/last row inside a rounded `overflow: hidden` container uses a thickened left/inline-start border (`>= 2px`) or `inset 2px+ 0 0` shadow that clips along the rounded corners, violating [selection and surface edge accents](../../monica-ui-development/references/monica-visual-language.md#selection-and-surface-edge-accents)
 - Border radii drift from the theme baseline without an intentional component contract, grow across nested surfaces, or global theme selectors override component-owned geometry
 - The implementation loses the prototype's typography, density, spacing rhythm, composition, surface roles, width utilization, or responsive reflow
 - Prototype acceptance checks only wide and phone layouts or lack matched owner widths; intermediate native breakpoints silently change the layout, or small repeated markers, icon tiles, badges and selected segments differ without rendered measurements
