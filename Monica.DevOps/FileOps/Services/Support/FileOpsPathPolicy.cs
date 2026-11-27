@@ -236,15 +236,7 @@ public class FileOpsPathPolicy
 
     private static bool IsWithinRoot(string path, string rootPath)
     {
-        var normalizedPath = Path.TrimEndingDirectorySeparator(Path.GetFullPath(path));
-        var normalizedRoot = Path.TrimEndingDirectorySeparator(Path.GetFullPath(rootPath));
-        if (string.Equals(normalizedPath, normalizedRoot, PathComparison))
-        {
-            return true;
-        }
-
-        return normalizedPath.StartsWith(normalizedRoot + Path.DirectorySeparatorChar, PathComparison) ||
-               normalizedPath.StartsWith(normalizedRoot + Path.AltDirectorySeparatorChar, PathComparison);
+        return FileOpsRuntimeConfig.IsWithinRoot(Path.GetFullPath(path), Path.GetFullPath(rootPath));
     }
 
     private void EnsureVisible(FileOpsRuntimeConfig runtimeConfig, string fullPath, string rootPath, bool targetMayNotExist = false)

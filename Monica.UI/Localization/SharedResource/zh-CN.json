@@ -275,6 +275,7 @@
     "Recovery": "请检查地址，或选择其他页面。"
   },
   "RouteAccess": {
+    "ReturnToWorkspace": "返回工作区",
     "CheckingPageTitle": "正在检查访问权限",
     "Checking": "正在检查你是否可以访问此页面。",
     "DeniedPageTitle": "访问被拒绝",

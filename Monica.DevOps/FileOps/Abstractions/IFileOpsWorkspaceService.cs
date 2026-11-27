@@ -18,6 +18,10 @@ public interface IFileOpsWorkspaceService
     /// <remarks>Entries are bounded by the policy limit. A truncated result does not provide a total count.</remarks>
     Task<FileOpsBrowseResult> BrowseAsync(string? path, CancellationToken cancellationToken = default);
 
+    /// <summary>Observes metadata and preview capability for one exact file, even outside the directory display cap.</summary>
+    /// <remarks>Resolves the file under current path and hidden-entry policy before observing it.</remarks>
+    Task<FileOpsEntrySummary> ObserveFileAsync(string path, CancellationToken cancellationToken = default);
+
     /// <summary>Reads bounded decoded text with current metadata and policy capabilities.</summary>
     Task<FileOpsFileTextContent> ReadTextFileAsync(string path, CancellationToken cancellationToken = default);
 

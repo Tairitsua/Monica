@@ -8,7 +8,7 @@ internal static class FileOpsWorkspaceSnapshots
     {
         Name = value.Name, FullPath = value.FullPath, Kind = value.Kind, Extension = value.Extension,
         SizeBytes = value.SizeBytes, LastModifiedAt = value.LastModifiedAt, IsHidden = value.IsHidden,
-        IsReadOnly = value.IsReadOnly, CanDownload = value.CanDownload, CanEditText = value.CanEditText,
+        IsReadOnly = value.IsReadOnly, CanDownload = value.CanDownload, CanEditText = value.CanEditText, TextPreview = value.TextPreview,
         CanDelete = value.CanDelete, CanWriteInto = value.CanWriteInto
     };
 

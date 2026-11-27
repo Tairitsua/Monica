@@ -62,17 +62,25 @@ public class FileOpsRuntimeConfig
         };
     }
 
+    /// <summary>Normalizes paths, limits and extensions for the current host and returns this instance.</summary>
     public FileOpsRuntimeConfig Normalize()
     {
+        NormalizeWithEvidence();
+        return this;
+    }
+
+    internal FileOpsPolicyNormalization NormalizeWithEvidence()
+    {
         AllowedRoots = NormalizePaths(AllowedRoots);
+        var usedDefaultRoots = AllowedRoots.Count == 0;
         if (AllowedRoots.Count == 0)
         {
             AllowedRoots = GetDefaultAllowedRoots();
         }
 
-        ReadOnlyPaths = NormalizePaths(ReadOnlyPaths)
-            .Where(path => AllowedRoots.Any(root => IsWithinRoot(path, root)))
-            .ToList();
+        var readOnlyPaths = NormalizePaths(ReadOnlyPaths)
+            .ToLookup(path => AllowedRoots.Any(root => IsWithinRoot(path, root)));
+        ReadOnlyPaths = readOnlyPaths[true].ToList();
 
         EditableExtensions = EditableExtensions
             .Select(NormalizeExtension)
@@ -86,14 +94,15 @@ public class FileOpsRuntimeConfig
         MaxDirectoryEntries = Math.Clamp(MaxDirectoryEntries, 50, 5_000);
 
         StartupPath = NormalizePath(StartupPath);
-        if (string.IsNullOrWhiteSpace(StartupPath) ||
+        var usedDefaultStartup = string.IsNullOrWhiteSpace(StartupPath) ||
             !AllowedRoots.Any(root => IsWithinRoot(StartupPath, root)) ||
-            !Directory.Exists(StartupPath))
+            !Directory.Exists(StartupPath);
+        if (usedDefaultStartup)
         {
             StartupPath = AllowedRoots[0];
         }
 
-        return this;
+        return new(usedDefaultRoots, usedDefaultStartup, readOnlyPaths[false].ToArray());
     }
 
     public bool CanEditExtension(string? extension)
@@ -142,7 +151,7 @@ public class FileOpsRuntimeConfig
             .ToList();
     }
 
-    private static string NormalizePath(string? value)
+    internal static string NormalizePath(string? value)
     {
         if (string.IsNullOrWhiteSpace(value))
         {
@@ -151,7 +160,7 @@ public class FileOpsRuntimeConfig
 
         try
         {
-            return Path.GetFullPath(value.Trim().Trim('"'));
+            return Path.TrimEndingDirectorySeparator(Path.GetFullPath(value.Trim().Trim('"')));
         }
         catch
         {
@@ -159,7 +168,7 @@ public class FileOpsRuntimeConfig
         }
     }
 
-    private static string NormalizeExtension(string? value)
+    internal static string NormalizeExtension(string? value)
     {
         if (string.IsNullOrWhiteSpace(value))
         {
@@ -175,7 +184,7 @@ public class FileOpsRuntimeConfig
         return normalized.ToLowerInvariant();
     }
 
-    private static bool IsWithinRoot(string path, string rootPath)
+    internal static bool IsWithinRoot(string path, string rootPath)
     {
         var comparison = GetPathComparison();
         var normalizedPath = Path.TrimEndingDirectorySeparator(path);
@@ -185,9 +194,8 @@ public class FileOpsRuntimeConfig
             return true;
         }
 
-        var prefix = normalizedRoot + Path.DirectorySeparatorChar;
-        var altPrefix = normalizedRoot + Path.AltDirectorySeparatorChar;
-        return normalizedPath.StartsWith(prefix, comparison) || normalizedPath.StartsWith(altPrefix, comparison);
+        var prefix = Path.EndsInDirectorySeparator(normalizedRoot) ? normalizedRoot : normalizedRoot + Path.DirectorySeparatorChar;
+        return normalizedPath.StartsWith(prefix, comparison);
     }
 
     private static StringComparer GetPathComparer()
@@ -200,3 +208,5 @@ public class FileOpsRuntimeConfig
         return OperatingSystem.IsWindows() ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal;
     }
 }
+
+internal sealed record FileOpsPolicyNormalization(bool UsedDefaultRoots, bool UsedDefaultStartup, IReadOnlyList<string> DiscardedReadOnlyPaths);

@@ -1,21 +1,93 @@
-@using Monica.DevOps.Localization
+@using System.Runtime.InteropServices
+@using Microsoft.Extensions.Options
+@using Monica.Modules
+@using Monica.UI.Shared.Components.Navigation
 @inject IStringLocalizer<FileOpsResource> L
-<div class="family-header">
-    <header>
-        <p class="page-category"><MoIcon Icon="@MoIcons.Folder" Size="1.5rem" Style="color:var(--mud-palette-primary);" /><span>@L["Page:Category"]</span></p>
-        <h1>@L["Page:Title"]</h1>
-        <p class="page-introduction">@L["Page:Introduction"]</p>
-    </header>
-    <div class="policy-trigger">
-        <MudButton Variant="Variant.Text" StartIcon="@MoIcons.Sliders" data-policy-open="true" Disabled="@(Busy && !PolicyOpen)" aria-disabled="@(Busy || PolicyOpen ? "true" : "false")" OnClick="OpenAsync">@L["Policy:Title"]</MudButton>
-    </div>
-</div>
+@inject MoTimeFormatter UiTime
+@inject IOptions<ModuleShellUIOption> Shell
+
+<MoPageMasthead Icon="@(IsPolicy ? MoIcons.Sliders : MoIcons.Folder)" Crumb="@L["Design:Eyebrow"]"
+                Title="@L[IsPolicy ? "Pages:FileOpsPolicy:Title" : "Pages:FileOps:Title"]">
+    <Meta>
+        @if (Posture is { } posture)
+        {
+            <span class="mo-vl-status mo-vl-status--pill @posture.Role.ToCssClass()">
+                <i class="mo-vl-status-dot" aria-hidden="true"></i>@posture.Text
+            </span>
+        }
+        @if (Config?.AllowDeleteOperations == true)
+        {
+            <span class="mo-vl-capsule mo-vl-role--error"><MoIcon Icon="@MoIcons.Delete" Size="13px" />@L["Design:PostureDeleteOn"]</span>
+        }
+        <span class="mo-vl-capsule mo-vl-capsule--outline mo-vl-role--info" title="@L["Design:MemoryTip"]">
+            <MoIcon Icon="@MoIcons.Info" Size="13px" />@L["Design:MemoryBadge"]
+        </span>
+        <span class="mo-vl-capsule mo-vl-capsule--outline mo-vl-mono">@Shell.Value.GetAppId() · @RuntimeInformation.RuntimeIdentifier</span>
+        <span class="mo-vl-capsule mo-vl-role--secondary">@L["Design:LiveHost"]</span>
+    </Meta>
+    <Actions>
+        @if (Captured is { } time)
+        {
+            <div class="fo-observed">
+                <span>@L["Design:Captured"]</span>
+                <time datetime="@time.ToString("O")" title="@UiTime.Format(time)">@UiTime.FormatTime(time)</time>
+            </div>
+        }
+        <MudButton Variant="Variant.Outlined" StartIcon="@MoIcons.Refresh" Disabled="@(Controller.IsBusy || PolicyWorking)" OnClick="Refresh">
+            @L["Design:Refresh"]
+        </MudButton>
+        @if (IsPolicy)
+        {
+            <MudButton Variant="Variant.Outlined" StartIcon="@MoIcons.ArrowLeft" Href="@FilesHref">@L["Design:BackToFiles"]</MudButton>
+        }
+        else if (Browse?.CanUpload == true)
+        {
+            <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@MoIcons.FileUpload" Disabled="@Controller.IsBusy"
+                       OnClick="Upload">@L["Design:ActUpload"]</MudButton>
+        }
+        else if (!AccessDenied)
+        {
+            <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@MoIcons.Sliders" Href="@UIFileOpsPolicyPage.PAGE_URL">
+                @L["Design:OpenPolicy"]
+            </MudButton>
+        }
+    </Actions>
+</MoPageMasthead>
+
+<MoWorkbenchNavigation Label="@L["Design:NavLabel"]" Compact="true">
+    <a href="@FilesHref" aria-current="@(IsPolicy ? null : "page")">
+        <MoIcon Icon="@MoIcons.FolderOpen" Size="15px" />@L["Design:NavFiles"]
+        <span class="fo-nav-count mo-vl-mono">@Shown</span>
+        @if (Controller.IsDirty) { <span class="fo-draft-dot" aria-label="@L["Design:BadgeDirty"]" title="@L["Design:BadgeDirty"]"></span> }
+    </a>
+    <a href="@UIFileOpsPolicyPage.PAGE_URL" aria-current="@(IsPolicy ? "page" : null)">
+        <MoIcon Icon="@(AccessDenied ? MoIcons.Lock : MoIcons.Sliders)" Size="15px" />@L["Design:NavPolicy"]
+        <span class="fo-nav-count mo-vl-mono @(AccessDenied ? "fo-nav-denied" : null)">@(AccessDenied ? "×" : Config?.AllowedRoots.Count.ToString() ?? "—")</span>
+        @if (PolicyDirty && !AccessDenied) { <span class="fo-draft-dot" aria-label="@L["Design:InspDirty"]" title="@L["Design:InspDirty"]"></span> }
+    </a>
+</MoWorkbenchNavigation>
+
 @code {
-    /// <summary>Opens the policy dialog in the current Files visit.</summary>
-    [Parameter] public EventCallback OpenPolicy { get; set; }
-    /// <summary>Whether the Files controller has an admitted operation.</summary>
-    [Parameter] public bool Busy { get; set; }
-    /// <summary>Keeps the native policy opener focusable until its own dialog result drains.</summary>
-    [Parameter] public bool PolicyOpen { get; set; }
-    private Task OpenAsync() => Busy || PolicyOpen ? Task.CompletedTask : OpenPolicy.InvokeAsync();
+    [Parameter, EditorRequired] public FileOpsWorkspaceController Controller { get; set; } = null!;
+    [Parameter] public FileOpsBrowseResult? Browse { get; set; }
+    [Parameter] public FileOpsRuntimeConfig? Config { get; set; }
+    [Parameter] public bool IsPolicy { get; set; }
+    [Parameter] public bool AccessDenied { get; set; }
+    [Parameter] public bool PolicyWorking { get; set; }
+    [Parameter] public bool PolicyDirty { get; set; }
+    [Parameter, EditorRequired] public string FilesHref { get; set; } = "";
+    [Parameter] public EventCallback Refresh { get; set; }
+    [Parameter] public EventCallback Upload { get; set; }
+
+    private DateTimeOffset? Captured => IsPolicy ? Controller.PolicyObservedAt : Controller.DirectoryObservedAt;
+    private string Shown => Browse is null ? "—" : Browse.IsTruncated ? $"{Browse.Entries.Count}+" : Browse.Entries.Count.ToString();
+    private (string Text, MoVisualRole Role)? Posture => (IsPolicy, AccessDenied, Config, Browse) switch
+    {
+        (true, true, _, _) => (L["Design:PosturePolicyDenied"], MoVisualRole.Error),
+        (_, _, _, _) when !IsPolicy && Controller.BrowseStale => (L["Design:PostureStale"], MoVisualRole.Warning),
+        (_, _, { AllowWriteOperations: false }, _) => (L["Design:PostureWritesOff"], MoVisualRole.Warning),
+        (false, _, _, { IsReadOnly: true }) => (L["Design:PostureReadOnlyPath"], MoVisualRole.Warning),
+        (_, _, not null, _) => (L["Design:PostureWritable"], MoVisualRole.Success),
+        _ => null
+    };
 }

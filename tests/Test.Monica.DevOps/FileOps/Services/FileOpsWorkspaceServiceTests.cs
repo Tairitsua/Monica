@@ -1,3 +1,4 @@
+using System.Text;
 using Microsoft.Extensions.Logging.Abstractions;
 using Monica.Core.Results;
 using Monica.DevOps.FileOps.Abstractions;
@@ -120,6 +121,54 @@ public sealed class FileOpsWorkspaceServiceTests
         Assert.Equal(FileOpsMessageCode.DeleteOperationsDisabled, exception.MessageCode);
         Assert.Equal(2, store.Reads);
         Assert.True(File.Exists(later));
+    }
+
+    [Fact]
+    public async Task BrowseAsync_WhenPreviewCapabilitiesDiffer_ShouldReportBoundedEvidence()
+    {
+        using var fixture = new FileOpsFilesystemFixture();
+        var token = TestContext.Current.CancellationToken;
+        var binary = Path.Combine(fixture.Root, "binary.json");
+        var oversized = Path.Combine(fixture.Root, "oversized.json");
+        var unicode = Path.Combine(fixture.Root, "unicode.txt");
+        var previewOnly = Path.Combine(fixture.Root, "preview.resx");
+        await File.WriteAllBytesAsync(binary, new byte[] { 77, 90, 0, 0 }, token);
+        await File.WriteAllTextAsync(oversized, new string('x', 4097), token);
+        await File.WriteAllTextAsync(unicode, "text with a UTF-16 byte-order mark", Encoding.Unicode, token);
+        await File.WriteAllTextAsync(previewOnly, "<root />", token);
+        fixture.Configure(config => config.MaxTextFileSizeBytes = 4096);
+
+        var result = await fixture.Workspace.BrowseAsync(fixture.Root, token);
+        var entries = result.Entries.ToDictionary(entry => entry.FullPath);
+
+        Assert.Equal(FileOpsTextPreviewKind.Binary, entries[binary].TextPreview);
+        Assert.False(entries[binary].CanEditText);
+        Assert.Equal(FileOpsTextPreviewKind.Oversized, entries[oversized].TextPreview);
+        Assert.False(entries[oversized].CanEditText);
+        Assert.Equal(FileOpsTextPreviewKind.Text, entries[previewOnly].TextPreview);
+        Assert.False(entries[previewOnly].CanEditText);
+        Assert.Equal(FileOpsTextPreviewKind.Text, entries[unicode].TextPreview);
+        Assert.True(entries[unicode].CanEditText);
+        Assert.Equal("text with a UTF-16 byte-order mark", (await fixture.Workspace.ReadTextFileAsync(unicode, token)).Content);
+    }
+
+    [Fact]
+    public async Task BrowseAsync_WhenRootIsRepeatedWithTrailingSeparator_ShouldShowOneRootAndProtectNestedAllowedRoot()
+    {
+        using var fixture = new FileOpsFilesystemFixture();
+        var token = TestContext.Current.CancellationToken;
+        var nested = Directory.CreateDirectory(Path.Combine(fixture.Root, "nested")).FullName;
+        fixture.Configure(config =>
+        {
+            config.AllowDeleteOperations = true;
+            config.AllowedRoots = [fixture.Root, fixture.Root + Path.DirectorySeparatorChar, nested];
+        });
+
+        var active = await fixture.Workspace.GetRuntimeConfigAsync(token);
+        var result = await fixture.Workspace.BrowseAsync(fixture.Root, token);
+
+        Assert.Equal(new[] { fixture.Root, nested }, active.AllowedRoots);
+        Assert.False(Assert.Single(result.Entries).CanDelete);
     }
 
     private sealed class ChangingDeletePolicyStore(FileOpsRuntimeConfig config) : IFileOpsRuntimeConfigStore

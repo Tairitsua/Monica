@@ -1,152 +1,285 @@
-@inject Monica.UI.Shared.Services.MoTimeFormatter UiTime
-@using Monica.DevOps.FileOps.Models
-@using Monica.DevOps.FileOps.State
-@using Monica.DevOps.Localization
+@using Microsoft.JSInterop
+@implements IAsyncDisposable
+@inject IJSRuntime JS
 @inject IStringLocalizer<FileOpsResource> L
-<section class="inventory-owner" aria-label="@L["Inventory:Title"]">
-    <div class="inventory-toolbar">
-        <div class="inventory-heading">
-            <h2>@L["Inventory:Title"]</h2>
-            @if (Browse is { } browse) { <span class="inventory-count" aria-label="@L["Location:Shown", browse.Entries.Count]"><strong>@browse.Entries.Count</strong><span>@L["Inventory:Shown"]</span></span> }
+@inject MoTimeFormatter UiTime
+
+<section class="fo-inv" aria-label="@L["Design:InvTitle"]">
+    <div class="fo-inv-head">
+        <div class="fo-inv-title">
+            <h2>@L["Design:InvTitle"]</h2>
+            @if (Browse is not null) { <span class="fo-count mo-vl-mono">@_rows.Count / @Browse.Entries.Count</span> }
+            <span class="fo-inv-sub">@L["Design:InvDirsFirstNote"]</span>
         </div>
-        <MudMenu Label="@FieldLabel(Controller.SortField)" AriaLabel="@SortLabel" Class="inventory-sort" EndIcon="@(Controller.SortDescending ? MoIcons.ArrowDown : MoIcons.ArrowUp)" Disabled="@Busy">
-            @foreach (var field in Enum.GetValues<FileOpsSortField>())
-            { <MudMenuItem OnClick="@(() => SortAsync(field))">@FieldLabel(field)</MudMenuItem> }
-            <MudDivider />
-            <MudMenuItem OnClick="DirectionAsync">@L[Controller.SortDescending ? "Inventory:Ascending" : "Inventory:Descending"]</MudMenuItem>
-        </MudMenu>
-    </div>
-    @if (!TableMode && Entries.Count > 0)
-    { <div class="compact-selection"><MudCheckBox T="bool?" Class="select-all" @key="nameof(SelectAllAsync)" Value="@AllSelected" ValueChanged="SelectAllAsync" data-select-all-state="@SelectAllState" Color="Color.Primary" Disabled="@Busy" Label="@L["Batch:SelectAll"]" CheckedIcon="@MoIcons.SquareCheck" UncheckedIcon="@MoIcons.Square" IndeterminateIcon="@MoIcons.SquareMinus" /></div> }
-    @if (Selected.Count > 0)
-    {
-        <div class="selection-band">
-            <strong>@L[Controller.Browse?.IsTruncated == true ? "Batch:SelectedShown" : "Batch:SelectedCount", Selected.Count]</strong>
-            <div class="toolbar-actions">
-                <MudButton Variant="Variant.Text" Disabled="@Busy" OnClick="ClearAsync">@L["Actions:ClearSelection"]</MudButton>
-                <MudTooltip Text="@L["Batch:ArchiveRule"]"><MudButton Variant="Variant.Outlined" StartIcon="@MoIcons.Archive" Disabled="@(Busy || !CanZip)" OnClick="@(() => DownloadSelection.InvokeAsync())">@L["Actions:DownloadSelected"]</MudButton></MudTooltip>
-                <MudTooltip Text="@L["Batch:DeleteRule"]"><MudButton Variant="Variant.Outlined" Color="Color.Error" StartIcon="@MoIcons.ClearList" Disabled="@(Busy || !CanDelete)" OnClick="@(() => DeleteSelection.InvokeAsync())">@L["Actions:DeleteSelected"]</MudButton></MudTooltip>
+        <div class="fo-inv-controls">
+            <label class="fo-search">
+                <MoIcon Icon="@MoIcons.Search" Size="15px" />
+                <input type="search" @ref="_search" aria-label="@L["Design:InvSearchPlaceholder"]" placeholder="@L["Design:InvSearchPlaceholder"]"
+                       value="@Query.Search" @oninput="SearchAsync" />
+            </label>
+            <div class="fo-sort" role="group" aria-label="@L["Design:InvSortLabel"]">
+                <MudSelect T="FileOpsSortField" Class="fo-sort-select" Value="Query.Sort" ValueChanged="@((FileOpsSortField value) => SortAsync(value, false))"
+                           aria-label="@L["Design:InvSortLabel"]" Variant="Variant.Outlined" Margin="Margin.Dense"
+                           OpenIcon="@MoIcons.ChevronDown" CloseIcon="@MoIcons.ChevronUp" SelectionOnEnter="true"
+                           ToStringFunc="@((FileOpsSortField field) => L.Sort(field).Value)">
+                    @foreach (var field in Enum.GetValues<FileOpsSortField>())
+                    {
+                        <MudSelectItem Value="field">@L.Sort(field)</MudSelectItem>
+                    }
+                </MudSelect>
+                <button type="button" class="fo-outline" @onclick="@(() => SortAsync(Query.Sort, !Query.Descending))">
+                    <MoIcon Icon="@SortIcon" Size="15px" />@L[Query.Descending ? "Design:InvDesc" : "Design:InvAsc"]
+                </button>
             </div>
-            <p class="batch-hint">@L["Batch:ArchiveRule"]</p>
-            @if (!CanZip || !CanDelete) { <p class="batch-hint">@L["Batch:Unavailable"]</p> }
+        </div>
+    </div>
+
+    @if (Browse is { Entries.Count: > 0 })
+    {
+        <div class="fo-filter-bar">
+            <div class="fo-filter-chips" role="group" aria-label="@L["Design:SigCapTitle"]">
+                @foreach (var cap in Enum.GetValues<FileOpsCapability>())
+                {
+                    <MoFilterChip Label="@L.Capability(cap)" Role="@FileOpsInventoryView.Role(cap)" Count="@View.OptionCount(cap)"
+                                  Selected="@(Query.Capability == cap)" Class="mo-vl-chip--instrument" Pill="true"
+                                  ShowDot="@(cap != FileOpsCapability.All)" SelectedChanged="@(_ => SetCapabilityAsync(cap))" />
+                }
+            </div>
+            @if (Query.Capability != FileOpsCapability.All || Query.Search.Length != 0)
+            {
+                <button type="button" class="fo-ghost" @onclick="ClearFiltersAsync"><MoIcon Icon="@MoIcons.FilterOff" Size="15px" />@L["Design:InvClearFilters"]</button>
+            }
         </div>
     }
-    @if (Controller.Browse?.IsTruncated == true)
-    { <div class="cap-notice"><MoIcon Size="1.25rem" Icon="@MoIcons.Info" Style="color:var(--mud-palette-info);" /><span>@L["Workspace:TruncatedEntries", Controller.Browse.EntryLimit]</span><MudButton Variant="Variant.Text" Disabled="@Busy" OnClick="@(() => OpenPolicy.InvokeAsync())">@L["Inventory:AdjustLimit"]</MudButton></div> }
-    @if (Controller.BrowseStale) { <p class="retained-note">@L["Inventory:Retained"]</p> }
-    @if (Controller.Browse is null)
+
+    @if (_checked.Length > 0)
     {
-        <div class="empty-state" tabindex="-1"><MoContentState Loading="@Busy">
-            @if (Busy) { <MudProgressCircular Indeterminate="true" Size="Size.Small" Color="Color.Primary" /><h3>@L["Workspace:Loading"]</h3> }
-            else { <MoIcon Icon="@MoIcons.FolderOff" Size="1.5rem" /><h3>@L["Inventory:NoAccepted"]</h3><p>@L["Inventory:RetryHint"]</p> }
-        </MoContentState></div>
+        var canZip = _checked.All(e => e.IsDirectory || e.CanDownload);
+        var canDelete = _checked.All(e => e.CanDelete);
+        var label = L[Browse?.IsTruncated == true ? "Design:BatchSelectedShown" : "Design:BatchSelected", _checked.Length];
+        <div class="fo-batch" role="region" aria-label="@label">
+            <div class="fo-batch-main">
+                <strong>@label</strong>
+                <div class="fo-batch-actions">
+                    <button type="button" class="fo-ghost" disabled="@Controller.IsBusy" @onclick="ClearSelection">@L["Design:BatchClear"]</button>
+                    <button type="button" class="fo-outline" disabled="@(!canZip || Controller.IsBusy)" @onclick="DownloadSelection">
+                        <MoIcon Icon="@MoIcons.Archive" Size="15px" />@L["Design:BatchZip"]
+                    </button>
+                    <button type="button" class="mo-vl-soft-action mo-vl-role--error" disabled="@(!canDelete || Controller.IsBusy)" @onclick="DeleteSelection">
+                        <MoIcon Icon="@MoIcons.Delete" Size="15px" />@L["Design:BatchDelete"]
+                    </button>
+                </div>
+            </div>
+            <p class="fo-batch-note">@L["Design:BatchZipRule"] @if (!canZip || !canDelete) { @L["Design:BatchIneligible"] }</p>
+        </div>
     }
-    else if (Entries.Count == 0)
-    { <div class="empty-state" tabindex="-1"><MoContentState><MoIcon Icon="@MoIcons.FolderOpen" Size="1.5rem" /><h3>@L["Workspace:EmptyDirectory"]</h3></MoContentState></div> }
+
+    @if (Browse is null)
+    {
+        <MoContentState>
+            <span class="mo-vl-tile mo-vl-role--error"><MoIcon Icon="@MoIcons.FolderOff" Size="18px" /></span>
+            <h2>@L["Design:InvUnavailableTitle"]</h2>
+            <p>@(Controller.LastRead?.Message ?? L["Design:InvUnavailableBody"].Value)</p>
+            <button type="button" class="fo-outline" disabled="@Controller.IsBusy" @onclick="Refresh"><MoIcon Icon="@MoIcons.Refresh" Size="15px" />@L["Design:Refresh"]</button>
+        </MoContentState>
+    }
+    else if (Browse.Entries.Count == 0)
+    {
+        <MoContentState>
+            <span class="mo-vl-tile mo-vl-role--neutral"><MoIcon Icon="@MoIcons.FolderOpen" Size="18px" /></span>
+            <h2>@L["Design:InvEmptyTitle"]</h2><p>@L["Design:InvEmptyBody"]</p>
+            @if (Browse.CanCreateDirectory)
+            {
+                <button type="button" class="fo-outline" disabled="@Controller.IsBusy" @onclick="Create">
+                    <MoIcon Icon="@MoIcons.FolderPlus" Size="15px" />@L["Design:ActNewFolder"]
+                </button>
+            }
+        </MoContentState>
+    }
+    else if (_rows.Count == 0)
+    {
+        <MoContentState>
+            <span class="mo-vl-tile mo-vl-role--neutral"><MoIcon Icon="@MoIcons.SearchOff" Size="18px" /></span>
+            <h2>@L["Design:InvNoMatchTitle"]</h2><p>@L["Design:InvNoMatchBody"]</p>
+            <button type="button" class="fo-outline" @onclick="ClearFiltersAsync"><MoIcon Icon="@MoIcons.FilterOff" Size="15px" />@L["Design:InvClearFilters"]</button>
+        </MoContentState>
+    }
     else
     {
-        <div class="inventory-list" tabindex="0" aria-label="@L["Inventory:Entries"]">
-            @if (TableMode)
-            {
-                <MudTable T="FileOpsEntrySummary" Items="@Entries" Elevation="0" Square="true" Hover="true" Breakpoint="Breakpoint.None" RowClassFunc="@RowClass">
-                    <ColGroup><col class="check-column" /><col /><col class="type-column" /><col class="size-column" /><col class="modified-column" /><col class="actions-column" /></ColGroup>
-                    <HeaderContent>
-                        <MudTh Class="check-cell"><MudCheckBox T="bool?" Class="select-all" @key="nameof(SelectAllAsync)" Value="@AllSelected" ValueChanged="SelectAllAsync" data-select-all-state="@SelectAllState" Disabled="@Busy" Color="Color.Primary" aria-label="@L["Batch:SelectAll"]" CheckedIcon="@MoIcons.SquareCheck" UncheckedIcon="@MoIcons.Square" IndeterminateIcon="@MoIcons.SquareMinus" /></MudTh>
+        <div class="fo-table-wrap">
+            <table class="fo-table">
+                <thead>
+                    <tr>
+                        <th class="fo-col-check" scope="col">
+                            <input type="checkbox" class="fo-check" disabled="@Controller.IsBusy" @ref="_selectAll"
+                                   checked="@AllChecked" aria-checked="@(Mixed ? "mixed" : AllChecked ? "true" : "false")"
+                                   aria-label="@L["Design:ColSelectAll"]" @onchange="SetVisibleSelection" />
+                            <span class="fo-select-caption">@L["Design:ColSelectAll"]</span>
+                        </th>
                         @foreach (var field in Enum.GetValues<FileOpsSortField>())
-                        { <MudTh aria-sort="@SortAria(field)"><MudButton Variant="Variant.Text" Size="Size.Small" Disabled="@Busy" OnClick="@(() => SortAsync(field))" EndIcon="@(Controller.SortField == field ? Controller.SortDescending ? MoIcons.ArrowDown : MoIcons.ArrowUp : null)">@FieldLabel(field)</MudButton></MudTh> }
-                        <MudTh Class="actions-cell"><span class="sr-only">@L["Columns:Actions"]</span></MudTh>
-                    </HeaderContent>
-                    <RowTemplate>
-                        <MudTd Class="check-cell"><MudCheckBox T="bool" @key="context.FullPath" Value="@Controller.IsSelected(context)" ValueChanged="@((bool value) => CheckAsync(context, value))" Disabled="@Busy" Color="Color.Primary" aria-label="@L["Inventory:Check", context.Name]" CheckedIcon="@MoIcons.SquareCheck" UncheckedIcon="@MoIcons.Square" IndeterminateIcon="@MoIcons.SquareMinus" /></MudTd>
-                        <MudTd Class="name-cell"><div class="entry-identity"><MoIcon Icon="@(context.IsDirectory ? MoIcons.Folder : MoIcons.FileText)" Size="1.25rem" Style="@(context.IsDirectory ? "color:var(--mud-palette-primary);" : "color:var(--mud-palette-text-secondary);")" /><MudButton Class="entry-open" Variant="Variant.Text" aria-disabled="@(Busy ? "true" : "false")" data-entry-path="@context.FullPath" OnClick="@(() => Open.InvokeAsync(context))" title="@context.FullPath">@context.Name</MudButton>@Indicators(context)</div></MudTd>
-                        <MudTd><span class="entry-type" title="@TypeText(context)">@TypeText(context)</span></MudTd>
-                        <MudTd><span title="@(context.SizeBytes?.ToString() ?? L["Inventory:NotReported"].Value)">@context.SizeDisplay</span></MudTd>
-                        <MudTd><time datetime="@context.LastModifiedAt.ToString("O")" title="@DateText(context.LastModifiedAt)">@DateText(context.LastModifiedAt)</time></MudTd>
-                        <MudTd Class="actions-cell">@EntryMenu(context)</MudTd>
-                    </RowTemplate>
-                </MudTable>
-            }
-            else
-            {
-                <ul class="compact-entries">
-                    @foreach (var entry in Entries)
+                        {
+                            <th class="@ColumnClass(field)" scope="col" aria-sort="@(Query.Sort == field ? Query.Descending ? "descending" : "ascending" : null)">
+                                <button type="button" class="fo-th-btn" @onclick="@(() => SortAsync(field, Query.Sort == field && !Query.Descending))">
+                                    @L.Sort(field)
+                                    @if (Query.Sort == field) { <MoIcon Icon="@SortIcon" Size="13px" /> }
+                                </button>
+                            </th>
+                        }
+                        <th class="fo-col-act" scope="col"><span class="mud-sr-only">@L["Design:ColActions"]</span></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var entry in _rows)
                     {
-                        <li class="@RowClass(entry, 0)" @key="entry.FullPath">
-                            <MudCheckBox T="bool" @key="entry.FullPath" Value="@Controller.IsSelected(entry)" ValueChanged="@((bool value) => CheckAsync(entry, value))" Color="Color.Primary" Disabled="@Busy" aria-label="@L["Inventory:Check", entry.Name]" CheckedIcon="@MoIcons.SquareCheck" UncheckedIcon="@MoIcons.Square" IndeterminateIcon="@MoIcons.SquareMinus" />
-                            <div class="compact-identity">
-                                <div class="entry-identity"><MoIcon Icon="@(entry.IsDirectory ? MoIcons.Folder : MoIcons.FileText)" Size="1.25rem" Style="@(entry.IsDirectory ? "color:var(--mud-palette-primary);" : "color:var(--mud-palette-text-secondary);")" /><MudButton Class="entry-open" Variant="Variant.Text" aria-disabled="@(Busy ? "true" : "false")" data-entry-path="@entry.FullPath" OnClick="@(() => Open.InvokeAsync(entry))" title="@entry.FullPath">@entry.Name</MudButton>@Indicators(entry)</div>
-                                <div class="entry-metadata"><span>@TypeText(entry)</span>@if (!entry.IsDirectory && entry.SizeBytes.HasValue) { <span>@entry.SizeDisplay</span> }<time datetime="@entry.LastModifiedAt.ToString("O")">@DateText(entry.LastModifiedAt)</time></div>
-                            </div>
-                            @EntryMenu(entry)
-                        </li>
+                        var cap = FileOpsInventoryView.Classify(entry);
+                        var inspected = IsInspected(entry);
+                        var selected = Controller.IsSelected(entry);
+                        <tr @key="entry.FullPath" class="fo-row @(inspected ? "is-inspected" : null) @(selected ? "is-checked" : null)">
+                            <td class="fo-col-check">
+                                <input type="checkbox" class="fo-check" checked="@selected" aria-label="@L["Design:ActCheck", entry.Name]"
+                                       disabled="@Controller.IsBusy" @onchange="@((ChangeEventArgs args) => ToggleEntry(entry, args))" />
+                            </td>
+                            <td class="fo-col-name" data-label="@L["Design:ColName"]">
+                                <div class="fo-entry">
+                                    <span class="fo-entry-ico @FileOpsInventoryView.Role(cap).ToCssClass()">
+                                        <MoIcon Icon="@(entry.IsDirectory ? MoIcons.Folder : cap == FileOpsCapability.Editable ? MoIcons.FileCode : MoIcons.FileText)" Size="16px" />
+                                    </span>
+                                    <button type="button" class="fo-entry-btn" title="@entry.FullPath" @onclick="@(() => Open.InvokeAsync(entry))">
+                                        <span class="fo-entry-name">@entry.Name</span>
+                                    </button>
+                                    <span class="fo-entry-tags">
+                                        @if (cap == FileOpsCapability.Editable) { <span class="mo-vl-badge mo-vl-role--success">@L["Design:BadgeEditable"]</span> }
+                                        @if (cap == FileOpsCapability.Preview) { <span class="mo-vl-badge mo-vl-role--info">@L["Design:BadgePreview"]</span> }
+                                        @if (entry.IsReadOnly) { <span class="mo-vl-badge mo-vl-role--warning">@L["Design:BadgeReadOnly"]</span> }
+                                        @if (entry.IsHidden) { <span class="mo-vl-badge mo-vl-role--neutral">@L["Design:BadgeHidden"]</span> }
+                                        @if (cap == FileOpsCapability.Blocked) { <span class="mo-vl-badge mo-vl-role--warning">@L["Design:BadgeOverDown"]</span> }
+                                        else if (entry.TextPreview == FileOpsTextPreviewKind.Oversized) { <span class="mo-vl-badge mo-vl-role--warning">@L["Design:BadgeOverText"]</span> }
+                                        @if (inspected && Controller.IsDirty) { <span class="mo-vl-badge mo-vl-role--warning">@L["Design:BadgeDirty"]</span> }
+                                    </span>
+                                </div>
+                            </td>
+                            <td class="fo-col-type mo-vl-mono" data-label="@L["Design:ColType"]">
+                                @(entry.IsDirectory ? L["Design:TypeDir"].Value : entry.Extension.Length > 0 ? entry.Extension : L["Design:TypeFile"].Value)
+                            </td>
+                            <td class="is-num mo-vl-mono" data-label="@L["Design:ColSize"]" title="@entry.SizeBytes?.ToString("N0")">
+                                @(entry.SizeBytes is { } bytes ? FileOpsLabels.Bytes(bytes) : "—")
+                            </td>
+                            <td class="fo-col-mod mo-vl-mono" data-label="@L["Design:ColModified"]">@UiTime.Format(entry.LastModifiedAt)</td>
+                            <td class="fo-col-act" data-label="@L["Design:ColActions"]">
+                                <div class="fo-row-acts">
+                                    <button type="button" class="fo-ghost" @onclick="@(() => Open.InvokeAsync(entry))">
+                                        @L[entry.IsDirectory ? "Design:ActOpen" : cap == FileOpsCapability.Editable ? "Design:ActEdit" : "Design:ActInspect"]
+                                    </button>
+                                    @if (!entry.IsDirectory && entry.CanDownload)
+                                    {
+                                        <button type="button" class="fo-icon" aria-label="@L["Design:RowDownload", entry.Name]" title="@L["Design:ActDownload"]"
+                                                @onclick="@(() => Download.InvokeAsync(entry.FullPath))"><MoIcon Icon="@MoIcons.Download" Size="16px" /></button>
+                                    }
+                                    @if (entry.CanDelete)
+                                    {
+                                        <button type="button" class="fo-icon fo-delete" aria-label="@L["Design:RowDelete", entry.Name]" title="@L["Design:ActDelete"]"
+                                                @onclick="@(() => Delete.InvokeAsync(entry))"><MoIcon Icon="@MoIcons.Delete" Size="16px" /></button>
+                                    }
+                                </div>
+                            </td>
+                        </tr>
                     }
-                </ul>
-            }
+                </tbody>
+            </table>
         </div>
     }
 </section>
+
 @code {
-    /// <summary>The borrowed controller; presentation has no independent selection or sort state.</summary>
     [Parameter, EditorRequired] public FileOpsWorkspaceController Controller { get; set; } = null!;
-    /// <summary>True only when the actual rendered inventory owner is at least 800 CSS pixels wide.</summary>
-    [Parameter] public bool TableMode { get; set; }
-    /// <summary>Opens a captured displayed entry without checking it.</summary>
+    [Parameter] public FileOpsBrowseResult? Browse { get; set; }
+    [Parameter, EditorRequired] public FileOpsInventoryView View { get; set; } = null!;
+    [Parameter, EditorRequired] public FileOpsViewQuery Query { get; set; } = null!;
+    [Parameter] public EventCallback<FileOpsViewQuery> Filter { get; set; }
     [Parameter] public EventCallback<FileOpsEntrySummary> Open { get; set; }
-    /// <summary>Downloads the captured file on disk.</summary>
     [Parameter] public EventCallback<string> Download { get; set; }
-    /// <summary>Confirms deletion of a captured entry.</summary>
     [Parameter] public EventCallback<FileOpsEntrySummary> Delete { get; set; }
-    /// <summary>Downloads the captured checked subset as a ZIP.</summary>
     [Parameter] public EventCallback DownloadSelection { get; set; }
-    /// <summary>Confirms deletion of the checked subset.</summary>
     [Parameter] public EventCallback DeleteSelection { get; set; }
-    /// <summary>Notifies the visit after a synchronous sort/check transition, without authorizing focus.</summary>
-    [Parameter] public EventCallback Changed { get; set; }
-    /// <summary>Opens this same Files visit's runtime policy dialog.</summary>
-    [Parameter] public EventCallback OpenPolicy { get; set; }
-    /// <summary>Authorizes guarded focus return after Clear removes its own contextual action band.</summary>
-    [Parameter] public EventCallback Cleared { get; set; }
-    private IReadOnlyList<FileOpsEntrySummary> _entries = [];
-    private IReadOnlyList<FileOpsEntrySummary> Entries => _entries;
-    private FileOpsBrowseResult? Browse => Controller.Browse;
+    [Parameter] public EventCallback Refresh { get; set; }
+    [Parameter] public EventCallback Create { get; set; }
+
+    private IReadOnlyList<FileOpsEntrySummary> _rows = [];
+    private FileOpsEntrySummary[] _checked = [];
+    private ElementReference _selectAll, _search;
+    private Task<IJSObjectReference>? _import;
+    private bool _retired, _restoreFocus;
+    private int CheckedVisible => _rows.Count(Controller.IsSelected);
+    private bool AllChecked => _rows.Count > 0 && CheckedVisible == _rows.Count;
+    private bool Mixed => !AllChecked && CheckedVisible != 0;
+    private string SortIcon => Query.Descending ? MoIcons.ArrowDown : MoIcons.ArrowUp;
+
     protected override void OnParametersSet()
     {
-        // MudTable keys rows by item reference. Retain each path's presentation object so a
-        // check-state rerender updates the existing native input instead of replacing focus.
-        var previous = Entries.ToDictionary(entry => entry.FullPath, OperatingSystem.IsWindows() ? StringComparer.OrdinalIgnoreCase : StringComparer.Ordinal);
-        _entries = Controller.SortedEntries.Select(current =>
-        {
-            if (!previous.TryGetValue(current.FullPath, out var retained)) return current;
-            retained.FullPath = current.FullPath; retained.Name = current.Name; retained.Kind = current.Kind; retained.Extension = current.Extension;
-            retained.SizeBytes = current.SizeBytes; retained.LastModifiedAt = current.LastModifiedAt;
-            retained.IsHidden = current.IsHidden; retained.IsReadOnly = current.IsReadOnly;
-            retained.CanDownload = current.CanDownload; retained.CanEditText = current.CanEditText;
-            retained.CanDelete = current.CanDelete; retained.CanWriteInto = current.CanWriteInto;
-            return retained;
-        }).ToArray();
+        _rows = View.Filtered;
+        UpdateSelection();
     }
-    private List<FileOpsEntrySummary> Selected => Entries.Where(Controller.IsSelected).ToList();
-    private bool Busy => Controller.IsBusy;
-    private bool CanZip => Selected.Count > 0 && Selected.All(entry => entry.IsDirectory || entry.CanDownload);
-    private bool CanDelete => Selected.Count > 0 && Selected.All(entry => entry.CanDelete);
-    private bool? AllSelected => Selected.Count == 0 ? false : Selected.Count == Entries.Count ? true : null;
-    private string SelectAllState => AllSelected switch { true => "true", false => "false", null => "mixed" };
-    private string SortLabel => L["Inventory:Sort", FieldLabel(Controller.SortField), L[Controller.SortDescending ? "Inventory:Descending" : "Inventory:Ascending"]];
-    private string FieldLabel(FileOpsSortField field) => L[field switch { FileOpsSortField.Name => "Columns:Name", FileOpsSortField.Type => "Columns:Type", FileOpsSortField.Size => "Columns:Size", _ => "Columns:Modified" }];
-    private string SortAria(FileOpsSortField field) => Controller.SortField != field ? "none" : Controller.SortDescending ? "descending" : "ascending";
-    private string TypeText(FileOpsEntrySummary entry) => entry.IsDirectory ? L["Labels:Directory"] : string.IsNullOrWhiteSpace(entry.Extension) ? L["Labels:File"] : entry.Extension;
-    private string DateText(DateTimeOffset value) => UiTime.Format(value);
-    private string RowClass(FileOpsEntrySummary entry, int index) => Same(entry.FullPath, Controller.InspectedEntry?.FullPath) ? "entry-row entry-selected" : "entry-row";
-    private static bool Same(string? left, string? right) => string.Equals(left, right, OperatingSystem.IsWindows() ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal);
-    private async Task CheckAsync(FileOpsEntrySummary entry, bool value) { if (Busy) return; Controller.ToggleEntrySelection(entry, value); await Changed.InvokeAsync(); }
-    private async Task SelectAllAsync(bool? value) { if (Busy) return; Controller.SelectAll(value == true); await Changed.InvokeAsync(); }
-    private async Task ClearAsync() { if (Busy) return; Controller.ClearSelection(); await Cleared.InvokeAsync(); }
-    private async Task SortAsync(FileOpsSortField field) { if (Busy) return; Controller.SetSort(field, Controller.SortField == field && !Controller.SortDescending); await Changed.InvokeAsync(); }
-    private async Task DirectionAsync() { if (Busy) return; Controller.SetSort(Controller.SortField, !Controller.SortDescending); await Changed.InvokeAsync(); }
-    private RenderFragment Indicators(FileOpsEntrySummary entry) => @<span class="entry-indicators">@if (entry.IsReadOnly) { <MudTooltip Text="@L["Location:ReadOnly"]"><MoIcon Size="1.25rem" Icon="@MoIcons.Lock" /></MudTooltip> }@if (entry.IsHidden) { <MudTooltip Text="@L["Inventory:Hidden"]"><MoIcon Size="1.25rem" Icon="@MoIcons.EyeOff" /></MudTooltip> }</span>;
-    private RenderFragment EntryMenu(FileOpsEntrySummary entry) => @<MudMenu Icon="@MoIcons.MoreVertical" AriaLabel="@L["Inventory:Actions", entry.Name]" Disabled="@Busy">
-        @if (!entry.IsDirectory && entry.CanDownload) { <MudMenuItem Icon="@MoIcons.Download" OnClick="@(() => Download.InvokeAsync(entry.FullPath))">@L["Actions:Download"]</MudMenuItem> }
-        @if (entry.CanDelete) { <MudMenuItem Icon="@MoIcons.Delete" OnClick="@(() => Delete.InvokeAsync(entry))">@L["Actions:Delete"]</MudMenuItem> }
-        @if (!entry.CanDelete && (entry.IsDirectory || !entry.CanDownload)) { <MudMenuItem Disabled="true">@L["Inventory:NoActions"]</MudMenuItem> }
-    </MudMenu>;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (_retired) return;
+        try
+        {
+            if (_rows.Count > 0)
+            {
+                _import ??= JS.InvokeAsync<IJSObjectReference>("import", "./_content/Monica.DevOps/FileOps/Components/FileOpsWorkspace.razor.js").AsTask();
+                var module = await _import;
+                if (!_retired && _rows.Count > 0)
+                    await module.InvokeVoidAsync("setIndeterminate", _selectAll, Mixed);
+            }
+            if (_retired || !_restoreFocus) return;
+            _restoreFocus = false;
+            await (_rows.Count > 0 ? _selectAll : _search).FocusAsync(preventScroll: true);
+        }
+        catch (JSDisconnectedException) { }
+    }
+
+    private static string? ColumnClass(FileOpsSortField field) => field switch
+    {
+        FileOpsSortField.Type => "fo-col-type",
+        FileOpsSortField.Size => "is-num",
+        FileOpsSortField.Modified => "fo-col-mod",
+        _ => null
+    };
+
+    private bool IsInspected(FileOpsEntrySummary entry) => string.Equals(entry.FullPath, Query.File,
+        OperatingSystem.IsWindows() ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal);
+    private Task SortAsync(FileOpsSortField field, bool descending) => Filter.InvokeAsync(Query with { Sort = field, Descending = descending });
+    private Task SearchAsync(ChangeEventArgs args) => Filter.InvokeAsync(Query with { Search = args.Value?.ToString() ?? "" });
+    private Task ClearFiltersAsync() => Filter.InvokeAsync(Query with { Search = "", Capability = FileOpsCapability.All });
+    private Task SetCapabilityAsync(FileOpsCapability cap) => Filter.InvokeAsync(Query with { Capability = cap });
+
+    private void UpdateSelection() => _checked = Browse?.Entries.Where(Controller.IsSelected).ToArray() ?? [];
+
+    private void ToggleEntry(FileOpsEntrySummary entry, ChangeEventArgs args)
+    {
+        Controller.ToggleEntrySelection(entry, args.Value is true);
+        UpdateSelection();
+    }
+
+    private void SetVisibleSelection(ChangeEventArgs args)
+    {
+        Controller.SelectVisible(_rows, args.Value is true);
+        UpdateSelection();
+    }
+
+    private void ClearSelection()
+    {
+        Controller.ClearSelection();
+        _restoreFocus = true;
+        UpdateSelection();
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        _retired = true;
+        if (_import is null) return;
+        try { await (await _import).DisposeAsync(); }
+        catch (JSDisconnectedException) { }
+    }
 }

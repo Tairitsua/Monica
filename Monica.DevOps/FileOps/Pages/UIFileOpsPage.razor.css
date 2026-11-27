@@ -1,4 +1,0 @@
-.file-ops-page { width: 100%; min-width: 0; box-sizing: border-box; color: var(--mud-palette-text-primary); container: file-ops-page / inline-size; }
-.file-ops-page ::deep .file-workspace { padding: 32px; }
-@container file-ops-page (max-width: 1200px) { .file-ops-page ::deep .file-workspace { padding: 24px; } }
-@container file-ops-page (max-width: 600px) { .file-ops-page ::deep .file-workspace { padding: 20px 16px; } }

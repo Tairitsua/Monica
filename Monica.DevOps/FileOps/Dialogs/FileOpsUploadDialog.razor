@@ -1,0 +1,76 @@
+@using Microsoft.AspNetCore.Components.Forms
+@using Monica.DevOps.FileOps.Components
+@using Monica.DevOps.FileOps.Models
+@using Monica.DevOps.FileOps.State
+@using Monica.DevOps.Localization
+@using Monica.UI.Shared.Components.Dialogs
+@inject IStringLocalizer<FileOpsResource> L
+
+<MudDialog DefaultFocus="DefaultFocus.FirstChild" OnKeyUp="HandleKey">
+    <TitleContent><MoDialogHeading Text="@L["Design:DlgUploadTitle"]" /></TitleContent>
+    <DialogContent>
+        <p>@L["Design:DlgUploadTarget"] <code>@Directory</code></p>
+        <p>@L["Design:DlgUploadLimit", FileOpsLabels.Bytes(MaximumBytes)]</p>
+        <InputFile OnChange="ChooseFile" disabled="@_uploading" aria-label="@L["Design:DlgUploadPick"]" />
+        @if (_file is { } file)
+        {
+            <dl>
+                <dt>@L["Design:DlgUploadName"]</dt><dd><code>@file.Name</code></dd>
+                <dt>@L["Design:DlgUploadSize"]</dt><dd><code>@FileOpsLabels.Bytes(file.Size)</code></dd>
+                <dt>@L["Design:DlgUploadContent"]</dt><dd><code>@(string.IsNullOrWhiteSpace(file.ContentType) ? "—" : file.ContentType)</code></dd>
+            </dl>
+            @if (file.Size > MaximumBytes)
+            {
+                <MudAlert Severity="Severity.Error" Dense="true">@L["Design:DlgUploadTooLarge", FileOpsLabels.Bytes(MaximumBytes)]</MudAlert>
+            }
+            @if (Existing?.IsReadOnly == true)
+            {
+                <MudAlert Severity="Severity.Error" Dense="true">@L["Design:DlgUploadRoTarget"]</MudAlert>
+            }
+            else if (Existing is not null)
+            {
+                <MudAlert Severity="Severity.Warning" Dense="true">@L["Design:UploadReplace", file.Name]</MudAlert>
+            }
+        }
+    </DialogContent>
+    <DialogActions>
+        <MudButton Disabled="@_uploading" OnClick="Cancel">@L["Common:Cancel"]</MudButton>
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" Disabled="@(!CanUpload)" OnClick="UploadAsync">
+            @L["Design:DlgUploadConfirm"]
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] private IMudDialogInstance Dialog { get; set; } = null!;
+    /// <summary>The directory accepted when the upload chooser was opened.</summary>
+    [Parameter, EditorRequired] public string Directory { get; set; } = "";
+    /// <summary>The observed one-file upload limit in bytes.</summary>
+    [Parameter] public long MaximumBytes { get; set; }
+    /// <summary>The borrowed controller used to report visible collision evidence.</summary>
+    [Parameter, EditorRequired] public FileOpsWorkspaceController Controller { get; set; } = null!;
+    /// <summary>Completes the actual upload while the browser input remains mounted.</summary>
+    [Parameter, EditorRequired] public Func<IBrowserFile, Task> Upload { get; set; } = null!;
+
+    private IBrowserFile? _file;
+    private bool _uploading;
+    private FileOpsEntrySummary? Existing => _file is null ? null : Controller.Browse?.Entries.FirstOrDefault(entry =>
+        string.Equals(entry.Name, _file.Name, OperatingSystem.IsWindows() ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal));
+    private bool CanUpload => !_uploading && _file is { } file && file.Size <= MaximumBytes && Existing is not { IsReadOnly: true };
+
+    private void ChooseFile(InputFileChangeEventArgs args) => _file = args.File;
+    private void Cancel() { if (!_uploading) Dialog.Cancel(); }
+    private void HandleKey(KeyboardEventArgs args) { if (args.Key == "Escape") Cancel(); }
+
+    private async Task UploadAsync()
+    {
+        if (!CanUpload || _file is not { } file) return;
+        _uploading = true;
+        try
+        {
+            await Upload(file);
+            Dialog.Close();
+        }
+        finally { _uploading = false; }
+    }
+}

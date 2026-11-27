@@ -1,0 +1,242 @@
+@inject IStringLocalizer<FileOpsResource> L
+
+<section class="fo-sig" aria-label="@L["Design:LocLabel"]">
+    <div class="fo-loc-band">
+        <div class="fo-roots" role="group" aria-label="@L["Design:LocRootLabel"]">
+            <button type="button" class="fo-up-btn fo-outline" disabled="@(Browse?.ParentPath is null || Controller.IsBusy)"
+                    title="@L["Design:LocUp"]" aria-label="@L["Design:LocUp"]"
+                    @onclick="@(() => Navigate.InvokeAsync(Browse!.ParentPath!))"><MoIcon Icon="@MoIcons.ArrowUp" Size="16px" /></button>
+            <div class="fo-root-chips">
+                @foreach (var root in Config?.AllowedRoots ?? [])
+                {
+                    var active = SamePath(root, Browse?.CurrentRootPath);
+                    <button type="button" class="fo-root-pill mo-vl-mono @(active ? "is-active" : null)"
+                            aria-pressed="@Aria(active)" title="@root" disabled="@Controller.IsBusy"
+                            @onclick="@(() => Navigate.InvokeAsync(root))">
+                        <MoIcon Icon="@(active ? MoIcons.FolderOpen : MoIcons.Folder)" Size="14px" /><span>@root</span>
+                    </button>
+                }
+            </div>
+        </div>
+        <div class="fo-loc-right">
+            <button type="button" class="fo-outline" aria-expanded="@Aria(JumpOpen)" aria-controls="file-ops-jump" @onclick="ToggleJump">
+                <MoIcon Icon="@MoIcons.MapPinEdit" Size="15px" />@L["Design:LocGoToPath"]
+            </button>
+            @if (Browse?.CanCreateDirectory == true)
+            {
+                <button type="button" class="fo-outline" disabled="@(Controller.IsBusy && !CreateActive)"
+                        aria-disabled="@Aria(CreateActive)" @onclick="Create"><MoIcon Icon="@MoIcons.FolderPlus" Size="15px" />@L["Design:ActNewFolder"]</button>
+            }
+        </div>
+    </div>
+
+    @if (Browse is { } directory)
+    {
+        <nav class="fo-crumbs" aria-label="@L["Design:LocBreadcrumbs"]">
+            @for (var i = 0; i < directory.Breadcrumbs.Count; i++)
+            {
+                var segment = directory.Breadcrumbs[i];
+                if (i > 0) { <span class="fo-crumb-sep" aria-hidden="true">/</span> }
+                if (i == directory.Breadcrumbs.Count - 1)
+                {
+                    <span class="fo-crumb-cur mo-vl-mono" aria-current="location" title="@segment.Path">@segment.Name</span>
+                }
+                else
+                {
+                    <button type="button" class="fo-crumb-btn mo-vl-mono" title="@segment.Path" disabled="@Controller.IsBusy"
+                            @onclick="@(() => Navigate.InvokeAsync(segment.Path))">@segment.Name</button>
+                }
+            }
+            <span class="fo-crumb-exact mo-vl-mono" title="@directory.CurrentPath">@directory.CurrentPath</span>
+        </nav>
+    }
+
+    @if (JumpOpen)
+    {
+        <form id="file-ops-jump" class="fo-jump" @onsubmit="SubmitPathAsync" @onsubmit:preventDefault>
+            <div class="fo-jump-row">
+                <input type="text" class="fo-input mo-vl-mono" spellcheck="false" autocomplete="off"
+                       @ref="_jumpInput" @bind="_proposedPath" @bind:event="oninput" aria-invalid="@(_jumpError is null ? null : "true")"
+                       placeholder="@L["Design:LocPathPlaceholder"]" aria-label="@L["Design:LocGoToPath"]" />
+                <button type="submit" class="fo-outline" disabled="@(Controller.IsBusy || string.IsNullOrWhiteSpace(_proposedPath))">@L["Design:LocBrowse"]</button>
+                @if (Browse is not null) { <button type="button" class="fo-ghost" @onclick="ToggleJump">@L["Design:LocDismissPath"]</button> }
+            </div>
+            @if (_jumpError is not null) { <p class="fo-field-err" role="alert">@_jumpError</p> }
+        </form>
+    }
+
+    <div class="fo-decision">
+        <div class="fo-metric">
+            <p class="fo-display-label">
+                @L["Design:SigShownLabel"]
+                @if (Browse is { IsTruncated: true } cap)
+                {
+                    <span class="mo-vl-capsule mo-vl-role--warning mo-vl-mono">@L["Design:CapBadge", cap.EntryLimit]</span>
+                }
+            </p>
+            <MoDisplayValue Compact="true" Value="@(Browse?.Entries.Count.ToString("N0") ?? "—")"
+                            Unit="@(Browse is null ? null : Browse.IsTruncated ? L["Design:SigTruncatedUnit", Browse.EntryLimit].Value : L["Design:SigShownUnit"].Value)" />
+            @if (Browse is not null)
+            {
+                <div class="fo-reasons">
+                    @foreach (var category in FileOpsInventoryView.Categories)
+                    {
+                        var count = Inventory.Count(category);
+                        var role = FileOpsInventoryView.Role(category).ToCssClass();
+                        <span><i class="mo-vl-swatch @role @(count == 0 ? "mo-vl-swatch--empty" : null)" aria-hidden="true"></i>
+                            @L.Capability(category)<b class="mo-vl-mono">@count.ToString("N0")</b></span>
+                    }
+                </div>
+            }
+        </div>
+        <p class="fo-lede">
+            @if (Browse is null || Config is null)
+            {
+                @L["Design:FindingUnavailable"]
+            }
+            else if (Browse.Entries.Count == 0)
+            {
+                @L[Browse.CanCreateDirectory ? "Design:FindingEmpty" : "Design:FindingEmptyReadOnly", Browse.CurrentPath]
+            }
+            else
+            {
+                @MoRichFinding.Compose(L["Design:FindingDirectory"], @<code class="mo-vl-mono">@Browse.CurrentPath</code>, FindingBody)
+                @if (ReadOnlyCount > 0 && !Browse.IsReadOnly)
+                {
+                    @MoRichFinding.Compose(L["Design:FindingProtected"], @<MoValueMark Role="MoVisualRole.Warning">@L["Design:ProtectedCount", ReadOnlyCount]</MoValueMark>)
+                }
+                @if (FirstLarge is { } large)
+                {
+                    @MoRichFinding.Compose(L["Design:FindingLarge"], LinkedMark(large.Name, MoVisualRole.Warning, () => Inspect.InvokeAsync(large.FullPath)),
+                        @<text>@FileOpsLabels.Bytes(large.SizeBytes!.Value)</text>)
+                }
+                @if (Browse.IsTruncated)
+                {
+                    @MoRichFinding.Compose(L["Design:FindingTruncated"], @<MoValueMark Role="MoVisualRole.Warning">@L["Design:FindingEntryCap", Browse.EntryLimit]</MoValueMark>)
+                }
+                @MoRichFinding.Compose(L["Design:FindingDelete"], @<MoValueMark Role="@(Config.AllowDeleteOperations ? MoVisualRole.Error : MoVisualRole.Neutral)">@L[Config.AllowDeleteOperations ? "Design:Enabled" : "Design:Disabled"]</MoValueMark>)
+            }
+        </p>
+    </div>
+
+    @if (Browse is { } accepted)
+    {
+        <div class="fo-scope-strip">
+            <span class="fo-scope-note">
+                <MoIcon Icon="@MoIcons.Info" Size="15px" />
+                <span>@(accepted.IsTruncated ? L["Design:SigScopeTruncated", accepted.EntryLimit, accepted.Entries.Count] : L["Design:SigScopeAll", accepted.Entries.Count])</span>
+            </span>
+            @if (Config?.AllowHiddenEntries == false) { <span class="fo-scope-sub">@L["Design:InvHiddenNotice"]</span> }
+        </div>
+    }
+
+    @if (Config is { } config)
+    {
+        var writable = config.AllowWriteOperations && Browse is { IsReadOnly: false };
+        <dl class="fo-facts" aria-label="@L["Design:PolSecLimits"]">
+            @Fact(L["Design:FactLocationLabel"],
+                  Browse is null ? "—" : L[writable ? "Design:FactLocationWritable" : !config.AllowWriteOperations ? "Design:FactLocationWritesOff" : "Design:FactLocationRoPath"],
+                  Browse is null ? "" : L[writable ? "Design:FactLocationSubWritable" : !config.AllowWriteOperations ? "Design:FactLocationSubWritesOff" : "Design:FactLocationSubRoPath"],
+                  Browse is null ? MoVisualRole.Neutral : writable ? MoVisualRole.Success : MoVisualRole.Warning)
+            @Fact(L["Design:FactDeleteLabel"], L[config.AllowDeleteOperations ? "Design:FactDeleteOn" : "Design:FactDeleteOff"],
+                  L[config.AllowHiddenEntries ? "Design:FactDeleteSubOn" : "Design:FactDeleteSubOff"],
+                  config.AllowDeleteOperations ? MoVisualRole.Error : MoVisualRole.Neutral)
+            @Fact(L["Design:FactTextCapLabel"], FileOpsLabels.Bytes(config.MaxTextFileSizeBytes),
+                  L["Design:FactTextCapSub", config.EditableExtensions.Count], MoVisualRole.Info)
+            @Fact(L["Design:FactTransferLabel"], FileOpsLabels.Bytes(config.MaxDownloadFileSizeBytes),
+                  L["Design:FactTransferSub", FileOpsLabels.Bytes(config.MaxUploadFileSizeBytes), FileOpsLabels.Bytes(config.MaxDownloadFileSizeBytes)], MoVisualRole.Secondary)
+        </dl>
+    }
+
+    @if (Browse is { Entries.Count: > 0 } populated)
+    {
+        <FileOpsCapabilityTape Browse="populated" Inventory="Inventory" Active="Query.Capability" Select="ToggleFilterAsync" />
+    }
+</section>
+
+@code {
+    [Parameter, EditorRequired] public FileOpsWorkspaceController Controller { get; set; } = null!;
+    [Parameter] public FileOpsBrowseResult? Browse { get; set; }
+    [Parameter] public FileOpsRuntimeConfig? Config { get; set; }
+    [Parameter, EditorRequired] public FileOpsInventoryView Inventory { get; set; } = null!;
+    [Parameter, EditorRequired] public FileOpsViewQuery Query { get; set; } = null!;
+    [Parameter] public EventCallback<FileOpsViewQuery> Filter { get; set; }
+    [Parameter] public EventCallback<string> Navigate { get; set; }
+    [Parameter] public EventCallback<string> Inspect { get; set; }
+    [Parameter] public EventCallback Create { get; set; }
+    [Parameter] public bool CreateActive { get; set; }
+
+    private ElementReference _jumpInput;
+    private string _proposedPath = "";
+    private string? _jumpError;
+    private bool _jumpOpen, _focusJump;
+    private bool JumpOpen => _jumpOpen || Browse is null;
+    private int ReadOnlyCount => Browse?.Entries.Count(entry => entry.IsReadOnly) ?? 0;
+    private FileOpsEntrySummary? FirstLarge => Browse?.Entries.FirstOrDefault(entry => !entry.IsDirectory &&
+        (!entry.CanDownload || entry.TextPreview == FileOpsTextPreviewKind.Oversized));
+
+    private RenderFragment FindingBody => @<text>
+        @if (Browse?.Entries.FirstOrDefault(entry => entry.CanEditText) is { } editable)
+        {
+            @MoRichFinding.Compose(L["Design:FindingEdit"],
+                LinkedMark(L["Design:EditableCount", Inventory.Count(FileOpsCapability.Editable)], MoVisualRole.Success, () => ToggleFilterAsync(FileOpsCapability.Editable)),
+                LinkedMark(editable.Name, MoVisualRole.Primary, () => Inspect.InvokeAsync(editable.FullPath)))
+        }
+        else if (Browse?.IsReadOnly == true)
+        {
+            @MoRichFinding.Compose(L["Design:FindingReadOnly"], Mark(L["Design:FactLocationRoPath"], MoVisualRole.Warning))
+        }
+        else if (Config?.AllowWriteOperations == false)
+        {
+            @MoRichFinding.Compose(L["Design:FindingWritesOff"], Mark(L["Design:PostureWritesOff"], MoVisualRole.Warning))
+        }
+        else
+        {
+            @MoRichFinding.Compose(L["Design:FindingNoEdit"],
+                LinkedMark(L["Design:DirectoryCount", Inventory.Count(FileOpsCapability.Dir)], MoVisualRole.Primary, () => ToggleFilterAsync(FileOpsCapability.Dir)))
+        }
+    </text>;
+
+    private static RenderFragment Mark(string label, MoVisualRole role) => @<MoValueMark Role="role">@label</MoValueMark>;
+
+    private RenderFragment LinkedMark(string label, MoVisualRole role, Func<Task> action) => @<button type="button"
+        class="mo-vl-mark fo-mark-link @role.ToCssClass()" @onclick="action">@label</button>;
+
+    private static RenderFragment Fact(string label, string value, string description, MoVisualRole role) => @<div class="fo-fact @role.ToCssClass()">
+        <dt><i class="mo-vl-swatch @role.ToCssClass()" aria-hidden="true"></i>@label</dt>
+        <dd>@value<small>@description</small></dd>
+    </div>;
+
+    private void ToggleJump()
+    {
+        _jumpOpen = !_jumpOpen;
+        _jumpError = null;
+        if (!_jumpOpen) return;
+        _proposedPath = Browse?.CurrentPath ?? Config?.StartupPath ?? "";
+        _focusJump = true;
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!_focusJump) return;
+        _focusJump = false;
+        await _jumpInput.FocusAsync();
+    }
+
+    private async Task SubmitPathAsync()
+    {
+        if (string.IsNullOrWhiteSpace(_proposedPath)) return;
+        await Navigate.InvokeAsync(_proposedPath);
+        _jumpError = Controller.LastRead is { Succeeded: false, Kind: FileOpsOperationKind.Browse } error ? error.Message : null;
+        _jumpOpen = _jumpError is not null;
+    }
+
+    private Task ToggleFilterAsync(FileOpsCapability category) => Filter.InvokeAsync(Query with
+    {
+        Capability = Query.Capability == category ? FileOpsCapability.All : category
+    });
+
+    private static string Aria(bool value) => value ? "true" : "false";
+    private static bool SamePath(string? left, string? right) => string.Equals(left, right,
+        OperatingSystem.IsWindows() ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal);
+}

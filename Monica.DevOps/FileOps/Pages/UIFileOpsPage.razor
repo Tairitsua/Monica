@@ -3,10 +3,8 @@
 @attribute [Route(PAGE_URL)]
 @inject IStringLocalizer<FileOpsResource> L
 <PageTitle>@L["Page:DocumentTitle"]</PageTitle>
-<div class="file-ops-page"><FileOpsWorkspace OpenPolicy="@(PolicyRequest == "edit")" /></div>
+<FileOpsWorkspace />
 @code {
-    /// <summary>The portable FileOps entry route.</summary>
+    /// <summary>The Files workbench route; supports directory, inspector, capability, search and sort query state.</summary>
     public const string PAGE_URL = "/ui/file-ops";
-    /// <summary>Compatibility dialog entry only; no filesystem identity or draft is carried in the URL.</summary>
-    [SupplyParameterFromQuery(Name = "policy")] public string? PolicyRequest { get; set; }
 }

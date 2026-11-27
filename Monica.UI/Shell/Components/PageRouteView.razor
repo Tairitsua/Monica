@@ -1,3 +1,4 @@
+@using System.Reflection
 @using Monica.UI.Localization
 @using Monica.UI.Shell.Support
 
@@ -38,7 +39,9 @@ else
                             Icon="@MoIcons.Lock"
                             Severity="Severity.Warning"
                             IsChecking="false"
-                            HomeLabel="@L["Common:GoHome"]" />
+                            HomeHref="@(_returnHref ?? "/")"
+                            HomeIcon="@(_returnHref is null ? MoIcons.Home : MoIcons.ArrowLeft)"
+                            HomeLabel="@L[_returnHref is null ? "Common:GoHome" : "RouteAccess:ReturnToWorkspace"]" />
         }
         <span class="mud-sr-only" role="status">@_denialAnnouncement</span>
     </LayoutView>
@@ -53,6 +56,7 @@ else
     private JsModuleSession? _focusInterop;
     private RouteData? _announcedRouteData;
     private string _denialAnnouncement = string.Empty;
+    private string? _returnHref;
     private readonly object _disposeSync = new();
     private Task? _disposeTask;
 
@@ -71,8 +75,10 @@ else
     protected override async Task OnParametersSetAsync()
     {
         var evaluationVersion = Interlocked.Increment(ref _evaluationVersion);
+        var pageType = RouteData.PageType;
         _accessState = RouteAccessState.Checking;
         _denialAnnouncement = string.Empty;
+        _returnHref = null;
 
         using var evaluationCancellation = new CancellationTokenSource();
         var previousEvaluation = Interlocked.Exchange(ref _evaluationCancellation, evaluationCancellation);
@@ -81,13 +87,20 @@ else
         try
         {
             var isAuthorized = await PageAccess.IsRouteAuthorizedAsync(
-                RouteData.PageType,
+                pageType,
                 evaluationCancellation.Token);
+            string? returnHref = null;
+            if (!isAuthorized && pageType.GetCustomAttribute<RouteAccessReturnAttribute>() is { Route.Length: > 0 } recovery &&
+                await PageAccess.IsAuthorizedAsync(recovery.Route, evaluationCancellation.Token))
+            {
+                returnHref = "/" + recovery.Route;
+            }
 
             if (Volatile.Read(ref _disposed) == 0 &&
                 !evaluationCancellation.IsCancellationRequested &&
                 evaluationVersion == Volatile.Read(ref _evaluationVersion))
             {
+                _returnHref = returnHref;
                 _accessState = isAuthorized ? RouteAccessState.Allowed : RouteAccessState.Denied;
             }
         }

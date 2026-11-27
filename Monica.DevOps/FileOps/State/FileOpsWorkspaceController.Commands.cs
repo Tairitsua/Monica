@@ -224,7 +224,7 @@ public sealed partial class FileOpsWorkspaceController
     private static bool Affects(FileOpsEntrySummary entry, string path) =>
         PathsEqual(entry.FullPath, path) || entry.IsDirectory && IsWithin(path, entry.FullPath);
 
-    private static bool Invalidates(FileOpsRuntimeConfig config, FileOpsFileTextContent file, bool isHidden)
+    internal static bool Invalidates(FileOpsRuntimeConfig config, FileOpsFileTextContent file, bool isHidden)
     {
         var root = config.AllowedRoots.Where(root => IsWithin(file.FullPath, root)).OrderByDescending(root => root.Length).FirstOrDefault();
         if (root is null) return true;
@@ -238,9 +238,6 @@ public sealed partial class FileOpsWorkspaceController
 
     private static bool IsWithin(string path, string root)
     {
-        var normalizedPath = Path.TrimEndingDirectorySeparator(path);
-        var normalizedRoot = Path.TrimEndingDirectorySeparator(root);
-        return PathsEqual(normalizedPath, normalizedRoot) || normalizedPath.StartsWith(normalizedRoot + Path.DirectorySeparatorChar,
-            OperatingSystem.IsWindows() ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal);
+        return FileOpsRuntimeConfig.IsWithinRoot(path, root);
     }
 }

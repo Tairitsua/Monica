@@ -5,6 +5,8 @@ using Monica.Core.Modularity.Abstractions;
 using Monica.Core.Modularity.Models;
 using Monica.DevOps.FileOps.Pages;
 using Monica.DevOps.FileOps.State;
+using Monica.DevOps.FileOps.Support;
+using Monica.UI.Shell.Support;
 using Monica.DevOps.Localization;
 using Monica.UI.Shell.Models;
 using Monica.UI.Icons;
@@ -13,15 +15,16 @@ using MudBlazor;
 // ReSharper disable once CheckNamespace
 namespace Monica.Modules;
 
-/// <summary>Composes Files with a same-visit host policy dialog and a hidden compatibility route.</summary>
-/// <remarks>Requires FileOps infrastructure, localization and the shell. The scoped return context contains
-/// passive identities only; each routed workspace owns and retires its controller and native resources.</remarks>
+/// <summary>Composes the Files and runtime-policy workbench routes.</summary>
+/// <remarks>Requires FileOps infrastructure, localization and the shell. The circuit-scoped session owns
+/// the shared controller and drafts, while each routed page owns its native resources.</remarks>
 public class ModuleFileOpsUI : MonicaModule<ModuleFileOpsUIOption>, IUIModule
 {
     /// <inheritdoc />
     public override void ConfigureServices(ModuleContext<ModuleFileOpsUIOption> context)
     {
         context.Services.AddScoped<FileOpsNavigationState>();
+        context.Services.AddScoped<FileOpsPolicyPageAccessPolicy>();
     }
 
     /// <inheritdoc />
@@ -50,8 +53,9 @@ public class ModuleFileOpsUI : MonicaModule<ModuleFileOpsUIOption>, IUIModule
                     "Pages:FileOpsPolicy:Title",
                     MoIcons.Sliders,
                     category,
-                    addToNav: false,
-                    navOrder: 37);
+                    addToNav: true,
+                    navOrder: 37,
+                    accessPolicyType: typeof(FileOpsPolicyPageAccessPolicy));
             }));
     }
 }
@@ -73,5 +77,11 @@ public static class ModuleFileOpsUIBuilderExtensions
 
 
 
-/// <summary>FileOps UI module options; this route family adds no independent authorization policy.</summary>
-public class ModuleFileOpsUIOption : ModuleOptions<ModuleFileOpsUI>;
+/// <summary>Configures the FileOps workbench presentation and host policy access.</summary>
+public class ModuleFileOpsUIOption : ModuleOptions<ModuleFileOpsUI>
+{
+    /// <summary>Gets or sets a host-registered <see cref="IPageAccessPolicy"/> for the runtime-policy route.</summary>
+    /// <remarks>Defaults to null, which adds no per-page restriction. A configured policy must be
+    /// resolvable in the circuit. This option does not affect file operations or HTTP API authorization.</remarks>
+    public Type? PolicyAccessPolicyType { get; set; }
+}

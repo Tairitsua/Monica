@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Components;
+using Microsoft.AspNetCore.Components.Web;
 using MudBlazor;
 
 namespace Monica.UI.Shared.Components.Dialogs;
@@ -45,6 +46,12 @@ public partial class MoSideSheet : IAsyncDisposable
     /// <summary>Gets or sets the desired CSS width, capped at the viewport. Defaults to 480px.</summary>
     [Parameter] public string Width { get; set; } = "480px";
 
+    /// <summary>Gets or sets the alternate width when the sheet is expanded. The viewport still caps the width.</summary>
+    [Parameter] public string? ExpandedWidth { get; set; }
+
+    /// <summary>Applies the alternate width without recreating the native dialog or resetting keyboard focus.</summary>
+    [Parameter] public bool Expanded { get; set; }
+
     /// <summary>Uses the compact evidence padding in the identity and scrolling body. Defaults to false.</summary>
     [Parameter] public bool Compact { get; set; }
 
@@ -54,6 +61,11 @@ public partial class MoSideSheet : IAsyncDisposable
 
     /// <summary>Gets or sets a contextual Close label; omission uses the shared localized Close text.</summary>
     [Parameter] public string? CloseLabel { get; set; }
+
+    /// <summary>Handles Close, Escape and backdrop requests before the sheet closes.</summary>
+    /// <remarks>When supplied, the owner decides whether to close through Open or the hosted dialog reference.
+    /// Programmatic closure and disposal bypass this request.</remarks>
+    [Parameter] public EventCallback DismissRequested { get; set; }
 
     [CascadingParameter] private IMudDialogInstance? DialogInstance { get; set; }
     [CascadingParameter(Name = "IsNested")] private bool IsNested { get; set; }
@@ -75,7 +87,12 @@ public partial class MoSideSheet : IAsyncDisposable
     private Task? _retirement;
     private bool _retired, _dismissed, _requestedOpen;
     private bool IsHosted => DialogInstance is not null && !IsNested;
-    private DialogOptions CurrentOptions => Dismissible ? Options : Options with { CloseOnEscapeKey = false, BackdropClick = false };
+    private DialogOptions CurrentOptions => Options with
+    {
+        CloseOnEscapeKey = Dismissible && !DismissRequested.HasDelegate,
+        BackdropClick = Dismissible,
+        CloseOnNavigation = DismissRequested.HasDelegate ? false : Options.CloseOnNavigation
+    };
 
     /// <inheritdoc />
     protected override void OnParametersSet()
@@ -115,9 +132,20 @@ public partial class MoSideSheet : IAsyncDisposable
         await OpenChanged.InvokeAsync(false);
     }
 
+    private EventCallback EscapeHandler => DismissRequested.HasDelegate
+        ? EventCallback.Factory.Create(this, CloseAsync) : default;
+
+    private EventCallback<MouseEventArgs> BackdropHandler => DismissRequested.HasDelegate
+        ? EventCallback.Factory.Create<MouseEventArgs>(this, _ => CloseAsync()) : default;
+
     private async Task CloseAsync()
     {
         if (_retired || !Dismissible) return;
+        if (DismissRequested.HasDelegate)
+        {
+            await DismissRequested.InvokeAsync();
+            return;
+        }
         if (IsHosted) DialogInstance!.Cancel();
         else if (_dialog is not null) await _dialog.CloseAsync();
     }

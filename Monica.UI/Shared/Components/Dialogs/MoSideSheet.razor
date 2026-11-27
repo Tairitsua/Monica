@@ -2,11 +2,13 @@
 @inject IStringLocalizer<SharedResource> L
 
 <MudDialog @ref="_dialog" VisibleChanged="OnVisibilityChangedAsync" Options="CurrentOptions"
+           DefaultFocus="@(DismissRequested.HasDelegate ? DefaultFocus.FirstChild : null)" OnBackdropClick="BackdropHandler"
            Gutters="false" TitleClass="pa-0" ContentClass="mo-side-sheet-content" ActionsClass="mo-side-sheet-footer"
-           Class="@(Compact ? "mo-side-sheet mo-side-sheet--compact" : "mo-side-sheet")" Style="@($"--mo-side-sheet-width: {Width};")"
+           Class="@(Compact ? "mo-side-sheet mo-side-sheet--compact" : "mo-side-sheet")" Style="@($"--mo-side-sheet-width: {Width}; --mo-side-sheet-expanded-width: {ExpandedWidth ?? Width};")"
            AriaLabelledBy="@_headingId">
     <TitleContent>
         <div class="mo-side-sheet-heading">
+            @if (Expanded) { <span class="mo-side-sheet-expanded" hidden></span> }
             <div id="@_headingId" class="mo-side-sheet-identity">
                 @if (TitleContent is not null) { @TitleContent }
                 else { <h2>@Title</h2> }
@@ -20,7 +22,7 @@
         }
     </TitleContent>
     <DialogContent>
-        <MoSideSheetPolicy Options="CurrentOptions" />
+        <MoSideSheetPolicy Options="CurrentOptions" DismissRequested="EscapeHandler" />
         @if (TabPanels is not null)
         {
             <MudTabs Class="mo-side-sheet-tabs" ActivePanelIndex="ActiveTabIndex" ActivePanelIndexChanged="ActiveTabIndexChanged"

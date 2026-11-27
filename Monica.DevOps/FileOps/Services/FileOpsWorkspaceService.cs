@@ -55,13 +55,19 @@ public class FileOpsWorkspaceService(
         var runtimeConfig = runtimeConfigStore.GetCurrent();
         var directory = pathPolicy.ResolveDirectory(runtimeConfig, path);
         var entries = Directory.EnumerateFileSystemEntries(directory.FullPath)
-            .Select(CreateEntrySummary)
+            .Select(entryPath => CreateEntrySummary(runtimeConfig, entryPath))
             .Where(entry => runtimeConfig.AllowHiddenEntries || !entry.IsHidden)
             .OrderByDescending(static entry => entry.IsDirectory)
             .ThenBy(static entry => entry.Name, GetPathComparer())
             .ToList();
 
         var limitedEntries = entries.Take(runtimeConfig.MaxDirectoryEntries).ToList();
+        foreach (var entry in limitedEntries)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            ObservePreview(runtimeConfig, entry);
+        }
+
         return Task.FromResult(new FileOpsBrowseResult
         {
             CurrentPath = directory.FullPath,
@@ -75,45 +81,68 @@ public class FileOpsWorkspaceService(
             IsTruncated = entries.Count > limitedEntries.Count,
             EntryLimit = runtimeConfig.MaxDirectoryEntries
         });
+    }
 
-        FileOpsEntrySummary CreateEntrySummary(string entryPath)
+    /// <inheritdoc />
+    public Task<FileOpsEntrySummary> ObserveFileAsync(string path, CancellationToken cancellationToken = default)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        var policy = runtimeConfigStore.GetCurrent();
+        var file = pathPolicy.ResolveFile(policy, path);
+        var entry = CreateEntrySummary(policy, file.FullPath);
+        ObservePreview(policy, entry);
+        return Task.FromResult(entry);
+    }
+
+    private void ObservePreview(FileOpsRuntimeConfig policy, FileOpsEntrySummary entry)
+    {
+        if (entry.IsDirectory || entry.TextPreview != FileOpsTextPreviewKind.Unknown) return;
+
+        entry.TextPreview = textInspector.Classify(entry.FullPath, entry.SizeBytes!.Value, policy.MaxTextFileSizeBytes);
+        entry.CanEditText &= entry.TextPreview == FileOpsTextPreviewKind.Text;
+    }
+
+    private FileOpsEntrySummary CreateEntrySummary(FileOpsRuntimeConfig runtimeConfig, string entryPath)
+    {
+        var attributes = File.GetAttributes(entryPath);
+        if (attributes.HasFlag(FileAttributes.Directory))
         {
-            var attributes = File.GetAttributes(entryPath);
-            if (attributes.HasFlag(FileAttributes.Directory))
-            {
-                var directoryInfo = new DirectoryInfo(entryPath);
-                return new FileOpsEntrySummary
-                {
-                    Name = directoryInfo.Name,
-                    FullPath = directoryInfo.FullName,
-                    Kind = FileOpsEntryKind.Directory,
-                    LastModifiedAt = directoryInfo.LastWriteTimeUtc,
-                    IsHidden = pathPolicy.IsHidden(directoryInfo),
-                    IsReadOnly = pathPolicy.IsReadOnlyPath(runtimeConfig, directoryInfo.FullName),
-                    CanDelete = runtimeConfig.AllowDeleteOperations && !pathPolicy.IsReadOnlyPath(runtimeConfig, directoryInfo.FullName),
-                    CanWriteInto = runtimeConfig.AllowWriteOperations && !pathPolicy.IsReadOnlyPath(runtimeConfig, directoryInfo.FullName)
-                };
-            }
-
-            var fileInfo = new FileInfo(entryPath);
+            var directoryInfo = new DirectoryInfo(entryPath);
             return new FileOpsEntrySummary
             {
-                Name = fileInfo.Name,
-                FullPath = fileInfo.FullName,
-                Kind = FileOpsEntryKind.File,
-                Extension = fileInfo.Extension,
-                SizeBytes = fileInfo.Length,
-                LastModifiedAt = fileInfo.LastWriteTimeUtc,
-                IsHidden = pathPolicy.IsHidden(fileInfo),
-                IsReadOnly = pathPolicy.IsReadOnlyPath(runtimeConfig, fileInfo.FullName),
-                CanDownload = fileInfo.Length <= runtimeConfig.MaxDownloadFileSizeBytes,
-                CanEditText = fileInfo.Length <= runtimeConfig.MaxTextFileSizeBytes &&
-                              runtimeConfig.CanEditExtension(fileInfo.Extension) &&
-                              runtimeConfig.AllowWriteOperations &&
-                              !pathPolicy.IsReadOnlyPath(runtimeConfig, fileInfo.FullName),
-                CanDelete = runtimeConfig.AllowDeleteOperations && !pathPolicy.IsReadOnlyPath(runtimeConfig, fileInfo.FullName)
+                Name = directoryInfo.Name,
+                FullPath = directoryInfo.FullName,
+                Kind = FileOpsEntryKind.Directory,
+                LastModifiedAt = directoryInfo.LastWriteTimeUtc,
+                IsHidden = pathPolicy.IsHidden(directoryInfo),
+                IsReadOnly = pathPolicy.IsReadOnlyPath(runtimeConfig, directoryInfo.FullName),
+                CanDelete = runtimeConfig.AllowDeleteOperations && !pathPolicy.IsReadOnlyPath(runtimeConfig, directoryInfo.FullName) &&
+                            !runtimeConfig.AllowedRoots.Contains(Path.TrimEndingDirectorySeparator(directoryInfo.FullName), GetPathComparer()),
+                CanWriteInto = runtimeConfig.AllowWriteOperations && !pathPolicy.IsReadOnlyPath(runtimeConfig, directoryInfo.FullName)
             };
         }
+
+        var fileInfo = new FileInfo(entryPath);
+        return new FileOpsEntrySummary
+        {
+            Name = fileInfo.Name,
+            FullPath = fileInfo.FullName,
+            Kind = FileOpsEntryKind.File,
+            Extension = fileInfo.Extension,
+            SizeBytes = fileInfo.Length,
+            LastModifiedAt = fileInfo.LastWriteTimeUtc,
+            TextPreview = attributes.HasFlag(FileAttributes.ReparsePoint)
+                ? FileOpsTextPreviewKind.Unavailable : FileOpsTextPreviewKind.Unknown,
+            IsHidden = pathPolicy.IsHidden(fileInfo),
+            IsReadOnly = pathPolicy.IsReadOnlyPath(runtimeConfig, fileInfo.FullName),
+            CanDownload = fileInfo.Length <= runtimeConfig.MaxDownloadFileSizeBytes,
+            CanEditText = !attributes.HasFlag(FileAttributes.ReparsePoint) &&
+                          fileInfo.Length <= runtimeConfig.MaxTextFileSizeBytes &&
+                          runtimeConfig.CanEditExtension(fileInfo.Extension) &&
+                          runtimeConfig.AllowWriteOperations &&
+                          !pathPolicy.IsReadOnlyPath(runtimeConfig, fileInfo.FullName),
+            CanDelete = runtimeConfig.AllowDeleteOperations && !pathPolicy.IsReadOnlyPath(runtimeConfig, fileInfo.FullName)
+        };
     }
 
     public async Task<FileOpsFileTextContent> ReadTextFileAsync(string path, CancellationToken cancellationToken = default)
