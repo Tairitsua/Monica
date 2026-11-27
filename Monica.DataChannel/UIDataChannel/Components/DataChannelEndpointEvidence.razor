@@ -1,0 +1,82 @@
+@using Monica.DataChannel.Abstractions.Communication
+@using Monica.Kafka
+@inject IStringLocalizer<DataChannelResource> L
+
+<div class="dc-tab-stack">
+    <div class="dc-ep-grid">
+        @Endpoint(Channel.Status.InnerEndpoint, true)
+        @Endpoint(Channel.Status.OuterEndpoint, false)
+    </div>
+</div>
+
+@code {
+    /// <summary>Gets or sets the channel whose endpoints are captured.</summary>
+    [Parameter, EditorRequired] public ChannelEvidence Channel { get; set; } = null!;
+
+    private RenderFragment Endpoint(PipelineComponentInfo endpoint, bool inner) => @<section class="dc-panel dc-ep-card">
+        <header class="dc-ep-head">
+            <div class="dc-ep-badges">
+                <span class="dc-pill @(inner ? "mo-vl-role--primary" : "mo-vl-role--info")">@L[inner ? "Design:Sheet:InnerLabel" : "Design:Sheet:OuterLabel"]</span>
+                @if (!inner)
+                {
+                    <span class="dc-transport mono mo-vl-role--info">@DataChannelVisual.Transport(endpoint)</span>
+                }
+                @if (endpoint.EndpointDirection is { } direction && direction != ConnectionDirection.None)
+                {
+                    <span class="dc-pill mo-vl-role--neutral">@L[direction switch
+                    {
+                        ConnectionDirection.Input => "Design:Sheet:DirTagInput",
+                        ConnectionDirection.Output => "Design:Sheet:DirTagOutput",
+                        _ => "Design:Sheet:DirTagBidi"
+                    }]</span>
+                }
+            </div>
+            <h3 class="mono">@endpoint.Name</h3>
+            <p class="dc-ep-fqn mono">@endpoint.TypeName</p>
+            @if (endpoint.IsTransient)
+            {
+                <p class="dc-ep-transient"><MoIcon Icon="@MoIcons.Zap" Size="14px" /><span>@L["Design:Sheet:TransientTag"]</span></p>
+            }
+        </header>
+        @if (endpoint.KafkaInput is { } input)
+        {
+            <div class="dc-kafka-box">
+                <h4>@L["Design:Sheet:KafkaTitle"]</h4>
+                @if (input.Consumer is { } snapshot)
+                {
+                    @foreach (var blocked in snapshot.BlockedPartitions)
+                    {
+                        <MoSemanticCallout Severity="MoVisualRole.Error" Title="@L["Design:Sheet:KafkaBlockedAlert", blocked.Partition, blocked.Offset.ToString("N0")]">
+                            @L["Design:Sheet:KafkaBlockedHelp"]
+                            <div class="mono">@blocked.Topic · @blocked.Reason</div>
+                        </MoSemanticCallout>
+                    }
+                }
+                <dl class="dc-key-values">
+                    <div><dt>@L["KafkaInput:FailurePolicy"]</dt><dd>@DataChannelPresentation.FailurePolicy(input, L)</dd></div>
+                    @if (input.Action == KafkaFailureAction.DeadLetter)
+                    {
+                        <div><dt>@L["KafkaInput:DeadLetterTopic"]</dt><dd class="mono">@input.DeadLetterTopic</dd></div>
+                    }
+                    @if (input.Consumer is { } consumer)
+                    {
+                        <div><dt>@L["KafkaInput:Processed"]</dt><dd class="mono">@consumer.ProcessedMessages.ToString("N0")</dd></div>
+                        <div><dt>@L["KafkaInput:Skipped"]</dt><dd class="mono">@consumer.SkippedMessages.ToString("N0")</dd></div>
+                        @if (input.Action == KafkaFailureAction.DeadLetter)
+                        {
+                            <div><dt>@L["KafkaInput:DeadLettered"]</dt><dd class="mono">@consumer.DeadLetteredMessages.ToString("N0")</dd></div>
+                        }
+                    }
+                    else
+                    {
+                        <div><dt>@L["KafkaInput:Counters"]</dt><dd>@L["KafkaInput:Unavailable"]</dd></div>
+                    }
+                </dl>
+            </div>
+        }
+        <div class="dc-ep-meta">
+            <h4>@L["Design:Sheet:MetadataTitle"]</h4>
+            <MetadataDisplay Metadata="endpoint.Metadata" />
+        </div>
+    </section>;
+}

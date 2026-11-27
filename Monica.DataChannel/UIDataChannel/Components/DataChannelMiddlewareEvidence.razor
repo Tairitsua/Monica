@@ -1,0 +1,109 @@
+@using System.Text.Json
+@using Monica.DataChannel.Models
+@using Monica.UI.Shared.Components.Json
+@using Monica.UI.Shared.Services
+@inject IStringLocalizer<DataChannelResource> L
+@inject MoTimeFormatter UiTime
+
+@{
+    var ordered = Channel.Configuration.Concat(Channel.Transforms).ToArray();
+    var selected = ordered.FirstOrDefault(c => c.ComponentKey == SelectedKey) ?? ordered.FirstOrDefault();
+}
+<div class="dc-tab-stack">
+    @if (selected is null)
+    {
+        <MoContentState Compact="true" Class="dc-empty">
+            <span class="mo-vl-tile mo-vl-role--neutral"><MoIcon Icon="@MoIcons.Layers" Size="18px" /></span>
+            <h2>@L["Design:Sheet:MwEmpty"]</h2><p>@L["Design:Sheet:NoTransforms"]</p>
+        </MoContentState>
+    }
+    else
+    {
+        <p class="dc-tab-help">@L["Design:Sheet:MwTableHelp"]</p>
+        <div class="dc-mw-list" role="list">
+            @foreach (var component in ordered)
+            {
+                var active = component.ComponentKey == selected.ComponentKey;
+                <div class="dc-mw-row @(active ? "is-selected" : null)" role="listitem" @key="component.ComponentKey">
+                    <button type="button" class="dc-mw-select" aria-pressed="@(active ? "true" : "false")"
+                            @onclick="() => OnSelectMiddleware.InvokeAsync(component.ComponentKey)">
+                        <span class="dc-mw-stage mono mo-vl-role--third">@L[component.Stage == PipelineComponentStage.Transform ?
+                            "Design:Sheet:MwStageTransform" : "Design:Sheet:MwStageConfig"] @(component.Ordinal + 1)</span>
+                        <span class="dc-mw-ident">
+                            <b class="mono">@component.Name</b>
+                            <small>@L[$"Pipeline:ComponentKinds:{DataChannelPresentation.KindKey(component.Type)}"]
+                                @if (component.IsTransient) { <text> · @L["Design:Sheet:TransientTag"]</text> }
+                            </small>
+                        </span>
+                    </button>
+                    @if (component.CanDebugMessages)
+                    {
+                        <div class="dc-mw-row-actions">
+                            <button type="button" class="btn btn-sm @(component.IsDebuggerActive ? "btn-soft mo-vl-role--info" : "btn-outline")"
+                                    @onclick="() => OnOpenDebugger.InvokeAsync(component.ComponentKey)">
+                                <MoIcon Icon="@MoIcons.Bug" Size="14px" />
+                                <span>@L["Design:Sheet:OpenDebugger"]@if (component.IsDebuggerActive) { <text> · @L["Design:Sheet:DebuggerRunning"]</text> }</span>
+                            </button>
+                        </div>
+                    }
+                </div>
+            }
+        </div>
+        <section class="dc-panel dc-mw-evidence" @key="selected.ComponentKey">
+            <header class="dc-panel-head">
+                <h3 class="mono">@selected.TypeName</h3>
+                <p>@L["Design:Sheet:FrozenNote", UiTime.Format(selected.CapturedAt)]</p>
+            </header>
+            @if (selected.InfoDictionary is { Count: > 0 } info)
+            {
+                <div class="dc-mw-info">
+                    <h4>@L["Design:Sheet:MwInfoTitle"]</h4>
+                    <dl class="dc-key-values">
+                        @foreach (var (key, value) in info)
+                        {
+                            <div>
+                                <dt>@key</dt>
+                                <dd class="mono">
+                                    @if (value.CaptureError is { } error)
+                                    {
+                                        <span class="dc-info-error" title="@error">@L["Metadata:CaptureFailed"]</span>
+                                    }
+                                    else
+                                    {
+                                        @ReadValue(value.Json)
+                                    }
+                                </dd>
+                            </div>
+                        }
+                    </dl>
+                </div>
+            }
+            <div class="dc-ep-meta">
+                <h4>@L["Design:Sheet:MetadataTitle"]</h4>
+                <MetadataDisplay Metadata="selected.Metadata" />
+            </div>
+        </section>
+    }
+</div>
+
+@code {
+    /// <summary>Gets or sets the channel's configured middleware capture.</summary>
+    [Parameter, EditorRequired] public ChannelEvidence Channel { get; set; } = null!;
+    /// <summary>Gets or sets the selected opaque registration key.</summary>
+    [Parameter] public string? SelectedKey { get; set; }
+    /// <summary>Reports a change in the selected middleware.</summary>
+    [Parameter] public EventCallback<string> OnSelectMiddleware { get; set; }
+    /// <summary>Opens the debugger for the selected persistent middleware.</summary>
+    [Parameter] public EventCallback<string> OnOpenDebugger { get; set; }
+
+    private RenderFragment ReadValue(string? json)
+    {
+        if (json is null) return @<span>@L["Design:None"]</span>;
+        using var document = JsonDocument.Parse(json);
+        var value = document.RootElement;
+        if (value.ValueKind is JsonValueKind.Array or JsonValueKind.Object)
+            return @<MoJson Value="@json" AllowPlainText="true" ShowLineNumbers="false" />;
+        var display = value.ValueKind == JsonValueKind.String ? value.GetString() : json;
+        return @<span>@display</span>;
+    }
+}

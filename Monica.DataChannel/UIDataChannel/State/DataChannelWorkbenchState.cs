@@ -40,7 +40,8 @@ public sealed class DataChannelWorkbenchState(DataChannelFacade facade, ILogger<
             HasAttemptedCapture = true;
             try
             {
-                var result = await facade.GetManagementSnapshotAsync(cancellationToken);
+                // The detached facade reads synchronous provider metadata. Keep it off the circuit renderer.
+                var result = await Task.Run(() => facade.GetManagementSnapshotAsync(cancellationToken), cancellationToken);
                 cancellationToken.ThrowIfCancellationRequested();
                 if (result.IsFailure())
                 {

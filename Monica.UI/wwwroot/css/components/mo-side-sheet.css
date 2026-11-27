@@ -81,6 +81,9 @@
     font-weight: 600;
 }
 .mo-side-sheet--inset-header .mo-side-sheet-tabs .mud-tab.mud-disabled { color: var(--mud-palette-text-disabled); }
+.mo-side-sheet--inset-header.mo-side-sheet--wrap-tabs .mud-tabs-tabbar-wrapper { width: 100%; flex-wrap: wrap; transform: none !important; }
+.mo-side-sheet--inset-header.mo-side-sheet--wrap-tabs .mud-tabs-tabbar-content { min-width: 0; width: 100%; }
+.mo-side-sheet--inset-header.mo-side-sheet--wrap-tabs .mud-tabs-scroll-button { display: none; }
 .mo-side-sheet--inset-header .mo-side-sheet-tabs > .mud-tabs-panels { display: grid; grid-template-rows: minmax(0, 1fr); padding: 0; overflow: hidden; }
 /* The native tab panel defaults to display: contents. It needs a box to own scroll position. */
 .mo-side-sheet--inset-header :is(.mo-side-sheet-body,

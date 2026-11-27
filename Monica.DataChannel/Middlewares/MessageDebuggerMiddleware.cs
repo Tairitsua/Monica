@@ -13,6 +13,7 @@ namespace Monica.DataChannel.Middlewares;
 /// </summary>
 public class MessageDebuggerMiddleware : PipelineInfoDisplayMiddlewareBase
 {
+    internal const string SampleMetadataKey = "DataChannel.DebugSample";
     /// <summary>
     /// Represents the legacy live debug message view. Raw payload and nested metadata values may be mutable.
     /// </summary>
@@ -143,11 +144,23 @@ public class MessageDebuggerMiddleware : PipelineInfoDisplayMiddlewareBase
     /// </summary>
     public override ChannelDataContext Pass(ChannelDataContext context)
     {
-        if (!IsActive)
-        {
-            return context;
-        }
+        TryCapture(context);
+        return context;
+    }
 
+    // The review command exercises the same filter, formatter and queue without dispatching a message.
+    internal bool CaptureSample()
+    {
+        var sample = new ChannelDataContext(ChannelSide.Inner, new DebugCaptureSample(true, FilterKeyword));
+        ((IDictionary<string, object?>)sample.Metadata)[SampleMetadataKey] = true;
+        return TryCapture(sample);
+    }
+
+    private sealed record DebugCaptureSample(bool Sample, string Keyword);
+
+    private bool TryCapture(ChannelDataContext context)
+    {
+        if (!IsActive) return false;
         try
         {
             var formattedContent = FormatMessage(context.Data);
@@ -166,7 +179,7 @@ public class MessageDebuggerMiddleware : PipelineInfoDisplayMiddlewareBase
 
                 var metadata = new ReadOnlyDictionary<string, DataChannelValueSnapshot>(context.Metadata
                     .ToDictionary(entry => entry.Key, entry => DataChannelValueSnapshot.Capture(entry.Value), StringComparer.Ordinal));
-                AddDebugMessage(debugMessage, DataChannelValueSnapshot.Capture(context.Data), metadata);
+                return AddDebugMessage(debugMessage, DataChannelValueSnapshot.Capture(context.Data), metadata);
             }
         }
         catch (Exception ex)
@@ -174,7 +187,7 @@ public class MessageDebuggerMiddleware : PipelineInfoDisplayMiddlewareBase
             CollectException(ex, this, "Message debugging failed.");
         }
 
-        return context;
+        return false;
     }
 
     /// <summary>
@@ -227,11 +240,12 @@ public class MessageDebuggerMiddleware : PipelineInfoDisplayMiddlewareBase
     /// <summary>
     /// Adds a debug message to the queue.
     /// </summary>
-    private void AddDebugMessage(DebugMessage message, DataChannelValueSnapshot payload,
+    private bool AddDebugMessage(DebugMessage message, DataChannelValueSnapshot payload,
         IReadOnlyDictionary<string, DataChannelValueSnapshot> metadata)
     {
         lock (_queueLock)
         {
+            if (!_isActive) return false;
             var snapshot = new DebugMessageSnapshot(++_messageSequence, message.Timestamp, message.Source,
                 message.FormattedContent, message.MessageType, payload, metadata);
             _debugMessages.Enqueue((message, snapshot));
@@ -240,6 +254,7 @@ public class MessageDebuggerMiddleware : PipelineInfoDisplayMiddlewareBase
             var count = _debugMessages.Count;
             SetInfo("Captured message count", count);
             SetInfo("Last captured at", message.Timestamp);
+            return true;
         }
     }
 

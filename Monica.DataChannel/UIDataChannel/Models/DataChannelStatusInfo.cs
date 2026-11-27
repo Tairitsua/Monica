@@ -48,6 +48,9 @@ public class DataChannelStatusInfo
     /// Indicates whether the channel is currently initializing.
     /// </summary>
     public bool IsInitializing { get; set; }
+
+    /// <summary>Gets or sets the latest failed local initialization message, independent of retained history.</summary>
+    public string? InitializationError { get; set; }
     
     /// <summary>
     /// Indicates whether the captured history retains any exception records.

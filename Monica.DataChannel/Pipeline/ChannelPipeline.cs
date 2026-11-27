@@ -24,6 +24,7 @@ public class ChannelPipeline : IObservableInstance
     private bool _isInitialized;
     private bool _isInitializing;
     private bool _isNotAvailable;
+    private string? _initializationError;
     private bool _isDisposed;
     private Task? _disposalTask;
     private IRoleHealthStateProvider? _roleHealth;
@@ -80,7 +81,14 @@ public class ChannelPipeline : IObservableInstance
     public bool IsNotAvailable
     {
         get { lock (_initializationGate) return _isNotAvailable; }
-        set { lock (_initializationGate) _isNotAvailable = value; }
+        set
+        {
+            lock (_initializationGate)
+            {
+                _isNotAvailable = value;
+                _initializationError = null;
+            }
+        }
     }
 
     /// <summary>
@@ -257,9 +265,9 @@ public class ChannelPipeline : IObservableInstance
         }
     }
 
-    internal (bool IsInitialized, bool IsInitializing, bool IsNotAvailable) CaptureInitializationState()
+    internal (bool IsInitialized, bool IsInitializing, bool IsNotAvailable, string? Error) CaptureInitializationState()
     {
-        lock (_initializationGate) return (_isInitialized, _isInitializing, _isNotAvailable);
+        lock (_initializationGate) return (_isInitialized, _isInitializing, _isNotAvailable, _initializationError);
     }
 
     /// <summary>
@@ -401,9 +409,11 @@ public class ChannelPipeline : IObservableInstance
                 throw new InvalidOperationException($"Data channel '{Id}' is already initializing.");
             _isInitializing = true;
             _isInitialized = false;
+            _initializationError = null;
         }
         var completed = false;
         var lifecycleEntered = false;
+        string? initializationError = null;
         try
         {
             await _lifecycleLock.WaitAsync(cancellationToken);
@@ -444,6 +454,11 @@ public class ChannelPipeline : IObservableInstance
                 throw;
             }
         }
+        catch (Exception exception)
+        {
+            initializationError = exception.Message;
+            throw;
+        }
         finally
         {
             lock (_initializationGate)
@@ -451,6 +466,7 @@ public class ChannelPipeline : IObservableInstance
                 _isInitialized = completed;
                 _isNotAvailable = !completed;
                 _isInitializing = false;
+                _initializationError = initializationError;
             }
             if (lifecycleEntered) _lifecycleLock.Release();
         }
@@ -478,6 +494,7 @@ public class ChannelPipeline : IObservableInstance
                 ObjectDisposedException.ThrowIf(_isDisposed, this);
                 _isInitialized = false;
                 _isNotAvailable = true;
+                _initializationError = null;
             }
             List<Exception>? failures = null;
             foreach (var endpoint in GetEndpoints().Reverse().OfType<ICommunicationEndpoint>())

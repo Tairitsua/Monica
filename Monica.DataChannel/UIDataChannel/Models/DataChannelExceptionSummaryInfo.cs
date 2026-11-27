@@ -77,4 +77,6 @@ public class DataChannelExceptionSummaryItem
     /// Timestamp of the latest retained exception, or null after all exception evidence is cleared or trimmed.
     /// </summary>
     public DateTime? LatestException { get; set; }
+
+    internal IReadOnlyList<(string Type, string Message)> RetainedSearchText { get; init; } = [];
 }

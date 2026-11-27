@@ -1,0 +1,19 @@
+@inject IStringLocalizer<DataChannelResource> L
+
+<span class="dc-state is-compact @DataChannelVisual.InitRole(State).ToCssClass()">
+    <MoIcon Icon="@Icon" Class="@(State == "Initializing" ? "dc-spin" : null)" Size="13px" />
+    <span>@L[$"Channel:States:{State}"]</span>
+</span>
+
+@code {
+    /// <summary>Gets or sets the initialization state from the detached channel capture.</summary>
+    [Parameter, EditorRequired] public string State { get; set; } = "NotInitialized";
+
+    private string Icon => State switch
+    {
+        "Initializing" => MoIcons.Refresh,
+        "Unavailable" => MoIcons.Error,
+        "Initialized" => MoIcons.Success,
+        _ => MoIcons.Circle
+    };
+}

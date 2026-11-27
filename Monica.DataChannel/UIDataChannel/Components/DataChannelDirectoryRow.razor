@@ -1,0 +1,107 @@
+@inject IStringLocalizer<DataChannelResource> L
+
+@{
+    var id = Channel.Id;
+    var pipeline = Query.Open(id).Url(false);
+    var endpoint = Channel.Status.OuterEndpoint;
+    var inner = Channel.Status.InnerEndpoint;
+    var debugger = Channel.Debugger;
+    var hasMiddleware = Channel.Status.Middlewares.Count > 0;
+}
+<tr class="dc-ch-row @(Channel.NeedsAttention ? "is-attention" : null)">
+    <td data-label="@L["Design:Cols:Channel"]">
+        <div class="dc-cell-channel">
+            <a class="dc-link mono" href="@pipeline">@id</a>
+            <span class="dc-sub">
+                <span>@(Channel.Group ?? L["Workbench:Ungrouped"].Value)</span>
+                @if (Query.Flat && Channel.Setup?.Owner is { } owner)
+                {
+                    <span class="dot-sep" aria-hidden="true"></span><span class="mono">@DataChannelVisual.ShortOwner(owner)</span>
+                }
+            </span>
+        </div>
+    </td>
+    <td data-label="@L["Design:Cols:Conduit"]">
+        <div class="dc-conduit-cell">
+            <a class="dc-conduit-btn" href="@pipeline" title="@MiddlewareHint" aria-label="@L["Design:InspectChannel", id]">
+                <span class="dc-ep-node is-inner" title="@inner.TypeName">
+                    <span class="dc-ep-tag mo-vl-role--primary">@L["Design:InnerShort"]</span>
+                    <span class="mono">@(inner.Name == "DefaultChannelEndpoint" ? L["Design:DefaultEndpointShort"].Value : DataChannelVisual.EndpointName(inner))</span>
+                </span>
+                <span class="dc-bridge">
+                    <span class="dc-bridge-line" aria-hidden="true"></span>
+                    <span class="dc-bridge-pill @(hasMiddleware ? "mo-vl-role--third" : "mo-vl-role--neutral")">
+                        <MoIcon Icon="@DataChannelVisual.DirectionIcon(Channel.Direction)" Size="13px" />
+                        <span>@ConduitLabel</span>
+                        @if (debugger?.IsDebuggerActive == true)
+                        {
+                            <span class="dc-bridge-dot mo-vl-role--info" title="@L["Design:BlueprintDebugLive"]"></span>
+                        }
+                    </span>
+                    <span class="dc-bridge-line" aria-hidden="true"></span>
+                </span>
+                <span class="dc-ep-node is-outer mo-vl-role--info" title="@endpoint.TypeName">
+                    <MoIcon Icon="@DataChannelVisual.TransportIcon(endpoint)" Size="13px" /><span class="mono">@DataChannelVisual.Transport(endpoint)</span>
+                </span>
+            </a>
+            @if (debugger?.IsDebuggerActive == true)
+            {
+                <a href="@Query.Open(id, "middleware", debugger.ComponentKey, debugger: true).Url(false)" class="dc-pill is-btn mo-vl-role--info dc-live-dbg">
+                    <MoIcon Icon="@MoIcons.Bug" Size="12px" />@L["Design:BlueprintDebugLive"]
+                </a>
+            }
+        </div>
+    </td>
+    <td data-label="@L["Design:Cols:Init"]">
+        <div class="dc-cell-init">
+            <DataChannelInitBadge State="@Channel.Initialization" />
+            @if (Channel.Blocked.FirstOrDefault() is { } blocked)
+            {
+                <a class="dc-pill is-btn mo-vl-role--error mono" href="@Query.Open(id, "endpoints").Url(false)"
+                   title="@L["KafkaInput:Offset", blocked.Offset]">@L["Design:BlueprintBlockedShort", blocked.Partition]</a>
+            }
+        </div>
+    </td>
+    <td data-label="@L["Design:Cols:Retained"]">
+        <DataChannelPoolCell Channel="Channel" Href="@Query.Open(id, "exceptions").Url(false)" Directory="true" />
+    </td>
+    <td data-label="@L["Design:Cols:Lifetime"]" class="is-num">
+        <div class="dc-life-cell">
+            <b class="mono">@Channel.Lifetime.ToString("N0")</b>
+            @if (Channel.Trimmed > 0) { <small class="dc-evicted-note">@L["Design:ExEvictedSub", Channel.Trimmed]</small> }
+        </div>
+    </td>
+    <td data-label="@L["Design:Cols:Actions"]" class="is-end">
+        <div class="dc-row-actions">
+            <a href="@pipeline" class="btn btn-soft btn-sm mo-vl-role--primary">@L["Channel:Actions:Inspect"]</a>
+            <a class="icon-btn" href="@(new DataChannelQuery { Channel = id }.Url(true))" title="@L["Design:OpenExceptionsRoute"]"
+               aria-label="@L["Design:OpenExceptionsRoute"]"><MoIcon Icon="@MoIcons.Warning" Size="15px" /></a>
+            <button type="button" class="icon-btn" title="@L["Channel:Actions:Reinitialize"]" aria-label="@L["Channel:Actions:Reinitialize"]"
+                    disabled="@(!Channel.CanReinitialize || IsBusy)" @onclick="() => OnReinitialize.InvokeAsync(id)">
+                <MoIcon Icon="@MoIcons.Refresh" Size="15px" />
+            </button>
+            <button type="button" class="icon-btn" title="@L["Design:ClearHistoryBtn"]" aria-label="@L["Design:ClearHistoryBtn"]"
+                    disabled="@IsBusy" @onclick="() => OnClear.InvokeAsync(id)"><MoIcon Icon="@MoIcons.ClearList" Size="15px" /></button>
+        </div>
+    </td>
+</tr>
+
+@code {
+    /// <summary>Gets or sets the channel and owning setup to display.</summary>
+    [Parameter, EditorRequired] public ChannelEvidence Channel { get; set; } = null!;
+    /// <summary>Gets or sets the URL state preserved when opening evidence.</summary>
+    [Parameter, EditorRequired] public DataChannelQuery Query { get; set; } = new();
+    /// <summary>Disables channel commands while the owner is busy.</summary>
+    [Parameter] public bool IsBusy { get; set; }
+    /// <summary>Requests a channel reinitialization.</summary>
+    [Parameter] public EventCallback<string> OnReinitialize { get; set; }
+    /// <summary>Requests confirmation to clear the channel's history.</summary>
+    [Parameter] public EventCallback<string> OnClear { get; set; }
+
+    private string MiddlewareHint => Channel.Status.Middlewares.Count == 0 ? L["Design:DirectBridge"].Value :
+        string.Join(" → ", Channel.Configuration.Select(c => $"C{c.Ordinal + 1} {c.Name}")
+            .Concat(Channel.Transforms.Select(c => $"T{c.Ordinal + 1} {c.Name}")));
+    private string ConduitLabel => Channel.Status.Middlewares.Count == 0 ? L["Design:DirectShort"].Value :
+        Channel.Configuration.Count == 0 ? L["Design:TfBadge", Channel.Transforms.Count].Value :
+        $"{L["Design:CfgBadge", Channel.Configuration.Count]} · {L["Design:TfBadge", Channel.Transforms.Count]}";
+}

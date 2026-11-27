@@ -232,6 +232,7 @@ public class DataChannelFacade(IDataChannelManager manager, ILogger<DataChannelF
             IsInitialized = initialization.IsInitialized,
             IsInitializing = initialization.IsInitializing,
             IsNotAvailable = initialization.IsNotAvailable,
+            InitializationError = initialization.Error,
             HasExceptions = retainedExceptions > 0,
             ExceptionCount = retainedExceptions,
             TotalExceptionCount = tracker.TotalExceptions
@@ -251,7 +252,8 @@ public class DataChannelFacade(IDataChannelManager manager, ILogger<DataChannelF
             TotalExceptionCount = tracker.TotalExceptions,
             MaxPoolSize = tracker.MaxHistorySize,
             HasExceptions = exceptions.Count > 0,
-            LatestException = exceptions.Count > 0 ? exceptions.Max(entry => entry.Timestamp) : null
+            LatestException = exceptions.Count > 0 ? exceptions.Max(entry => entry.Timestamp) : null,
+            RetainedSearchText = exceptions.Select(entry => (entry.Exception!.TypeName, entry.Exception.Message)).ToArray()
         };
     }
 

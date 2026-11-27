@@ -1,12 +1,18 @@
 @inject IStringLocalizer<DataChannelResource> L
 
-<MudDialog>
-    <DialogContent>
-        <div class="history-confirmation">
-            <div class="history-confirmation__intro">
-                <MoIcon Icon="@MoIcons.ClearList" Size="2.25rem" Style="color:var(--mud-palette-warning);" />
+<MudDialog DefaultFocus="DefaultFocus.None" Gutters="false">
+    <TitleContent>
+        <div class="history-confirmation__intro">
+            <span class="mo-vl-tile mo-vl-role--warning"><MoIcon Icon="@MoIcons.ClearList" Size="16px" /></span>
+            <div>
+                <h2>@L["Workbench:ClearHistoryTitle"]</h2>
                 <p>@L["ClearHistory:Description"]</p>
             </div>
+            <MudIconButton Icon="@MoIcons.Close" Size="Size.Small" OnClick="Cancel" aria-label="@L["Design:Close"]" />
+        </div>
+    </TitleContent>
+    <DialogContent>
+        <div class="history-confirmation">
             <div class="history-confirmation__identity">
                 <span>@L["Exceptions:Columns:ChannelId"]</span>
                 <code>@ChannelId</code>
@@ -17,8 +23,8 @@
     </DialogContent>
     <DialogActions>
         <div class="history-confirmation-actions">
-            <MudButton OnClick="Cancel">@L["Common:Actions:Cancel"]</MudButton>
-            <MudButton Color="Color.Error" Variant="Variant.Outlined" StartIcon="@MoIcons.ClearList" OnClick="Confirm">@L["ClearHistory:Confirm"]</MudButton>
+            <MudButton @ref="_cancel" Variant="Variant.Outlined" OnClick="Cancel">@L["Common:Actions:Cancel"]</MudButton>
+            <MudButton Color="Color.Error" Variant="Variant.Filled" StartIcon="@MoIcons.ClearList" OnClick="Confirm">@L["ClearHistory:Confirm"]</MudButton>
         </div>
     </DialogActions>
 </MudDialog>
@@ -28,6 +34,15 @@
     /// <summary>Gets or sets the exact channel identity being confirmed; this dialog does not mutate host history.</summary>
     [Parameter, EditorRequired]
     public string ChannelId { get; set; } = string.Empty;
+
+    private MudButton? _cancel;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender || _cancel is null) return;
+        try { await _cancel.FocusAsync(); }
+        catch (JSDisconnectedException) { }
+    }
 
     private void Cancel() => Dialog.Cancel();
     private void Confirm() => Dialog.Close(DialogResult.Ok(true));

@@ -1,201 +1,255 @@
-@using Monica.DataChannel.UIDataChannel.Models
-@using Monica.DataChannel.UIDataChannel.Support
+@using Monica.Core.TypeDiscovery.Abstractions
+@using Monica.DataChannel.Models
 @inject IStringLocalizer<DataChannelResource> L
-@implements IDisposable
 
-<section class="channel-directory" aria-labelledby="channel-directory-title">
-    <header class="directory-heading">
-        <div>
-            <span>@L["Directory:Eyebrow"]</span>
-            <h2 id="channel-directory-title">@L["Directory:Title"]</h2>
+@{
+    var rows = View.DirectoryRows(Query).ToArray();
+    var bySetup = rows.ToLookup(c => c.Setup?.Id, StringComparer.Ordinal);
+    var setups = View.Setups.Where(s => bySetup.Contains(s.Id) || DataChannelView.ShowEmptySetup(s, Query)).ToArray();
+    var facet = View.DirectoryRows(Query, ignoreState: true).ToArray();
+    var hasFilters = Query.Setup is not null || Query.Group is not null || Query.State is not null || Query.Evidence is not null || !string.IsNullOrWhiteSpace(Query.Search);
+    var missingExact = Query.Channel is not null && !View.ById.ContainsKey(Query.Channel);
+}
+<section class="mo-vl-surface dc-dir" aria-labelledby="dc-dir-title">
+    <header class="mo-vl-surface-heading dc-dir-head">
+        <span class="mo-vl-tile mo-vl-role--primary"><MoIcon Icon="@MoIcons.Route" Size="16px" /></span>
+        <div class="surface-title">
+            <h2 id="dc-dir-title">@L["Design:DirUnifiedTitle"]</h2>
+            <p>@L["Design:DirUnifiedDesc"]</p>
         </div>
-        <p>@L["Directory:Shown", FilteredRows.Count, Channels.Count]</p>
+        <div class="dc-dir-head-end">
+            <span class="count mono">@L["Design:DirShown", rows.Length, View.Total]</span>
+            <div class="mo-vl-segment dc-view-seg" role="group" aria-label="@L["Design:ViewModeLabel"]">
+                <button type="button" aria-pressed="@Pressed(!Query.Flat)" @onclick="() => Change(Query with { Flat = false })">
+                    <MoIcon Icon="@MoIcons.Layers" Size="14px" />@L["Design:ViewBySetup"]
+                </button>
+                <button type="button" aria-pressed="@Pressed(Query.Flat)" @onclick="() => Change(Query with { Flat = true })">
+                    <MoIcon Icon="@MoIcons.List" Size="14px" />@L["Design:ViewFlat"]
+                </button>
+            </div>
+        </div>
     </header>
-    @if (!string.IsNullOrEmpty(ChannelId))
+
+    @if (Query.Channel is { } exact)
     {
-        <div class="directory-exact">
-            <span>@L["Directory:ExactChannel"]</span>
-            <code>@ChannelId</code>
-            <a href="/datachannel-manage">@L["Directory:ShowAllChannels"]</a>
+        <div class="dc-exact">
+            <MoIcon Icon="@MoIcons.Crosshair" Size="15px" /><span>@L["Design:ExactChannel"]</span><code class="mono">@exact</code>
+            <button type="button" class="btn btn-soft btn-sm mo-vl-role--primary" @onclick="ClearScope">@L["Design:ShowAllChannels"]</button>
         </div>
     }
-    <div class="directory-query">
-        <div class="directory-query__search">
-            <MudTextField T="string" @ref="_searchField" @bind-Value="_query" Immediate="true" Label="@L["Directory:Search"]" Placeholder="@L["Directory:SearchPlaceholder"]" Variant="Variant.Outlined" Margin="Margin.Dense" Adornment="Adornment.Start" AdornmentIcon="@MoIcons.Search" Clearable="true" ClearIcon="@MoIcons.Close" />
+
+    <div class="dc-toolbar">
+        <div class="dc-search">
+            <MoIcon Icon="@MoIcons.Search" Size="15px" />
+            <input type="search" value="@Query.Search" placeholder="@L["Design:SearchPlaceholder"]" aria-label="@L["Design:SearchLabel"]"
+                   @oninput="e => Change(Query with { Search = Filter(e.Value?.ToString()) })" />
+            @if (!string.IsNullOrEmpty(Query.Search))
+            {
+                <button type="button" class="icon-btn" aria-label="@L["Design:ClearSearch"]" @onclick="() => Change(Query with { Search = null })">
+                    <MoIcon Icon="@MoIcons.Close" Size="14px" />
+                </button>
+            }
         </div>
-        <div class="directory-query__group">
-            <MudSelect T="string" @bind-Value="_group" Label="@L["Directory:Group"]" Variant="Variant.Outlined" Margin="Margin.Dense" OpenIcon="@MoIcons.ChevronDown" CloseIcon="@MoIcons.ChevronUp">
-                <MudSelectItem Value="@("all")">@L["Directory:AllGroups"]</MudSelectItem>
+        <MudSelect T="string" Class="dc-select dc-select-setup" Value="@(Query.Setup ?? string.Empty)" ValueChanged="value => Change(Query with { Setup = Filter(value) })"
+                   Variant="Variant.Outlined" Margin="Margin.Dense" Dense="true" aria-label="@L["Design:SetupFilterLabel"]">
+            <MudSelectItem Value="@string.Empty">@L["Design:AllSetups"]</MudSelectItem>
+            @foreach (var setup in View.Setups)
+            {
+                <MudSelectItem Value="@setup.Id">@(setup.Owner is { } owner ? DataChannelVisual.ShortOwner(owner) : L["Design:HostInfra"].Value)</MudSelectItem>
+            }
+        </MudSelect>
+        <MudSelect T="string" Class="dc-select dc-select-group" Value="@(Query.Group ?? string.Empty)" ValueChanged="value => Change(Query with { Group = Filter(value) })"
+                   Variant="Variant.Outlined" Margin="Margin.Dense" Dense="true" aria-label="@L["Design:GroupLabel"]">
+            <MudSelectItem Value="@string.Empty">@L["Design:AllGroups"]</MudSelectItem>
+            @if (View.Channels.Any(c => c.Group is null))
+            {
                 <MudSelectItem Value="@("ungrouped")">@L["Workbench:Ungrouped"]</MudSelectItem>
-                @foreach (var group in Groups)
-                {
-                    <MudSelectItem Value="@("group:" + group)">@group</MudSelectItem>
-                }
-            </MudSelect>
-        </div>
-        <MudButton Variant="Variant.Text" Size="Size.Small" OnClick="ClearFiltersAsync">@L["Directory:Reset"]</MudButton>
-    </div>
-    <div class="directory-state-filters" aria-label="@L["Directory:InitializationFilters"]">
-        @foreach (var state in InitializationStates)
+            }
+            @foreach (var group in View.Channels.Select(c => c.Group).OfType<string>().Distinct().Order())
+            {
+                <MudSelectItem Value="@group">@group</MudSelectItem>
+            }
+        </MudSelect>
+        <MudSelect T="string" Class="dc-select dc-select-evidence" Value="@(Query.Evidence ?? string.Empty)" ValueChanged="value => Change(Query with { Evidence = Filter(value) })"
+                   Variant="Variant.Outlined" Margin="Margin.Dense" Dense="true" aria-label="@L["Design:EvidenceLabel"]">
+            <MudSelectItem Value="@string.Empty">@L["Design:EvidenceAll"]</MudSelectItem>
+            <MudSelectItem Value="@("retained")">@L["Design:EvidenceRetained"]</MudSelectItem>
+            <MudSelectItem Value="@("historical")">@L["Design:EvidenceHistorical"]</MudSelectItem>
+            <MudSelectItem Value="@("clean")">@L["Design:EvidenceClean"]</MudSelectItem>
+        </MudSelect>
+        <MudSelect T="string" Class="dc-select dc-select-order" Value="@(Query.Sort ?? string.Empty)" ValueChanged="value => Change(Query with { Sort = Filter(value) })"
+                   Variant="Variant.Outlined" Margin="Margin.Dense" Dense="true" aria-label="@L["Design:SortLabel"]">
+            <MudSelectItem Value="@string.Empty">@L["Design:Sorts:Attention"]</MudSelectItem>
+            <MudSelectItem Value="@("retained")">@L["Design:Sorts:Retained"]</MudSelectItem>
+            <MudSelectItem Value="@("lifetime")">@L["Design:Sorts:Lifetime"]</MudSelectItem>
+            <MudSelectItem Value="@("name")">@L["Design:Sorts:Name"]</MudSelectItem>
+        </MudSelect>
+        @if (hasFilters)
         {
-            <MudButton data-state="@state" aria-pressed="@(_state == state ? "true" : "false")" OnClick="() => _state = state">
-                <span class="directory-state-dot" aria-hidden="true">
-                </span>
-                <span>@L[state == "All" ? "Directory:AllStates" : $"Channel:States:{state}"]</span>
-                <span class="directory-state-count">@StateCount(state)</span>
-            </MudButton>
+            <button type="button" class="btn btn-ghost btn-sm" @onclick="Reset">@L["Design:ResetFilters"]</button>
         }
     </div>
-    <div class="directory-table">
-        <MudTable T="DirectoryRow" Items="FilteredRows" Square="true" Elevation="0" Hover="true" Dense="true" Breakpoint="Breakpoint.Xs" RowsPerPage="10">
-            <HeaderContent>
-                <MudTh>@L["Directory:Columns:Channel"]</MudTh>
-                <MudTh>@L["Directory:Columns:Endpoints"]</MudTh>
-                <MudTh>@L["Directory:Columns:Middleware"]</MudTh>
-                <MudTh>@L["Directory:Columns:Initialization"]</MudTh>
-                <MudTh>@L["Directory:Columns:Exceptions"]</MudTh>
-                <MudTh>@L["Common:Columns:Actions"]</MudTh>
-            </HeaderContent>
-            <RowTemplate>
-                @{
-                    var channel = context.Capture;
-                }
-                <MudTd DataLabel="@L["Directory:Columns:Channel"]">
-                    <div class="channel-cell">
-                        <code>@channel.Id</code>
-                        <span>@DataChannelPresentation.Group(channel.GroupId, L)</span>
-                    </div>
-                </MudTd>
-                <MudTd DataLabel="@L["Directory:Columns:Endpoints"]">
-                    <div class="endpoint-cell">
-                        <span>
-                            <small>@L["PipelineInspector:Inner"]</small>
-                            <code title="@channel.InnerEndpoint.TypeName">@channel.InnerEndpoint.Name</code>
-                        </span>
-                        <span>
-                            <small>@L["PipelineInspector:Outer"]</small>
-                            <code title="@channel.OuterEndpoint.TypeName">@channel.OuterEndpoint.Name</code>
-                        </span>
-                    </div>
-                </MudTd>
-                <MudTd DataLabel="@L["Directory:Columns:Middleware"]">
-                    <span class="directory-number">@channel.Middlewares.Count</span>
-                </MudTd>
-                <MudTd DataLabel="@L["Directory:Columns:Initialization"]">
-                    <span class="channel-state" data-state="@DataChannelPresentation.Initialization(channel)">
-                        <MoIcon Icon="@DataChannelPresentation.InitializationIcon(channel)" Size="1.25rem" />@L[$"Channel:States:{DataChannelPresentation.Initialization(channel)}"]</span>
-                </MudTd>
-                <MudTd DataLabel="@L["Directory:Columns:Exceptions"]">
-                    <MudButton Class="retained-count" data-attention="@(channel.ExceptionCount > 0 ? "true" : "false")" Disabled="@IsBusy(channel.Id)" OnClick="() => OnViewExceptions.InvokeAsync(channel.Id)" aria-label="@L["Directory:InspectExceptionsFor", channel.Id]">@channel.ExceptionCount</MudButton>
-                </MudTd>
-                <MudTd DataLabel="@L["Common:Columns:Actions"]">
-                    <div class="directory-actions">
-                        <MudButton Variant="Variant.Text" Color="Color.Primary" Size="Size.Small" OnClick="() => OnInspect.InvokeAsync(channel)" aria-label="@L["Directory:InspectPipelineFor", channel.Id]">@L["Channel:Actions:Inspect"]</MudButton>
-                        <MudMenu Icon="@MoIcons.MoreVertical" Size="Size.Small" AriaLabel="@L["Channel:Actions:OpenMenu", channel.Id]">
-                            <MudMenuItem Icon="@MoIcons.Refresh" Disabled="@IsBusy(channel.Id)" OnClick="() => OnReinitialize.InvokeAsync(channel.Id)">@L["Channel:Actions:Reinitialize"]</MudMenuItem>
-                            <MudMenuItem Icon="@MoIcons.Error" Disabled="@IsBusy(channel.Id)" OnClick="() => OnViewExceptions.InvokeAsync(channel.Id)">@L["Channel:Actions:ViewExceptions"]</MudMenuItem>
-                            <MudMenuItem Icon="@MoIcons.ClearList" Disabled="@IsBusy(channel.Id)" OnClick="() => OnClear.InvokeAsync(channel.Id)">@L["Channel:Actions:ClearHistory"]</MudMenuItem>
-                        </MudMenu>
-                    </div>
-                </MudTd>
-            </RowTemplate>
-            <NoRecordsContent>
-                <div class="directory-empty">
-                    <MoIcon Icon="@MoIcons.Workflow" Size="2.25rem" />
-                    <h3>@L[MissingChannel ? "Directory:MissingChannel" : Channels.Count == 0 ? "Directory:Empty" : "Directory:NoMatches"]</h3>
-                    <p>@L[MissingChannel ? "Directory:MissingChannelHelp" : Channels.Count == 0 ? "Directory:EmptyHelp" : "Directory:NoMatchesHelp"]</p>
-                </div>
-            </NoRecordsContent>
-            <PagerContent>
-                <MudTablePager FirstIcon="@MoIcons.FirstPage" BeforeIcon="@MoIcons.ChevronLeft" NextIcon="@MoIcons.ChevronRight" LastIcon="@MoIcons.LastPage" />
-            </PagerContent>
-        </MudTable>
+
+    <div class="dc-state-chips fchips" role="group" aria-label="@L["Design:Cols:Init"]">
+        <MoFilterChip Pill="true" Label="@L["Design:AllStates"]" Count="@facet.Length" Role="MoVisualRole.Primary"
+                      Selected="@(Query.State is null)" SelectedChanged="@(_ => SelectState(null))" />
+        <MoFilterChip Pill="true" ShowDot="true" Class="dc-chip-mark" Label="@L["Design:NeedsAttentionChip"]"
+                      Count="@facet.Count(c => c.NeedsAttention)" Role="MoVisualRole.Error"
+                      Selected="@(Query.State == "Attention")" SelectedChanged="@(_ => SelectState("Attention"))" />
+        @foreach (var state in INIT_STATES)
+        {
+            <MoFilterChip Pill="true" ShowDot="true" Class="dc-chip-mark" Label="@L[$"Channel:States:{state}"]"
+                          Count="@facet.Count(c => c.Initialization == state)" Role="@DataChannelVisual.InitRole(state)"
+                          Selected="@(Query.State == state)" SelectedChanged="@(_ => SelectState(state))" />
+        }
     </div>
+
+    @if (rows.Length == 0 && (Query.Flat || setups.Length == 0))
+    {
+        <MoContentState Compact="true" Class="dc-empty">
+            <span class="mo-vl-tile mo-vl-role--neutral"><MoIcon Icon="@(missingExact ? MoIcons.SearchOff : MoIcons.FilterOff)" Size="18px" /></span>
+            <h2>@L[missingExact ? "Design:MissingChannelTitle" : "Design:NoMatchesTitle"]</h2>
+            <p>@L[missingExact ? "Design:MissingChannelBody" : "Design:NoMatchesBody"]</p>
+            <button type="button" class="btn btn-outline btn-sm" @onclick="@(missingExact ? ClearScope : Reset)">
+                @L[missingExact ? "Design:ShowAllChannels" : "Design:ResetFilters"]
+            </button>
+        </MoContentState>
+    }
+    else
+    {
+        <div class="table-wrap dc-table-wrap">
+            <table class="table dc-table dc-dir-table" aria-labelledby="dc-dir-title">
+                <thead>
+                    <tr>
+                        <th scope="col">@L["Design:Cols:Channel"]</th><th scope="col">@L["Design:Cols:Conduit"]</th>
+                        <th scope="col">@L["Design:Cols:Init"]</th><th scope="col">@L["Design:Cols:Retained"]</th>
+                        <th scope="col" class="is-num">@L["Design:Cols:Lifetime"]</th><th scope="col" class="is-end">@L["Design:Cols:Actions"]</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @if (Query.Flat)
+                    {
+                        @foreach (var channel in rows) { @Row(channel) }
+                    }
+                    else
+                    {
+                        @foreach (var setup in setups)
+                        {
+                            var unavailable = SetupBusy || View.Setups.Any(item => item.State is DataChannelSetupState.Starting or DataChannelSetupState.Stopping);
+                            <tr class="dc-setup-band @(setup.State == DataChannelSetupState.Failed ? "is-failed" : null)" data-setup="@setup.Id" @key="setup.Id">
+                                <td colspan="6">
+                                    <div class="dc-setup-band-inner">
+                                        <div class="dc-setup-band-id">
+                                            <strong class="dc-setup-owner">@(setup.Owner is { } name ? DataChannelVisual.ShortOwner(name) : L["Design:HostInfra"].Value)</strong>
+                                            <code class="dc-setup-cls mono" title="@setup.ImplementationType">@DataChannelVisual.BuilderName(setup.ImplementationType)</code>
+                                            <span class="dc-state is-compact @DataChannelVisual.SetupRole(setup.State).ToCssClass()">
+                                                <span class="status-dot" aria-hidden="true"></span>@L[$"Setup:States:{setup.State}"]
+                                            </span>
+                                            <span class="dc-setup-mode">@L[$"Setup:Modes:{setup.Mode}"]</span>
+                                            <span class="dot-sep" aria-hidden="true"></span>
+                                            <span class="dc-setup-count">@L["Design:SetupChannelCount", setup.ChannelIds.Count]</span>
+                                        </div>
+                                        <div class="dc-setup-actions">
+                                            @if (setup.Mode != ActivationMode.Disabled)
+                                            {
+                                                @if (setup.State != DataChannelSetupState.Running)
+                                                {
+                                                    <button type="button" class="btn btn-soft btn-sm mo-vl-role--primary" disabled="@unavailable" @onclick="() => OnStart.InvokeAsync(setup.Id)">
+                                                        <MoIcon Icon="@MoIcons.Play" Size="14px" />@L["Setup:Start"]
+                                                    </button>
+                                                }
+                                                @if (setup.State is not (DataChannelSetupState.Held or DataChannelSetupState.Stopped))
+                                                {
+                                                    <button type="button" class="btn btn-outline btn-sm" disabled="@unavailable" @onclick="() => OnStop.InvokeAsync(setup.Id)">
+                                                        <MoIcon Icon="@MoIcons.Stop" Size="14px" />@L["Setup:Stop"]
+                                                    </button>
+                                                }
+                                                @if (setup.State != DataChannelSetupState.Held)
+                                                {
+                                                    <button type="button" class="btn btn-ghost btn-sm" disabled="@unavailable" @onclick="() => OnRestart.InvokeAsync(setup.Id)">
+                                                        <MoIcon Icon="@MoIcons.Refresh" Size="14px" />@L["Setup:Restart"]
+                                                    </button>
+                                                }
+                                            }
+                                        </div>
+                                    </div>
+                                    @if (setup.Error is { Length: > 0 } failure)
+                                    {
+                                        <div class="dc-setup-error mo-vl-role--error" role="alert"><MoIcon Icon="@MoIcons.Error" Size="15px" />
+                                            <span class="mono">@failure</span>
+                                        </div>
+                                    }
+                                </td>
+                            </tr>
+                            @if (bySetup.Contains(setup.Id))
+                            {
+                                @foreach (var channel in bySetup[setup.Id]) { @Row(channel) }
+                            }
+                            else
+                            {
+                                <tr class="dc-setup-slot-row">
+                                    <td colspan="6">
+                                        @if (setup.State == DataChannelSetupState.Held)
+                                        {
+                                            <div class="dc-corridor-slot is-held hatch">
+                                                <span class="dc-pill mo-vl-role--warning"><MoIcon Icon="@MoIcons.Clock" Size="13px" />@L["Setup:States:Held"]</span>
+                                                <span>@L["Design:BlueprintUndeclared"]</span>
+                                            </div>
+                                        }
+                                        else
+                                        {
+                                            <div class="dc-corridor-slot @(setup.Mode == ActivationMode.Disabled ? "is-disabled" : "is-empty")">
+                                                @if (setup.Mode == ActivationMode.Disabled) { <MoIcon Icon="@MoIcons.Ban" Size="15px" /> }
+                                                <span>@L[setup.Mode == ActivationMode.Disabled ? "Design:BlueprintDisabledOwner" : "Design:BlueprintNoChannels"]</span>
+                                            </div>
+                                        }
+                                    </td>
+                                </tr>
+                            }
+                        }
+                        @if (bySetup.Contains(null))
+                        {
+                            <tr class="dc-setup-band"><td colspan="6"><strong>@L["Design:HostInfra"]</strong></td></tr>
+                            @foreach (var channel in bySetup[null]) { @Row(channel) }
+                        }
+                    }
+                </tbody>
+            </table>
+        </div>
+    }
 </section>
 
 @code {
-    /// <summary>Gets or sets the detached channel captures in their host registration order.</summary>
-    [Parameter, EditorRequired]
-    public IReadOnlyList<DataChannelStatusInfo> Channels { get; set; } = [];
+    private static readonly string[] INIT_STATES = ["Initialized", "Initializing", "Unavailable", "NotInitialized"];
 
-    /// <summary>Gets or sets an optional exact, ordinal channel identity supplied by the route.</summary>
-    [Parameter]
-    public string? ChannelId { get; set; }
+    /// <summary>Gets or sets the captured channels and owning setups.</summary>
+    [Parameter, EditorRequired] public DataChannelView View { get; set; } = null!;
+    /// <summary>Gets or sets URL-held directory options.</summary>
+    [Parameter, EditorRequired] public DataChannelQuery Query { get; set; } = new();
+    /// <summary>Receives changes to directory filtering and view mode.</summary>
+    [Parameter] public EventCallback<DataChannelQuery> OnQuery { get; set; }
+    /// <summary>Starts the specified host setup.</summary>
+    [Parameter] public EventCallback<string> OnStart { get; set; }
+    /// <summary>Stops the specified host setup.</summary>
+    [Parameter] public EventCallback<string> OnStop { get; set; }
+    /// <summary>Restarts the specified host setup.</summary>
+    [Parameter] public EventCallback<string> OnRestart { get; set; }
+    /// <summary>Reinitializes the selected channel.</summary>
+    [Parameter] public EventCallback<string> OnReinitialize { get; set; }
+    /// <summary>Requests confirmation to clear the selected channel's history.</summary>
+    [Parameter] public EventCallback<string> OnClear { get; set; }
+    /// <summary>Reports whether channel commands are busy.</summary>
+    [Parameter, EditorRequired] public Func<string, bool> IsBusy { get; set; } = null!;
+    /// <summary>Disables setup commands while work is admitted.</summary>
+    [Parameter] public bool SetupBusy { get; set; }
 
-    /// <summary>Gets or sets the owning workflow admission check for channel operations.</summary>
-    [Parameter, EditorRequired]
-    public Func<string, bool> IsBusy { get; set; } = _ => false;
+    private Task Change(DataChannelQuery query) => OnQuery.InvokeAsync(query);
+    private Task SelectState(string? state) => Change(Query with { State = state == Query.State ? null : state });
+    private Task ClearScope() => Change(Query with { Channel = null });
+    private Task Reset() => Change(Query with { Setup = null, Group = null, State = null, Evidence = null, Search = null, Sort = null });
+    private static string? Filter(string? value) => string.IsNullOrEmpty(value) ? null : value;
+    private static string Pressed(bool value) => value ? "true" : "false";
 
-    /// <summary>Gets or sets the callback that opens a native inspector for this captured channel.</summary>
-    [Parameter, EditorRequired]
-    public EventCallback<DataChannelStatusInfo> OnInspect { get; set; }
-
-    /// <summary>Gets or sets the owning workflow callback for real endpoint initialization.</summary>
-    [Parameter, EditorRequired]
-    public EventCallback<string> OnReinitialize { get; set; }
-
-    /// <summary>Gets or sets the callback that captures and inspects retained exception evidence.</summary>
-    [Parameter, EditorRequired]
-    public EventCallback<string> OnViewExceptions { get; set; }
-
-    /// <summary>Gets or sets the owning workflow callback for confirming and clearing retained observable history.</summary>
-    [Parameter, EditorRequired]
-    public EventCallback<string> OnClear { get; set; }
-
-    private static readonly string[] InitializationStates = ["All", "Initialized", "Initializing", "Unavailable", "NotInitialized"];
-    private readonly Dictionary<string, DirectoryRow> _rowsById = new(StringComparer.Ordinal);
-    private IReadOnlyList<DirectoryRow> _rows = [];
-    private MudTextField<string>? _searchField;
-    private string _query = string.Empty;
-    private string _group = "all";
-    private string _state = "All";
-    private bool _retired;
-    private bool MissingChannel => !string.IsNullOrEmpty(ChannelId) && !Channels.Any(channel => string.Equals(channel.Id, ChannelId, StringComparison.Ordinal));
-    private IEnumerable<string> Groups => Channels.Select(channel => channel.GroupId).Where(group => !string.IsNullOrEmpty(group)).Select(group => group!).Distinct(StringComparer.Ordinal).Order(StringComparer.Ordinal);
-    private List<DirectoryRow> FilteredRows => _rows.Where(row => Matches(row.Capture)).ToList();
-    private bool Matches(DataChannelStatusInfo channel) =>
-        (string.IsNullOrEmpty(ChannelId) || string.Equals(channel.Id, ChannelId, StringComparison.Ordinal)) &&
-        (_state == "All" || DataChannelPresentation.Initialization(channel) == _state) &&
-        (_group == "all" || (_group == "ungrouped" ? string.IsNullOrEmpty(channel.GroupId) : string.Equals(channel.GroupId, _group[6..], StringComparison.Ordinal))) &&
-        (string.IsNullOrWhiteSpace(_query) || new[] { channel.Id, channel.GroupId, channel.InnerEndpoint.TypeName, channel.OuterEndpoint.TypeName }.Any(value => value?.Contains(_query, StringComparison.OrdinalIgnoreCase) == true));
-    private int StateCount(string state) => state == "All" ? Channels.Count : Channels.Count(channel => DataChannelPresentation.Initialization(channel) == state);
-
-    protected override void OnParametersSet()
-    {
-        var retainedIds = new HashSet<string>(StringComparer.Ordinal);
-        var rows = new List<DirectoryRow>(Channels.Count);
-        foreach (var capture in Channels)
-        {
-            retainedIds.Add(capture.Id);
-            if (!_rowsById.TryGetValue(capture.Id, out var row))
-            {
-                row = new DirectoryRow(capture);
-                _rowsById.Add(capture.Id, row);
-            }
-            else
-            {
-                row.Capture = capture;
-            }
-            rows.Add(row);
-        }
-        foreach (var id in _rowsById.Keys.Where(id => !retainedIds.Contains(id)).ToArray())
-        {
-            _rowsById.Remove(id);
-        }
-        _rows = rows;
-    }
-
-    /// <summary>Retains MudTable's row identity across detached captures without changing host DTO equality.</summary>
-    private sealed class DirectoryRow(DataChannelStatusInfo capture)
-    {
-        /// <summary>Gets or sets the newest detached evidence for this exact channel identity.</summary>
-        public DataChannelStatusInfo Capture { get; set; } = capture;
-    }
-    private async Task ClearFiltersAsync()
-    {
-        if (_searchField is { } field) { await field.ClearAsync(); }
-        if (_retired) { return; }
-        _query = string.Empty; _group = "all"; _state = "All";
-    }
-    public void Dispose() => _retired = true;
+    private RenderFragment Row(ChannelEvidence channel) => @<DataChannelDirectoryRow @key="channel.Id" Channel="channel" Query="Query"
+        IsBusy="@IsBusy(channel.Id)" OnReinitialize="OnReinitialize" OnClear="OnClear" />;
 }

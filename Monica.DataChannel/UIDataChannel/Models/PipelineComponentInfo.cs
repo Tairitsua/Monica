@@ -41,8 +41,14 @@ public class PipelineComponentInfo
         AssemblyQualifiedName = componentType.AssemblyQualifiedName ?? TypeName;
         IsTransient = component is TransientComponentProxyBase;
         CanDebugMessages = component is MessageDebuggerMiddleware && !IsTransient;
+        IsDebuggerActive = component is MessageDebuggerMiddleware { IsActive: true } && CanDebugMessages;
         object? metadata = null;
         Metadata = DataChannelValueSnapshot.Capture(() => metadata = (object?)component.GetMetadata());
+        var options = metadata is KafkaEndpointMetadata kafkaMetadata ? kafkaMetadata.Options : metadata as CommunicationOptions;
+        if (component is IPipelineEndpoint && options is not null)
+        {
+            EndpointDirection = options.Direction;
+        }
         if (metadata is KafkaEndpointMetadata { Options.Direction: ConnectionDirection.Input or ConnectionDirection.InputAndOutput } kafka)
         {
             KafkaInput = new(kafka.Options.ProcessingFailureAction, kafka.Options.ProcessingMaxAttempts,
@@ -75,6 +81,11 @@ public class PipelineComponentInfo
     public bool IsTransient { get; }
     /// <summary>Gets whether this registration owns a persistent debugger queue, including derived debuggers.</summary>
     public bool CanDebugMessages { get; }
+    /// <summary>Gets whether the persistent debugger was capturing when this component was read.</summary>
+    public bool IsDebuggerActive { get; }
+    /// <summary>Gets the configured direction when the endpoint exposes typed communication options.</summary>
+    /// <remarks>Null represents unknown direction. It is independent of the transport's supported directions.</remarks>
+    public ConnectionDirection? EndpointDirection { get; }
     /// <summary>Gets complete detached metadata or its local capture failure.</summary>
     public DataChannelValueSnapshot Metadata { get; }
     internal KafkaInputDetails? KafkaInput { get; }

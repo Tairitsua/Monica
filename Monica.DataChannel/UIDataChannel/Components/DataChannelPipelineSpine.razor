@@ -1,0 +1,183 @@
+@using Monica.DataChannel.Abstractions.Communication
+@inject IStringLocalizer<DataChannelResource> L
+
+@{
+    var inbound = Channel.Direction == ConnectionDirection.Input;
+    var twoWay = Channel.Direction == ConnectionDirection.InputAndOutput;
+    var hasDirection = Channel.Direction is ConnectionDirection.Input or ConnectionDirection.Output or ConnectionDirection.InputAndOutput;
+    var first = inbound ? Channel.Status.OuterEndpoint : Channel.Status.InnerEndpoint;
+    var last = inbound ? Channel.Status.InnerEndpoint : Channel.Status.OuterEndpoint;
+    var settings = Channel.Configuration;
+}
+<div class="dc-tab-stack">
+    @if (Channel.Blocked.FirstOrDefault() is { } blocked)
+    {
+        <MoSemanticCallout Severity="MoVisualRole.Error" Title="@L["Design:Sheet:KafkaBlockedAlert", blocked.Partition, blocked.Offset.ToString("N0")]">
+            @L["Design:Sheet:KafkaBlockedHelp"]
+        </MoSemanticCallout>
+    }
+    @if (Channel.Initialization == "Unavailable")
+    {
+        <MoSemanticCallout Severity="MoVisualRole.Error" Title="@L["Channel:States:Unavailable"]">
+            <span class="mono">@(Channel.Status.InitializationError ?? Channel.Setup?.Error ?? L["Design:Sheet:UnavailableHelp"].Value)</span>
+        </MoSemanticCallout>
+    }
+
+    <section class="dc-panel dc-spine-panel">
+        <header class="dc-panel-head">
+            <div class="dc-spine-head-row">
+                <h3>@L["Design:Sheet:SpineTitle"]</h3>
+                <span class="dc-pill @DirectionRole.ToCssClass()">@DirectionLabel</span>
+            </div>
+            <p>@DirectionHelp</p>
+        </header>
+        <ol class="dc-spine @(twoWay ? "is-bidi" : null) @(!hasDirection ? "is-unknown" : null)" aria-label="@L["Design:Sheet:SpineTitle"]">
+            @Endpoint(first, inbound, twoWay || !hasDirection, twoWay, false)
+            @if (twoWay)
+            {
+                @BidirectionalConnector
+                @if (Channel.Transforms.Count > 0)
+                {
+                    <li class="dc-spine-bidi-item">
+                        <div class="dc-spine-bidi-box">
+                            <div class="dc-spine-bidi-head">
+                                <span class="dc-pill mo-vl-role--third"><MoIcon Icon="@MoIcons.ArrowLeftRight" Class="dc-icon-vert" Size="14px" />@L["Design:Sheet:SpineSameOrderPill"]</span>
+                            </div>
+                            <ol class="dc-spine dc-spine-inner" aria-label="@L["PipelineInspector:TransformChain"]">
+                                @foreach (var transform in Channel.Transforms)
+                                {
+                                    @Transform(transform, ReferenceEquals(transform, Channel.Transforms[^1]))
+                                }
+                            </ol>
+                        </div>
+                    </li>
+                }
+                else
+                {
+                    @Direct(twoWay)
+                }
+                @BidirectionalConnector
+            }
+            else if (Channel.Transforms.Count > 0)
+            {
+                @foreach (var transform in Channel.Transforms) { @Transform(transform, false) }
+            }
+            else
+            {
+                @Direct(false)
+            }
+            @Endpoint(last, !inbound, true, twoWay, true)
+        </ol>
+    </section>
+    <section class="dc-panel">
+        <header class="dc-panel-head">
+            <h3>@L["Design:Sheet:EndpointConfig"] <span class="count mono">@settings.Count</span></h3>
+            <p>@L["Design:Sheet:EndpointConfigHelp"]</p>
+        </header>
+        @if (settings.Count == 0)
+        {
+            <p class="dc-empty-inline">@L["Design:Sheet:NoEndpointConfig"]</p>
+        }
+        else
+        {
+            <ol class="dc-chain-list">
+                @foreach (var component in settings)
+                {
+                    <li @key="component.ComponentKey">
+                        <span class="dc-chain-num mono">@(component.Ordinal + 1)</span>
+                        <div class="dc-chain-copy">
+                            <button type="button" class="dc-link mono" @onclick="() => OnSelectMiddleware.InvokeAsync(component.ComponentKey)">@component.TypeName</button>
+                            <span class="dc-chain-meta">@L[$"Pipeline:ComponentKinds:{DataChannelPresentation.KindKey(component.Type)}"]</span>
+                        </div>
+                    </li>
+                }
+            </ol>
+        }
+    </section>
+</div>
+
+@code {
+    /// <summary>Gets or sets the ordered channel pipeline capture.</summary>
+    [Parameter, EditorRequired] public ChannelEvidence Channel { get; set; } = null!;
+    /// <summary>Selects endpoint evidence from either endpoint node.</summary>
+    [Parameter] public EventCallback OnOpenEndpoints { get; set; }
+    /// <summary>Selects the opaque registration key of the middleware node.</summary>
+    [Parameter] public EventCallback<string> OnSelectMiddleware { get; set; }
+    /// <summary>Opens the debugger of the selected persistent middleware.</summary>
+    [Parameter] public EventCallback<string> OnOpenDebugger { get; set; }
+
+    private MoVisualRole DirectionRole => Channel.Direction switch
+    {
+        ConnectionDirection.Input => MoVisualRole.Info,
+        ConnectionDirection.Output => MoVisualRole.Primary,
+        ConnectionDirection.InputAndOutput => MoVisualRole.Third,
+        _ => MoVisualRole.Neutral
+    };
+    private string DirectionLabel => L[Channel.Direction switch
+    {
+        ConnectionDirection.Input => "Design:Sheet:DirTagInput",
+        ConnectionDirection.Output => "Design:Sheet:DirTagOutput",
+        ConnectionDirection.InputAndOutput => "Design:Sheet:DirTagBidi",
+        _ => "Design:Sheet:DirectionUnknown"
+    }];
+    private string DirectionHelp => L[Channel.Direction switch
+    {
+        ConnectionDirection.Input => "Design:Sheet:SpineHelpInput",
+        ConnectionDirection.Output => "Design:Sheet:SpineHelpOutput",
+        ConnectionDirection.InputAndOutput => "Design:Sheet:SpineHelpBidi",
+        _ => "Design:Sheet:DirectionUnknownHelp"
+    }];
+
+    private RenderFragment Endpoint(PipelineComponentInfo endpoint, bool outer, bool endLine, bool twoWay, bool isTarget) => @<li
+        class="dc-spine-item is-endpoint @(endLine ? "is-last" : null)">
+        <button type="button" class="dc-spine-node is-ep @(outer ? "mo-vl-role--info" : "mo-vl-role--primary")" @onclick="OnOpenEndpoints">
+            <span class="dc-spine-marker" aria-hidden="true"><MoIcon Icon="@(outer ? DataChannelVisual.TransportIcon(endpoint) : MoIcons.Code)" Size="15px" /></span>
+            <span class="dc-spine-copy">
+                <span class="dc-spine-top">
+                    <span class="dc-spine-side">@L[outer ? "Design:Sheet:OuterLabel" : "Design:Sheet:InnerLabel"]</span>
+                    <b class="mono">@endpoint.Name</b>
+                </span>
+                <small class="mono dc-spine-fqn">@endpoint.TypeName</small>
+            </span>
+            @if (Channel.Direction is ConnectionDirection.Input or ConnectionDirection.Output or ConnectionDirection.InputAndOutput)
+            {
+                <span class="dc-pill">@L[twoWay ? "Design:Sheet:SpineBidiEnd" : isTarget ? "Design:Sheet:SpineTarget" :
+                    outer ? "Design:Sheet:SpineSourceInput" : "Design:Sheet:SpineSourceOutput"]</span>
+            }
+        </button>
+    </li>;
+
+    private RenderFragment Transform(PipelineComponentInfo component, bool last) => @<li class="dc-spine-item is-mw @(last ? "is-last" : null)" @key="component.ComponentKey">
+        <div class="dc-spine-mw-card">
+            <button type="button" class="dc-spine-node is-mw" @onclick="() => OnSelectMiddleware.InvokeAsync(component.ComponentKey)">
+                <span class="dc-spine-ord mono mo-vl-role--third">@(component.Ordinal + 1)</span>
+                <span class="dc-spine-copy">
+                    <b class="mono">@component.Name</b>
+                    <small>@L[$"Pipeline:ComponentKinds:{DataChannelPresentation.KindKey(component.Type)}"]
+                        @if (component.IsTransient) { <text> · @L["Design:Sheet:TransientTag"]</text> }
+                    </small>
+                </span>
+            </button>
+            @if (component.CanDebugMessages)
+            {
+                <button type="button" class="btn btn-sm dc-spine-dbg @(component.IsDebuggerActive ? "btn-soft mo-vl-role--info" : "btn-outline")"
+                        @onclick="() => OnOpenDebugger.InvokeAsync(component.ComponentKey)">
+                    <MoIcon Icon="@MoIcons.Bug" Size="14px" />@L[component.IsDebuggerActive ? "Design:Sheet:DebuggerRunning" : "Design:Sheet:OpenDebuggerShort"]
+                </button>
+            }
+        </div>
+    </li>;
+
+    private RenderFragment Direct(bool twoWay) => @<li class="dc-spine-item is-direct @(twoWay ? "is-last" : null)">
+        <div class="dc-spine-direct">
+            <span class="dc-spine-arrow" aria-hidden="true">
+                <MoIcon Icon="@(twoWay ? MoIcons.ArrowLeftRight : MoIcons.ArrowDown)" Class="@(twoWay ? "dc-icon-vert" : null)" Size="15px" />
+            </span>
+            <span>@L["Design:Sheet:NoTransforms"]</span>
+        </div>
+    </li>;
+
+    private RenderFragment BidirectionalConnector => @<li class="dc-spine-conn is-bidi" aria-hidden="true">
+        <span class="dc-spine-conn-mark"><MoIcon Icon="@MoIcons.ArrowLeftRight" Class="dc-icon-vert" Size="15px" /></span>
+    </li>;
+}

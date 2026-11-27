@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Components;
+using Microsoft.AspNetCore.Components.Routing;
 using Microsoft.Extensions.Localization;
 using Microsoft.Extensions.Logging;
 using Monica.Core.Results;
@@ -8,6 +9,8 @@ using Monica.DataChannel.Middlewares;
 using Monica.DataChannel.UIDataChannel.Dialogs;
 using Monica.DataChannel.UIDataChannel.Models;
 using Monica.DataChannel.UIDataChannel.State;
+using Monica.DataChannel.UIDataChannel.Support;
+using Monica.DataChannel.Pages;
 using MudBlazor;
 
 namespace Monica.DataChannel.UIDataChannel.Components;
@@ -21,12 +24,10 @@ public partial class DataChannelWorkbench : IAsyncDisposable
     [Inject] private ISnackbar Snackbar { get; set; } = null!;
     [Inject] private IStringLocalizer<DataChannelResource> L { get; set; } = null!;
     [Inject] private ILogger<DataChannelWorkbench> Logger { get; set; } = null!;
+    [Inject] private NavigationManager Navigation { get; set; } = null!;
 
     /// <summary>Gets or sets whether this route presents retained exception evidence instead of the channel directory.</summary>
     [Parameter] public bool Exceptions { get; set; }
-
-    /// <summary>Gets or sets an exact channel identity selected by a portable route link.</summary>
-    [Parameter] public string? ChannelId { get; set; }
 
     private readonly CancellationTokenSource _lifetime = new();
     private readonly CancellationToken _token;
@@ -36,65 +37,102 @@ public partial class DataChannelWorkbench : IAsyncDisposable
     private readonly HashSet<string> _pendingChannels = new(StringComparer.Ordinal);
     private Task? _dispose;
     private bool _retired;
+    private bool _debuggerOpen;
+    private DataChannelManagementSnapshot? _capture;
+    private DataChannelView? _view;
+    private DataChannelQuery Query { get; set; } = new();
+    private DataChannelView? View
+    {
+        get
+        {
+            if (!ReferenceEquals(_capture, State.Snapshot))
+            {
+                _capture = State.Snapshot;
+                _view = _capture is null ? null : new DataChannelView(_capture);
+            }
+            return _view;
+        }
+    }
 
     /// <summary>Creates a component-local lifetime. Injected circuit state and host services remain borrowed.</summary>
     public DataChannelWorkbench() => _token = _lifetime.Token;
 
-    protected override Task OnInitializedAsync() => RefreshAsync();
+    protected override Task OnInitializedAsync()
+    {
+        Query = DataChannelQuery.Read(Navigation.ToAbsoluteUri(Navigation.Uri));
+        Navigation.LocationChanged += OnLocationChanged;
+        return State.Snapshot is null ? RefreshAsync() : Task.CompletedTask;
+    }
 
     private bool IsChannelBusy(string channelId) => State.IsRefreshing || _pendingChannels.Contains(channelId);
+    private bool SetupBusy => State.IsRefreshing || _pendingChannels.Count > 0;
+    private string ScopeUrl(bool exceptions) => new DataChannelQuery { Channel = Query.Channel }.Url(exceptions);
 
     private Task RefreshAsync() => RunOwned(State.RefreshAsync);
 
-    private Task InspectPipelineAsync(DataChannelStatusInfo channel) => RunOwned(async token =>
+    private void OnLocationChanged(object? sender, LocationChangedEventArgs args)
     {
-        var exactId = channel.Id;
-        await ShowOwnedAsync<ChannelPipelineDialog>(L["Workbench:PipelineDialogTitle"].Value, new DialogParameters
+        _ = InvokeAsync(() =>
         {
-            [nameof(ChannelPipelineDialog.Channel)] = channel,
-            [nameof(ChannelPipelineDialog.OnOpenDebugger)] = (Func<PipelineComponentInfo, CancellationToken, Task>)
-                ((component, ownerToken) => OpenDebuggerAsync(exactId, component, ownerToken)),
-            [nameof(ChannelPipelineDialog.OnReinitialize)] = (Func<string, CancellationToken, Task>)ReinitializeAsync,
-            [nameof(ChannelPipelineDialog.OnViewExceptions)] = (Func<string, CancellationToken, Task>)InspectExceptionsAsync
-        }, token);
-        if (!_retired) await State.RefreshAsync(token);
-    });
+            if (_retired) return;
+            var uri = Navigation.ToAbsoluteUri(args.Location);
+            var ownPath = Exceptions ? UIDataChannelExceptionsPage.PAGE_URL : UIDataChannelPage.PAGE_URL;
+            if (!uri.AbsolutePath.TrimEnd('/').Equals(ownPath, StringComparison.OrdinalIgnoreCase)) return;
+            Query = DataChannelQuery.Read(uri);
+            StateHasChanged();
+        });
+    }
 
-    private Task OpenDebuggerAsync(string channelId, PipelineComponentInfo component, CancellationToken ownerToken) => RunOwned(async token =>
+    private void ChangeFilter(DataChannelQuery next) =>
+        Navigate(next, replace: Query.Inspect == next.Inspect);
+
+    private void CloseSheet() => Navigate(Query.Close(), replace: true);
+
+    private void Navigate(DataChannelQuery next, bool replace)
     {
-        var result = await Facade.GetMiddlewareByKeyAsync<MessageDebuggerMiddleware>(channelId, component.ComponentKey);
-        token.ThrowIfCancellationRequested();
-        if (result.IsFailure() || result.Data is not { } middleware)
+        if (Query == next) return;
+        Navigation.NavigateTo(next.Url(Exceptions), replace: replace);
+    }
+
+    protected override Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (_retired || _debuggerOpen || !Query.Debugger || Query.Inspect is not { } id ||
+            View?.ById.GetValueOrDefault(id) is not { } channel)
         {
-            Snackbar.Add(result.Message ?? L["Workbench:OperationFailed"].Value, Severity.Error);
-            return;
+            return Task.CompletedTask;
         }
-        await ShowOwnedAsync<MessageDebuggerDialog>(L["Workbench:DebuggerDialogTitle"].Value, new DialogParameters
+        var component = Query.Component is null ? channel.Debugger :
+            channel.Status.Middlewares.FirstOrDefault(item => item.CanDebugMessages && item.ComponentKey == Query.Component);
+        _debuggerOpen = true;
+        return RunOwned(async token =>
         {
-            [nameof(MessageDebuggerDialog.Middleware)] = middleware,
-            [nameof(MessageDebuggerDialog.ChannelId)] = channelId
-        }, token);
-    }, ownerToken);
-
-    private Task InspectExceptionsAsync(string channelId) => InspectExceptionsAsync(channelId, default);
-
-    private Task InspectExceptionsAsync(string channelId, CancellationToken ownerToken) => RunOwned(async token =>
-    {
-        var result = await Facade.GetChannelExceptionsAsync(channelId, cancellationToken: token);
-        token.ThrowIfCancellationRequested();
-        if (result.IsFailure() || result.Data is not { } details)
-        {
-            Snackbar.Add(result.Message ?? L["Workbench:OperationFailed"].Value, Severity.Error);
-            return;
-        }
-        await ShowOwnedAsync<ExceptionDetailsDialog>(L["Exceptions:Details:Title"].Value, new DialogParameters
-        {
-            [nameof(ExceptionDetailsDialog.ChannelId)] = channelId,
-            [nameof(ExceptionDetailsDialog.ExceptionInfo)] = details
-        }, token);
-    }, ownerToken);
-
-    private Task ReinitializeAsync(string channelId) => ReinitializeAsync(channelId, default);
+            try
+            {
+                var result = component is null ? null :
+                    await Facade.GetMiddlewareByKeyAsync<MessageDebuggerMiddleware>(id, component.ComponentKey);
+                token.ThrowIfCancellationRequested();
+                if (result?.Data is not { } middleware)
+                {
+                    Snackbar.Add(L["Design:DebuggerUnavailable"], Severity.Warning);
+                    return;
+                }
+                await ShowOwnedAsync<MessageDebuggerDialog>(L["Workbench:DebuggerDialogTitle"].Value, new DialogParameters
+                {
+                    [nameof(MessageDebuggerDialog.Middleware)] = middleware,
+                    [nameof(MessageDebuggerDialog.ChannelId)] = id
+                }, token, MaxWidth.False, closeButton: false);
+                if (!_retired) await State.RefreshAsync(token);
+            }
+            finally
+            {
+                _debuggerOpen = false;
+                if (!_retired && Query.Inspect == id && Query.Debugger)
+                {
+                    Navigate(Query with { Debugger = false }, replace: true);
+                }
+            }
+        });
+    }
 
     private Task StartSetupAsync(string setupId) => ExecuteSetupAsync(setupId, State.StartSetupAsync, "Setup:Started");
     private Task StopSetupAsync(string setupId) => ExecuteSetupAsync(setupId, State.StopSetupAsync, "Setup:Stopped");
@@ -108,18 +146,19 @@ public partial class DataChannelWorkbench : IAsyncDisposable
             await State.RefreshAsync(token);
         });
 
-    private Task ReinitializeAsync(string channelId, CancellationToken ownerToken) => ExecuteChannelAsync(channelId, async token =>
+    private Task ReinitializeAsync(string channelId) => ExecuteChannelAsync(channelId, async token =>
     {
         var outcome = await State.ReinitializeAsync(channelId, token);
         Report(outcome, "Workbench:ReinitializeSucceeded", channelId, token);
         await State.RefreshAsync(token);
-    }, ownerToken);
+    });
 
     private Task ClearHistoryAsync(string channelId) => ExecuteChannelAsync(channelId, async token =>
     {
         var exactId = channelId;
         var confirmation = await ShowOwnedAsync<ClearChannelHistoryDialog>(L["Workbench:ClearHistoryTitle"].Value,
-            new DialogParameters { [nameof(ClearChannelHistoryDialog.ChannelId)] = exactId }, token, MaxWidth.Small);
+            new DialogParameters { [nameof(ClearChannelHistoryDialog.ChannelId)] = exactId }, token, MaxWidth.Small,
+            closeButton: false);
         token.ThrowIfCancellationRequested();
         if (confirmation is not { Canceled: false, Data: true }) return;
         var outcome = await State.ClearHistoryAsync(exactId, token);
@@ -127,7 +166,7 @@ public partial class DataChannelWorkbench : IAsyncDisposable
         await State.RefreshAsync(token);
     });
 
-    private Task ExecuteChannelAsync(string channelId, Func<CancellationToken, Task> action, CancellationToken ownerToken = default)
+    private Task ExecuteChannelAsync(string channelId, Func<CancellationToken, Task> action)
     {
         return RunOwned(async token =>
         {
@@ -141,7 +180,7 @@ public partial class DataChannelWorkbench : IAsyncDisposable
                 lock (_ownershipGate) { _pendingChannels.Remove(channelId); }
                 if (!_retired) await InvokeAsync(StateHasChanged);
             }
-        }, ownerToken);
+        });
     }
 
     private void Report(Result result, string successKey, string channelId, CancellationToken cancellationToken)
@@ -152,12 +191,12 @@ public partial class DataChannelWorkbench : IAsyncDisposable
     }
 
     private async Task<DialogResult?> ShowOwnedAsync<T>(string title, DialogParameters parameters,
-        CancellationToken cancellationToken, MaxWidth maxWidth = MaxWidth.Large)
+        CancellationToken cancellationToken, MaxWidth maxWidth = MaxWidth.Large, bool closeButton = true)
         where T : IComponent
     {
         cancellationToken.ThrowIfCancellationRequested();
         var reference = await DialogService.ShowAsync<T>(title, parameters,
-            new DialogOptions { FullWidth = true, MaxWidth = maxWidth, CloseButton = true, CloseOnEscapeKey = true });
+            new DialogOptions { FullWidth = true, MaxWidth = maxWidth, CloseButton = closeButton, CloseOnEscapeKey = true });
         lock (_ownershipGate)
         {
             if (_retired || cancellationToken.IsCancellationRequested) { CancelDialog(reference); return null; }
@@ -170,25 +209,21 @@ public partial class DataChannelWorkbench : IAsyncDisposable
         finally { lock (_ownershipGate) { _dialogs.Remove(reference); } }
     }
 
-    private Task RunOwned(Func<CancellationToken, Task> action, CancellationToken ownerToken = default)
+    private Task RunOwned(Func<CancellationToken, Task> action)
     {
         TaskCompletionSource completion;
         lock (_ownershipGate)
         {
-            if (_retired || ownerToken.IsCancellationRequested) return Task.CompletedTask;
+            if (_retired) return Task.CompletedTask;
             completion = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
             _admitted.Add(completion);
         }
-        return RunAdmissionAsync(action, completion, ownerToken);
+        return RunAdmissionAsync(action, completion);
     }
 
-    private async Task RunAdmissionAsync(Func<CancellationToken, Task> action, TaskCompletionSource completion,
-        CancellationToken ownerToken)
+    private async Task RunAdmissionAsync(Func<CancellationToken, Task> action, TaskCompletionSource completion)
     {
-        using var linkedLifetime = ownerToken.CanBeCanceled
-            ? CancellationTokenSource.CreateLinkedTokenSource(_token, ownerToken)
-            : null;
-        var cancellationToken = linkedLifetime?.Token ?? _token;
+        var cancellationToken = _token;
         try { cancellationToken.ThrowIfCancellationRequested(); await action(cancellationToken); }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) { }
         catch (Exception exception)
@@ -216,6 +251,7 @@ public partial class DataChannelWorkbench : IAsyncDisposable
 
     private async Task RetireAsync()
     {
+        Navigation.LocationChanged -= OnLocationChanged;
         var failures = new List<Exception>();
         // Native dialog callbacks must run on this renderer-owned disposal context.
         try { _lifetime.Cancel(); }

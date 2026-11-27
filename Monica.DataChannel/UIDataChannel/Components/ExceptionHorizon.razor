@@ -1,0 +1,127 @@
+@using Monica.UI.Shared.Services
+@inject IStringLocalizer<DataChannelResource> L
+@inject MoTimeFormatter UiTime
+@inject IJSRuntime JS
+@implements IAsyncDisposable
+
+@{
+    var lanes = View.ExceptionRows(new DataChannelQuery()).Where(c => Query.AllLanes || c.Lifetime > 0 || c.Retained > 0).ToArray();
+    var peak = lanes.Length == 0 ? 0 : lanes.Max(c => c.Lifetime);
+    var focused = _focusedId is null ? null : View.ById.GetValueOrDefault(_focusedId);
+}
+<div class="dc-eh" @ref="_root">
+    <div class="dc-eh-head">
+        <div class="dc-bp-title">
+            <h2>@L["Design:ExHorizonTitle"]</h2>
+            <p>@L["Design:ExHorizonDesc"]</p>
+        </div>
+        <div class="dc-eh-tools">
+            <div class="mo-vl-segment" role="group" aria-label="@L["Design:ExHorizonTitle"]">
+                <button type="button" aria-pressed="@(!Query.AllLanes ? "true" : "false")" @onclick="() => UpdateLanes(false)">@L["Design:ExHorizonOnlyEx"]</button>
+                <button type="button" aria-pressed="@(Query.AllLanes ? "true" : "false")" @onclick="() => UpdateLanes(true)">@L["Design:ExHorizonShowAll"]</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="dc-eh-bar-meta">
+        <div class="mo-vl-legend">
+            <span><i class="dc-swatch mo-vl-role--error" aria-hidden="true"></i>@L["Design:ExHorizonLegendRetained"]</span>
+            <span><i class="dc-swatch hatch" aria-hidden="true"></i>@L["Design:ExHorizonLegendEvicted"]</span>
+            <span><i class="dc-swatch mo-vl-role--neutral" aria-hidden="true"></i>@L["Design:ExHorizonLegendPool"]</span>
+        </div>
+        <span class="dc-eh-peak mono">@L["Design:ExHorizonPeak", peak]</span>
+    </div>
+    @if (lanes.Length == 0)
+    {
+        <div class="dc-eh-empty"><MoIcon Icon="@MoIcons.Success" Size="16px" /><span>@L["Design:ExHorizonEmpty"]</span></div>
+    }
+    else
+    {
+        <div class="dc-eh-lanes" aria-label="@L["Design:ExHorizonTitle"]">
+            <div class="dc-eh-colheads" aria-hidden="true">
+                <span>@L["Design:ExCols:Channel"]</span><span>@L["Design:ExCols:Retained"]</span>
+                <span>@L["Design:ExCols:Lifetime"]</span><span class="is-end">@L["Design:ExCols:Latest"]</span>
+            </div>
+            @foreach (var channel in lanes)
+            {
+                <a class="dc-eh-lane" href="@Query.Open(channel.Id, "exceptions").Url(true)" @key="channel.Id"
+                   @onmouseenter="() => _focusedId = channel.Id" @onfocus="() => _focusedId = channel.Id"
+                   @onmouseleave="() => _focusedId = null" @onblur="() => _focusedId = null">
+                    <span class="dc-eh-id">
+                        <span class="status-dot @channel.StandingRole.ToCssClass()" aria-hidden="true"></span>
+                        <strong class="dc-eh-name mono">@channel.Id</strong>
+                        <small class="dc-eh-group">@(channel.Group ?? L["Workbench:Ungrouped"].Value)</small>
+                    </span>
+                    <span class="dc-eh-track-cell">
+                        <span class="dc-eh-track" aria-hidden="true">
+                            @if (channel.Retained > 0)
+                            {
+                                <span class="dc-eh-fill mo-vl-role--error" style="width:@ChannelEvidence.BarWidth(channel.Retained, channel.Capacity, 3)"></span>
+                            }
+                        </span>
+                        <span class="dc-eh-num mono @(channel.Retained > 0 ? "is-error" : "is-muted")">@channel.Retained / @channel.Capacity</span>
+                    </span>
+                    <span class="dc-eh-track-cell">
+                        <span class="dc-eh-track is-life" aria-hidden="true">
+                            @if (channel.Retained > 0)
+                            {
+                                <span class="dc-eh-fill mo-vl-role--error" style="width:@ChannelEvidence.BarWidth(channel.Retained, peak, 2)"></span>
+                            }
+                            @if (channel.Trimmed > 0)
+                            {
+                                <span class="dc-eh-fill is-evicted hatch" style="width:@ChannelEvidence.BarWidth(channel.Trimmed, peak, 2)"></span>
+                            }
+                        </span>
+                        <span class="dc-eh-num mono"><b>@channel.Lifetime</b>
+                            @if (channel.Trimmed > 0) { <small class="dc-eh-evicted">(@channel.Trimmed)</small> }
+                        </span>
+                    </span>
+                    <span class="dc-eh-latest mono">@Latest(channel)</span>
+                </a>
+            }
+        </div>
+    }
+    <p class="dc-readout" aria-live="polite">
+        <MoIcon Icon="@MoIcons.Crosshair" Size="15px" />
+        <span>@(focused is null ? L["Design:ExHorizonReadoutIdle"] :
+            L["Design:ExHorizonReadout", focused.Id, focused.Retained, focused.Capacity, focused.Lifetime, focused.Trimmed, Latest(focused)])</span>
+    </p>
+</div>
+
+@code {
+    /// <summary>Gets or sets the detached management evidence for all host channels.</summary>
+    [Parameter, EditorRequired] public DataChannelView View { get; set; } = null!;
+    /// <summary>Gets or sets the lane scope and portable inspector selection.</summary>
+    [Parameter, EditorRequired] public DataChannelQuery Query { get; set; } = new();
+    /// <summary>Applies interactive changes to the route.</summary>
+    [Parameter] public EventCallback<DataChannelQuery> OnQuery { get; set; }
+
+    private ElementReference _root;
+    private Task? _keyboardBinding;
+    private string? _focusedId;
+
+    protected override Task OnAfterRenderAsync(bool firstRender) =>
+        firstRender ? _keyboardBinding = BindKeyboardAsync() : Task.CompletedTask;
+
+    private async Task BindKeyboardAsync()
+    {
+        try
+        {
+            await using var module = await JS.InvokeAsync<IJSObjectReference>("import", "./_content/Monica.DataChannel/js/data-channel-horizon.js");
+            await module.InvokeVoidAsync("bindHorizonKeys", _root);
+        }
+        catch (JSDisconnectedException) { }
+    }
+
+    /// <summary>Observes the initial binding. The DOM element owns its listener and retires with the view.</summary>
+    public ValueTask DisposeAsync() => new(_keyboardBinding ?? Task.CompletedTask);
+
+    private Task UpdateLanes(bool all)
+    {
+        _focusedId = null;
+        return OnQuery.InvokeAsync(Query with { AllLanes = all });
+    }
+
+    private string Latest(ChannelEvidence channel) =>
+        channel.Latest is { } latest ? UiTime.Format(latest) : L["Design:None"].Value;
+}

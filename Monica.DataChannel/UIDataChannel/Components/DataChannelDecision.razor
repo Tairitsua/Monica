@@ -1,0 +1,192 @@
+@using System.Globalization
+@using Monica.DataChannel.Models
+@using Monica.UI.Shared.Services
+@inject IStringLocalizer<DataChannelResource> L
+@inject MoTimeFormatter UiTime
+
+<section class="mo-vl-surface @(Exceptions ? "dc-ex-sig" : "dc-sig")">
+    <div class="dc-decision">
+        <div class="dc-decision-value">
+            <p class="display-label">@L[Exceptions ? "Design:ExAttentionLabel" : "Design:DirAttentionLabel"]</p>
+            <MoDisplayValue Value="@Number(Exceptions ? View.TotalRetained : View.Attention)" Unit="@DisplayUnit" Compact="true" />
+            <div class="dc-reasons">
+                @foreach (var reason in Reasons)
+                {
+                    <span class="@(reason.Value == 0 ? "is-zero" : null)">
+                        <span class="dc-swatch @reason.Role.ToCssClass() @(reason.Hatched ? "hatch" : null)" aria-hidden="true"></span>
+                        @reason.Label <b class="mono">@Number(reason.Value)</b>
+                    </span>
+                }
+            </div>
+        </div>
+        <div class="dc-decision-finding">
+            <p class="lede">@Finding()</p>
+            @if (!Exceptions && View.Attention > 0)
+            {
+                <p class="dc-overlap-note">@L["Design:OverlapNote"]</p>
+            }
+        </div>
+    </div>
+    <dl class="dc-facts-wrap @(!Exceptions ? "is-bottom" : null)">
+        @foreach (var fact in Facts)
+        {
+            <div class="fact">
+                <dt><span class="dc-swatch @fact.Role.ToCssClass() @(fact.Hatched ? "hatch" : null)" aria-hidden="true"></span>@fact.Label</dt>
+                <dd><b>@fact.Value</b> <small>@fact.Unit</small></dd>
+                <dd class="dc-fact-note mono" title="@fact.Note">@fact.Note</dd>
+            </div>
+        }
+    </dl>
+    @if (Exceptions)
+    {
+        <ExceptionHorizon View="View" Query="Query" OnQuery="OnQuery" />
+    }
+</section>
+
+@code {
+    /// <summary>Gets or sets one detached view used for the headline, reasons and facts.</summary>
+    [Parameter, EditorRequired] public DataChannelView View { get; set; } = null!;
+    /// <summary>Gets or sets the active route filters and selected evidence.</summary>
+    [Parameter, EditorRequired] public DataChannelQuery Query { get; set; } = new();
+    /// <summary>Gets or sets whether to display the exception-evidence instrument.</summary>
+    [Parameter] public bool Exceptions { get; set; }
+    /// <summary>Applies a change to the interactive horizon's URL state.</summary>
+    [Parameter] public EventCallback<DataChannelQuery> OnQuery { get; set; }
+
+    private string DisplayUnit => Exceptions
+        ? L["Design:ExAcross", View.Retaining.Count, View.Total]
+        : L["Design:DirOfRegistered", View.Total];
+
+    private (MoVisualRole Role, string Label, long Value, bool Hatched)[] Reasons => Exceptions
+        ? [(MoVisualRole.Error, L["Design:ExReasons:Retained"], View.Retaining.Count, false),
+           (MoVisualRole.Warning, L["Design:ExReasons:Historical"], View.Historical.Count, false),
+           (MoVisualRole.Neutral, L["Design:ExReasons:Evicted"], View.Trimmed, true)]
+        : [(MoVisualRole.Error, L["Design:DirReasons:Unavailable"], View.Unavailable.Count, false),
+           (MoVisualRole.Error, L["Design:DirReasons:Blocked"], View.Blocked.Count, false),
+           (MoVisualRole.Error, L["Design:DirReasons:Retained"], View.Retaining.Count, false),
+           (MoVisualRole.Info, L["Design:DirReasons:Initializing"], View.Count("Initializing"), false),
+           (MoVisualRole.Warning, L["Design:DirReasons:Evicted"], View.Historical.Count, false),
+           (MoVisualRole.Success, L["Design:DirReasons:Running"], View.Channels.Count(c => c.Rank == 6), false)];
+
+    private (MoVisualRole Role, string Label, string Value, string Unit, string Note, bool Hatched)[] Facts
+    {
+        get
+        {
+            var retainedRole = View.TotalRetained > 0 ? MoVisualRole.Error : MoVisualRole.Success;
+            var retainedScope = Exceptions
+                ? L["Design:ExFacts:RetainedSub", View.Retaining.Count, View.Total]
+                : L["Design:Facts:RetainedSub", View.Retaining.Count, View.Total];
+            if (Exceptions)
+            {
+                var capacities = View.Channels.Select(c => c.Capacity).Distinct().Order().ToArray();
+                var capacity = capacities.Length switch
+                {
+                    0 => "—",
+                    1 => Number(capacities[0]),
+                    _ => $"{Number(capacities[0])}–{Number(capacities[^1])}"
+                };
+                return [
+                    (retainedRole, L["Design:ExFacts:Retained"], Number(View.TotalRetained), L["Design:ExFacts:RetainedUnit"], retainedScope, false),
+                    (MoVisualRole.Primary, L["Design:ExFacts:Lifetime"], Number(View.TotalLifetime), L["Design:ExFacts:LifetimeUnit"], L["Design:ExFacts:LifetimeSub"], false),
+                    (MoVisualRole.Warning, L["Design:ExFacts:Evicted"], Number(View.Trimmed), L["Design:ExFacts:EvictedUnit"], L["Design:ExFacts:EvictedSub"], View.Trimmed > 0),
+                    (MoVisualRole.Third, L["Design:ExFacts:Capacity"], capacity, L["Design:ExFacts:CapacityUnit"], L["Design:ExFacts:CapacitySub"], false)
+                ];
+            }
+
+            var running = View.Count(DataChannelSetupState.Running);
+            var failed = View.Count(DataChannelSetupState.Failed);
+            var initializing = View.Count("Initializing");
+            return [
+                (failed > 0 ? MoVisualRole.Error : View.Held.Count > 0 ? MoVisualRole.Warning : MoVisualRole.Success,
+                    L["Design:Facts:Setups"], $"{running} / {View.Setups.Count}", L["Design:Facts:SetupsUnit"],
+                    FactBreakdown(L["Design:Facts:SetupReady"], (View.Held.Count, "Design:Facts:SetupHeld"),
+                        (failed, "Design:Facts:SetupFailed"), (View.Count(DataChannelSetupState.Disabled), "Design:Facts:SetupDisabled")), false),
+                (View.Unavailable.Count > 0 ? MoVisualRole.Error : initializing > 0 ? MoVisualRole.Info : MoVisualRole.Success,
+                    L["Design:Facts:Pipelines"], $"{View.Count("Initialized")} / {View.Total}", L["Design:Facts:PipelinesUnit"],
+                    FactBreakdown(L["Design:Facts:LocalReady"], (initializing, "Design:Facts:LocalInitializing"),
+                        (View.Unavailable.Count, "Design:Facts:LocalUnavailable"), (View.Count("NotInitialized"), "Design:Facts:LocalNotInitialized")), false),
+                (retainedRole, L["Design:Facts:Retained"], Number(View.TotalRetained), L["Design:Facts:RetainedUnit"], retainedScope, false),
+                (View.Trimmed > 0 ? MoVisualRole.Warning : MoVisualRole.Neutral, L["Design:Facts:Lifetime"], Number(View.TotalLifetime), L["Design:Facts:LifetimeUnit"],
+                    View.Trimmed > 0 ? L["Design:Facts:LifetimeSub", Number(View.Trimmed)] : L["Design:Facts:LifetimeAll"], View.Trimmed > 0)
+            ];
+        }
+    }
+
+    private RenderFragment Finding() => builder =>
+    {
+        var error = MoVisualRole.Error;
+        var warning = MoVisualRole.Warning;
+        var retaining = View.Retaining.FirstOrDefault();
+        var historical = View.Historical.FirstOrDefault();
+        var held = View.Held.FirstOrDefault();
+        var findings = new List<RenderFragment>();
+        if (Exceptions)
+        {
+            findings.Add(retaining is null
+                ? MoRichFinding.Compose(L[View.TotalLifetime > 0 ? "Design:Findings:ExCalmHistorical" : "Design:Findings:ExCalm"].Value,
+                    Mark(View.Total, MoVisualRole.Success), Mark(View.TotalLifetime, warning))
+                : MoRichFinding.Compose(L["Design:Findings:ExRetained"].Value,
+                    Mark(View.Retaining.Count, error), Plain(View.Total), Mark(View.TotalRetained, error), Mark(View.TotalLifetime)));
+            if (retaining is not null)
+            {
+                findings.Add(MoRichFinding.Compose(L["Design:Findings:ExPeak"].Value, Link(retaining, error, "exceptions"),
+                    Mark(retaining.Retained, error), Plain(retaining.Capacity), Plain(UiTime.FormatTime(retaining.Latest))));
+            }
+            if (historical is not null)
+            {
+                findings.Add(MoRichFinding.Compose(L["Design:Findings:Historical"].Value, Link(historical, warning, "exceptions"),
+                    Mark(historical.Lifetime, warning)));
+            }
+            findings.Add(Plain(L["Design:Findings:Provenance"].Value));
+        }
+        else if (View.Attention > 0)
+        {
+            if (View.Unavailable.FirstOrDefault() is { } unavailable)
+            {
+                findings.Add(MoRichFinding.Compose(L["Design:Findings:Unavailable"].Value, Mark(View.Unavailable.Count, error),
+                    Link(unavailable, error)));
+            }
+            if (View.Blocked.FirstOrDefault() is { } blocked)
+            {
+                findings.Add(MoRichFinding.Compose(L["Design:Findings:Blocked"].Value, Link(blocked, error, "endpoints"),
+                    Mark(blocked.Blocked[0].Partition, error), Mark(blocked.Blocked[0].Offset, error)));
+            }
+            if (retaining is not null)
+            {
+                findings.Add(MoRichFinding.Compose(L["Design:Findings:Retaining"].Value, Mark(View.Retaining.Count, error),
+                    Mark(View.TotalRetained, error), Mark(View.TotalLifetime), Link(retaining, error, "exceptions")));
+            }
+        }
+        else
+        {
+            findings.Add(MoRichFinding.Compose(L["Design:Findings:Calm"].Value, Mark(View.Total, MoVisualRole.Success),
+                Mark(View.Count(DataChannelSetupState.Running), MoVisualRole.Success)));
+            if (historical is not null)
+            {
+                findings.Add(MoRichFinding.Compose(L["Design:Findings:Historical"].Value, Link(historical, warning, "exceptions"),
+                    Mark(historical.Lifetime, warning)));
+            }
+        }
+        if (!Exceptions && held is not null)
+        {
+            findings.Add(MoRichFinding.Compose(L["Design:Findings:Held"].Value, Mark(View.Held.Count, warning),
+                Plain(held.Owner is { } owner ? DataChannelVisual.ShortOwner(owner) : held.Id)));
+        }
+
+        foreach (var finding in findings)
+        {
+            builder.AddContent(0, finding);
+            builder.AddContent(1, L["Design:Findings:Separator"].Value);
+        }
+    };
+
+    private RenderFragment Link(ChannelEvidence channel, MoVisualRole role, string? tab = null) => @<MoValueMark Role="role" Href="@Query.Open(channel.Id, tab).Url(Exceptions)" Class="mono">@channel.Id</MoValueMark>;
+    private static RenderFragment Mark(long value, MoVisualRole role = MoVisualRole.Neutral) => @<MoValueMark Role="role" Class="mono">@Number(value)</MoValueMark>;
+    private static RenderFragment Plain(object value) => builder => builder.AddContent(0, value);
+    private static string Number(long value) => value.ToString("N0", CultureInfo.CurrentCulture);
+    private string FactBreakdown(string whenClear, params (int Value, string Key)[] reasons)
+    {
+        var parts = reasons.Where(reason => reason.Value > 0).Select(reason => L[reason.Key, reason.Value].Value).ToArray();
+        return parts.Length == 0 ? whenClear : string.Join(" · ", parts);
+    }
+}

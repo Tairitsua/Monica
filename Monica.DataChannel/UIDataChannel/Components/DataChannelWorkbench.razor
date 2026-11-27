@@ -1,113 +1,110 @@
-@inject Monica.UI.Shared.Services.MoTimeFormatter UiTime
-@using Monica.DataChannel.Pages
-@using Monica.DataChannel.UIDataChannel.Support
+@using Microsoft.Extensions.Options
+@using Monica.Modules
 @using Monica.UI.Shared.Components.Navigation
+@using Monica.UI.Shared.Services
+@inject IOptions<ModuleShellUIOption> Shell
+@inject MoTimeFormatter UiTime
 
-@{ var capture = State.Snapshot; }
-<PageTitle>@L[Exceptions ? "Pages:DataChannelExceptions:Title" : "Pages:DataChannelManage:Title"]</PageTitle>
-<div class="datachannel-workbench mo-page-shell mo-page-shell--full-width" aria-busy="@(State.IsRefreshing ? "true" : "false")">
-    <header class="datachannel-identity">
-        <div class="datachannel-identity__copy">
-            <span class="datachannel-identity__kicker">@L["Workbench:Eyebrow"]</span>
-            <h1>@L[Exceptions ? "ExceptionWorkbench:Title" : "Workbench:Title"]</h1>
-            <p>@L[Exceptions ? "ExceptionWorkbench:Description" : "Workbench:Description"]</p>
-        </div>
-        <div class="datachannel-identity__tools">
-            <div class="datachannel-capture">
+@{
+    var capture = State.Snapshot;
+    var view = View;
+    var loading = capture is null && (State.IsRefreshing || !State.HasAttemptedCapture);
+    var posture = Posture(view, loading);
+    var title = L[Exceptions ? "Pages:DataChannelExceptions:Title" : "Pages:DataChannelManage:Title"].Value;
+    var sheetChannel = Query.Inspect is { } identity ? view?.ById.GetValueOrDefault(identity) : null;
+}
+<PageTitle>@title</PageTitle>
+<div class="dc-page mo-page-shell mo-page-shell--full-width" aria-busy="@(State.IsRefreshing ? "true" : "false")">
+    <MoPageMasthead Title="@title" Crumb="@L["Design:Eyebrow"]" Icon="@(Exceptions ? MoIcons.Warning : MoIcons.Route)">
+        <Meta>
+            <span class="dc-state @posture.Role.ToCssClass()" role="status"><span class="status-dot" aria-hidden="true"></span>@posture.Label</span>
+            <span class="dc-outline-chip mono" title="@Environment.MachineName">@L["Design:HostChip"] · @Shell.Value.GetAppName()</span>
+            <span class="dc-outline-chip" title="@UiTime.TimeZone.Id">@L["Design:TzChip"] · @UiTime.FormatZoneLabel(capture?.CapturedAt)</span>
+        </Meta>
+        <Actions>
+            <div class="dc-stamp">
                 <span>@L["Workbench:Captured"]</span>
-                <time>@(capture is null ? L["Workbench:NoCapture"].Value : UiTime.Format(capture.CapturedAt))</time>
+                <time class="mono">@(capture is null ? L["Workbench:NoCapture"].Value : UiTime.FormatTime(capture.CapturedAt))</time>
             </div>
-            <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@MoIcons.Refresh" OnClick="RefreshAsync" Disabled="State.IsRefreshing">@L["Common:Actions:Refresh"]</MudButton>
-        </div>
-    </header>
-    <MoWorkbenchNavigation Label="@L["Workbench:Navigation"]">
-        <a href="@(UIDataChannelPage.PAGE_URL + ScopeQuery)" aria-current="@(!Exceptions ? "page" : null)">
-            <MoIcon Icon="@MoIcons.Workflow" Size="1.25rem" />
-            <span>@L["Workbench:Routes:Channels"]</span>
-        </a>
-        <a href="@(UIDataChannelExceptionsPage.PAGE_URL + ScopeQuery)" aria-current="@(Exceptions ? "page" : null)">
-            <MoIcon Icon="@MoIcons.Error" Size="1.25rem" />
-            <span>@L["Workbench:Routes:Exceptions"]</span>
+            <button type="button" class="btn btn-primary" disabled="@State.IsRefreshing" @onclick="RefreshAsync">
+                <MoIcon Icon="@MoIcons.Refresh" Class="@(State.IsRefreshing ? "dc-spin" : null)" Size="15px" />@L["Common:Actions:Refresh"]
+            </button>
+        </Actions>
+    </MoPageMasthead>
+
+    <MoWorkbenchNavigation Label="@L["Design:NavLabel"]" Compact="true">
+        <a href="@ScopeUrl(false)" aria-current="@(!Exceptions ? "page" : null)"><MoIcon Icon="@MoIcons.Route" /><span>@L["Workbench:Routes:Channels"]</span></a>
+        <a href="@ScopeUrl(true)" aria-current="@(Exceptions ? "page" : null)">
+            <MoIcon Icon="@MoIcons.Warning" /><span>@L["Design:Nav:Exceptions"]</span>
+            @if (view?.TotalRetained > 0)
+            {
+                <span class="dc-wbn-badge mo-vl-role--error">@view.TotalRetained</span>
+            }
         </a>
     </MoWorkbenchNavigation>
-    @if (!string.IsNullOrEmpty(State.RefreshError))
+
+    @if (State.RefreshError is { } error && capture is not null)
     {
-        <MudAlert Severity="Severity.Error" Variant="Variant.Outlined" Icon="@MoIcons.Error">
-            <strong>@L["Workbench:ReadFailed"]</strong>
-            <p>@State.RefreshError</p>
-            <p>@L[capture is null ? "Workbench:UnavailableHelp" : "Workbench:PreviousCaptureHelp"]</p>
-        </MudAlert>
+        <MoSemanticCallout Severity="MoVisualRole.Warning" Title="@L["Design:StaleTitle"]">
+            @L["Design:StaleNote", UiTime.FormatTime(capture.CapturedAt)] <code class="mono dc-err-inline">@error</code>
+        </MoSemanticCallout>
     }
-    @if (capture is null)
+    @if (view is null || view.IsEmpty)
     {
-        @if (State.IsRefreshing || !State.HasAttemptedCapture)
-        {
-            <div class="datachannel-loading" role="status">
-                <MudProgressCircular Indeterminate="true" Color="Color.Primary" Size="Size.Medium" />
-                <h2>@L["Workbench:Loading"]</h2>
-                <p>@L["Workbench:LoadingDescription"]</p>
-            </div>
-        }
-    }
-    else if (Exceptions)
-    {
-        <section class="datachannel-evidence-strip" aria-label="@L["ExceptionWorkbench:SummaryLabel"]">
-            <div>
-                <span>@L["ExceptionWorkbench:Retained"]</span>
-                <strong data-attention="@(capture.ExceptionSummary.TotalCurrentExceptions > 0 ? "true" : "false")">@capture.ExceptionSummary.TotalCurrentExceptions</strong>
-            </div>
-            <div>
-                <span>@L["ExceptionWorkbench:AffectedChannels"]</span>
-                <strong>@capture.ExceptionSummary.ChannelsWithExceptions <small>/ @capture.ExceptionSummary.TotalChannels</small>
-                </strong>
-            </div>
-            <div>
-                <span>@L["ExceptionWorkbench:Lifetime"]</span>
-                <strong>@capture.ExceptionSummary.TotalHistoricalExceptions</strong>
-            </div>
-            <div class="datachannel-evidence-strip__explanation">
-                <MoIcon Icon="@MoIcons.History" Size="1.5rem" />
-                <p>@L["ExceptionWorkbench:RetentionHelp"]</p>
-            </div>
+        <section class="mo-vl-surface dc-gate">
+            <MoContentState Loading="@loading" role="@(loading ? "status" : State.RefreshError is not null ? "alert" : null)">
+                <span class="mo-vl-tile @(loading ? "mo-vl-role--info" : State.RefreshError is null ? "mo-vl-role--neutral" : "mo-vl-role--error")">
+                    <MoIcon Icon="@(loading ? MoIcons.Refresh : State.RefreshError is null ? MoIcons.Route : MoIcons.Error)"
+                            Class="@(loading ? "dc-spin" : null)" Size="18px" />
+                </span>
+                <h2>@L[loading ? "Workbench:Loading" : State.RefreshError is null ? "Design:EmptyTitle" : "Design:LoadFailedTitle"]</h2>
+                <p>@L[loading ? "Workbench:LoadingDescription" : State.RefreshError is null ? "Design:EmptyBody" : "Design:LoadFailedBody"]</p>
+                @if (!loading)
+                {
+                    @if (State.RefreshError is { } failure)
+                    {
+                        <p class="mono dc-gate-err">@failure</p>
+                    }
+                    <button type="button" class="btn @(State.RefreshError is null ? "btn-outline" : "btn-primary")" @onclick="RefreshAsync">
+                        <MoIcon Icon="@MoIcons.Refresh" Size="15px" />@L["Common:Actions:Refresh"]
+                    </button>
+                }
+            </MoContentState>
         </section>
-        <ChannelExceptionDirectory Summary="capture.ExceptionSummary" ChannelId="@ChannelId" IsBusy="IsChannelBusy" OnInspect="InspectExceptionsAsync" OnClear="ClearHistoryAsync" />
     }
     else
     {
-        <SetupDirectory Setups="capture.Setups" IsBusy="@(_pendingChannels.Count > 0 || State.IsRefreshing)"
-                        OnStart="StartSetupAsync" OnStop="StopSetupAsync" OnRestart="RestartSetupAsync" />
-        <section class="datachannel-evidence-strip datachannel-evidence-strip--initialization" aria-label="@L["Workbench:SummaryLabel"]">
-            <div>
-                <span>@L["Workbench:Registered"]</span>
-                <strong>@capture.Channels.Count</strong>
-            </div>
-            <div data-state="Initialized">
-                <span>@L["Channel:States:Initialized"]</span>
-                <strong>@capture.Channels.Count(channel => DataChannelPresentation.Initialization(channel) == "Initialized")</strong>
-            </div>
-            <div data-state="Initializing">
-                <span>@L["Channel:States:Initializing"]</span>
-                <strong>@capture.Channels.Count(channel => DataChannelPresentation.Initialization(channel) == "Initializing")</strong>
-            </div>
-            <div data-state="Unavailable">
-                <span>@L["Channel:States:Unavailable"]</span>
-                <strong>@capture.Channels.Count(channel => DataChannelPresentation.Initialization(channel) == "Unavailable")</strong>
-            </div>
-            <div>
-                <span>@L["Channel:States:NotInitialized"]</span>
-                <strong>@capture.Channels.Count(channel => DataChannelPresentation.Initialization(channel) == "NotInitialized")</strong>
-            </div>
-            <div>
-                <span>@L["Workbench:RetainedExceptions"]</span>
-                <strong data-attention="@(capture.ExceptionSummary.TotalCurrentExceptions > 0 ? "true" : "false")">@capture.ExceptionSummary.TotalCurrentExceptions</strong>
-            </div>
-        </section>
-        <ChannelDirectory Channels="capture.Channels" ChannelId="@ChannelId" IsBusy="IsChannelBusy" OnInspect="InspectPipelineAsync" OnReinitialize="ReinitializeAsync" OnViewExceptions="InspectExceptionsAsync" OnClear="ClearHistoryAsync" />
-        <p class="datachannel-scope-note">
-            <MoIcon Icon="@MoIcons.Info" Size="1.25rem" />@L["Workbench:ScopeHelp"]</p>
+        <DataChannelDecision View="view" Query="Query" Exceptions="Exceptions" OnQuery="ChangeFilter" />
+        @if (Exceptions)
+        {
+            <ChannelExceptionDirectory View="view" Query="Query" OnQuery="ChangeFilter" OnClear="ClearHistoryAsync" IsBusy="IsChannelBusy" />
+        }
+        else
+        {
+            <ChannelDirectory View="view" Query="Query" OnQuery="ChangeFilter" OnReinitialize="ReinitializeAsync" OnClear="ClearHistoryAsync"
+                              OnStart="StartSetupAsync" OnStop="StopSetupAsync" OnRestart="RestartSetupAsync"
+                              IsBusy="IsChannelBusy" SetupBusy="SetupBusy" />
+        }
+        <p class="dc-scope-note"><MoIcon Icon="@MoIcons.Info" Size="16px" />
+            <span>@L[Exceptions ? "Design:ExScopeNote" : "Design:ScopeNote"]</span>
+        </p>
     }
 </div>
 
+@if (Query.Inspect is not null && (!Query.Debugger || sheetChannel is null))
+{
+    <DataChannelEvidenceSheet @key="Query.Inspect" Query="Query" Channel="sheetChannel" ExceptionsRoute="Exceptions"
+                              IsLoading="loading" IsBusy="@(sheetChannel is not null && IsChannelBusy(sheetChannel.Id))"
+                              OnQuery="ChangeFilter" OnClose="CloseSheet" OnReinitialize="ReinitializeAsync" OnClear="ClearHistoryAsync" />
+}
+
 @code {
-    private string ScopeQuery => string.IsNullOrEmpty(ChannelId) ? string.Empty : "?channel=" + Uri.EscapeDataString(ChannelId);
+    private (MoVisualRole Role, string Label) Posture(DataChannelView? view, bool loading)
+    {
+        if (loading || State.IsRefreshing) return (MoVisualRole.Info, L["Design:Posture:Loading"]);
+        if (State.RefreshError is not null) return (MoVisualRole.Warning, L["Design:Posture:Stale"]);
+        if (view is null || view.Total == 0) return (MoVisualRole.Neutral, L["Design:Posture:Empty"]);
+        if (view.Attention > 0) return (MoVisualRole.Error, L["Design:Posture:Attention", view.Attention]);
+        return (MoVisualRole.Success, L["Design:Posture:Calm"]);
+    }
 }

@@ -1,73 +1,100 @@
 @using Monica.UI.Shared.Components.Json
-@inject Monica.UI.Shared.Services.MoTimeFormatter UiTime
 @using Monica.DataChannel.Models
 @using Monica.DataChannel.Middlewares
 @using Monica.DataChannel.Pipeline
-@using Monica.DataChannel.UIDataChannel.Support
+@inject Monica.UI.Shared.Services.MoTimeFormatter UiTime
 @inject IStringLocalizer<DataChannelResource> L
 @inject ISnackbar Snackbar
 @inject Microsoft.Extensions.Logging.ILogger<MessageDebuggerDialog> Logger
 @implements IAsyncDisposable
 
-<MudDialog>
+<MudDialog Gutters="false" DefaultFocus="DefaultFocus.None" Style="width:min(760px, calc(100vw - 28px));max-height:calc(100dvh - 28px);">
+    <TitleContent>
+        <div class="debugger-heading">
+            <span class="mo-vl-tile mo-vl-role--info"><MoIcon Icon="@MoIcons.Bug" Size="16px" /></span>
+            <div><h2>@L["Workbench:DebuggerDialogTitle"] · @ChannelId</h2><p>@L["Debugger:Eyebrow"]</p></div>
+            <MudIconButton @ref="_close" Icon="@MoIcons.Close" Size="Size.Small" OnClick="Dismiss" aria-label="@L["Design:Close"]" />
+        </div>
+    </TitleContent>
     <DialogContent>
         <div class="debugger-console">
-            <header class="debugger-identity">
-                <span>@L["Debugger:Eyebrow"]</span>
-                <h2>@ChannelId</h2>
-                <p>@L["Debugger:CaptureScope"]</p>
-            </header>
+            <div class="debugger-scope" role="note">
+                <span class="mo-vl-tile mo-vl-role--info"><MoIcon Icon="@MoIcons.Info" Size="15px" /></span>
+                <span>@L["Debugger:CaptureScope"]</span>
+            </div>
             @if (_readError is not null)
             {
                 <MudAlert Severity="Severity.Error" Variant="Variant.Outlined" Icon="@MoIcons.Error">@L["Debugger:Messages:ReadFailed", _readError]</MudAlert>
             }
+
             <section class="debugger-controls" aria-label="@L["Debugger:Controls:AriaLabel"]">
-                <div class="debugger-controls__query">
-                    <MudTextField T="string" Value="_filterKeyword" ValueChanged="SetFilterKeyword" Label="@L["Debugger:Fields:FilterKeyword"]" Placeholder="@L["Debugger:Fields:FilterPlaceholder"]" Variant="Variant.Outlined" Margin="Margin.Dense" Immediate="true" Disabled="_isListening" />
+                <div class="debugger-field">
+                    <span id="dc-debug-keyword-label">@L["Debugger:Fields:FilterKeyword"]</span>
+                    <MudTextField T="string" Value="_filterKeyword" ValueChanged="SetFilterKeyword" Variant="Variant.Outlined"
+                                  aria-labelledby="dc-debug-keyword-label" Placeholder="@L["Debugger:Fields:FilterPlaceholder"]"
+                                  Margin="Margin.Dense" Immediate="true" Disabled="_isListening" />
                 </div>
-                <div class="debugger-controls__capacity">
-                    <MudNumericField T="int" Value="_maxQueueSize" ValueChanged="SetCapacity" Label="@L["Debugger:Fields:QueueLength"]" Min="1" Max="1000" Variant="Variant.Outlined" Margin="Margin.Dense" Disabled="_isListening" />
+                <div class="debugger-field">
+                    <span id="dc-debug-capacity-label">@L["Debugger:Fields:QueueLength"]</span>
+                    <MudNumericField T="int" Value="_maxQueueSize" ValueChanged="SetCapacity" Min="1" Max="1000"
+                                     aria-labelledby="dc-debug-capacity-label" Variant="Variant.Outlined" Margin="Margin.Dense"
+                                     HideSpinButtons="true" Disabled="_isListening" />
                 </div>
-                <MudButton Color="@(_isListening ? Color.Error : Color.Primary)" Variant="@(_isListening ? Variant.Outlined : Variant.Filled)" StartIcon="@(_isListening ? MoIcons.Stop : MoIcons.Play)" OnClick="ToggleListening">@L[_isListening ? "Debugger:Actions:Stop" : "Debugger:Actions:Start"]</MudButton>
+                <div class="debugger-controls__actions">
+                    <MudButton StartIcon="@(_isListening ? MoIcons.Stop : MoIcons.Play)"
+                               Color="@(_isListening ? Color.Default : Color.Primary)"
+                               Variant="@(_isListening ? Variant.Outlined : Variant.Filled)" OnClick="ToggleListening">
+                        @L[_isListening ? "Debugger:Actions:Stop" : "Debugger:Actions:Start"]
+                    </MudButton>
+                    @if (_isListening)
+                    {
+                        <MudButton Class="debugger-simulate" StartIcon="@MoIcons.Zap" OnClick="SimulateMessage" Disabled="_isExecutingCommand"
+                                   title="@L["Design:Debugger:SampleScope"]">@L["Design:Debugger:Simulate"]</MudButton>
+                    }
+                </div>
                 <p>@L["Debugger:SettingsHelp"]</p>
                 @if (_settingsDirty)
                 {
                     <p class="debugger-draft-help">@L["Debugger:DraftHelp", string.IsNullOrEmpty(_observedKeyword) ? L["Debugger:NoKeyword"].Value : _observedKeyword, _observedCapacity]</p>
                 }
             </section>
+
             <section class="debugger-stream" aria-labelledby="debugger-stream-title">
                 <header class="debugger-stream__header">
                     <div>
-                        <span class="debugger-state" data-active="@(_isListening ? "true" : "false")">@L[_isListening ? "Debugger:States:Listening" : "Debugger:States:Paused"]</span>
+                        <span class="mo-vl-status mo-vl-status--pill @(_isListening ? "mo-vl-status--live mo-vl-role--info" : "mo-vl-role--neutral")">
+                            <span class="mo-vl-status-dot" aria-hidden="true"></span>@L[_isListening ? "Debugger:States:Listening" : "Debugger:States:Paused"]
+                        </span>
                         <h3 id="debugger-stream-title">@L["Debugger:CapturedMessages"]</h3>
+                        <span class="debugger-count">@L["Debugger:MessageCount", _messages.Count]</span>
                     </div>
-                    <div class="debugger-stream__tools">
-                        <span>@L["Debugger:MessageCount", _messages.Count]</span>
-                        <MudButton Variant="Variant.Text" Color="Color.Primary" Size="Size.Small" StartIcon="@MoIcons.ClearList" OnClick="ClearMessages" aria-disabled="@(_messages.Count == 0 || _isExecutingCommand ? "true" : "false")">@L["Debugger:Actions:Clear"]</MudButton>
-                    </div>
+                    <MudButton Variant="Variant.Text" Size="Size.Small" StartIcon="@MoIcons.ClearList" OnClick="ClearMessages"
+                               Disabled="@(_messages.Count == 0 || _isExecutingCommand)">@L["Debugger:Actions:Clear"]</MudButton>
                 </header>
                 @if (_messages.Count == 0)
                 {
-                    <div class="debugger-empty">
-                        <MoIcon Icon="@MoIcons.Inbox" Size="2.25rem" />
-                        <h4>@L["Debugger:States:NoMessages"]</h4>
-                        <p>@L["Debugger:States:NoMessagesDescription"]</p>
-                    </div>
+                    <MoContentState Compact="true">
+                        <span class="mo-vl-tile mo-vl-role--neutral"><MoIcon Icon="@MoIcons.Inbox" Size="18px" /></span>
+                        <h3>@L["Debugger:States:NoMessages"]</h3><p>@L["Debugger:States:NoMessagesDescription"]</p>
+                    </MoContentState>
                 }
                 else
                 {
                     <div class="debugger-message-list">
-                        @foreach (var message in _messages.OrderByDescending(item => item.Sequence))
+                        @foreach (var message in _messages.Reverse())
                         {
-                            <article class="debugger-message" data-selected="@(_selectedMessage?.Sequence == message.Sequence ? "true" : "false")" @key="message.Sequence">
-                                <div class="debugger-message__summary">
-                                    <span class="debugger-message__source" data-source="@message.Source">@SourceLabel(message.Source)</span>
-                                    <code title="@message.MessageType">@message.MessageType</code>
+                            var isSelected = _selectedMessage?.Sequence == message.Sequence;
+                            var role = IsSample(message) ? "mo-vl-role--third" : message.Source == ChannelSide.Inner ? "mo-vl-role--primary" : "mo-vl-role--info";
+                            <button type="button" class="debugger-message" aria-pressed="@(isSelected ? "true" : "false")" @key="message.Sequence"
+                                    aria-label="@L["Debugger:InspectMessage", message.Sequence]" @onclick="() => _selectedMessage = message">
+                                <span class="debugger-message__summary">
+                                    <span class="debugger-message__source @role">@SourceLabel(message)</span>
+                                    <span class="debugger-ordinal">#@message.Sequence</span>
+                                    <code>@message.MessageType</code>
                                     <time>@UiTime.Format(message.Timestamp)</time>
-                                    <MudButton Size="Size.Small" Color="Color.Primary" OnClick="() => _selectedMessage = message" aria-label="@L["Debugger:InspectMessage", message.Sequence]">@L["Channel:Actions:Inspect"]</MudButton>
-                                </div>
-                                <p class="debugger-message__preview">@Preview(message.FormattedContent)</p>
-                            </article>
+                                </span>
+                                <span class="debugger-message__preview">@Preview(message.FormattedContent)</span>
+                            </button>
                         }
                     </div>
                 }
@@ -76,57 +103,55 @@
             {
                 <section class="debugger-inspector" aria-labelledby="debugger-inspector-title">
                     <header>
-                        <div>
-                            <span>@L["Debugger:SelectedEvidence", selected.Sequence]</span>
-                            <h3 id="debugger-inspector-title">@selected.MessageType</h3>
-                            <p>@SourceLabel(selected.Source) · @UiTime.Format(selected.Timestamp)</p>
-                        </div>
-                        <MudIconButton Icon="@MoIcons.Close" Size="Size.Small" OnClick="() => _selectedMessage = null" aria-label="@L["Debugger:CloseSelection"]" />
+                        <p>@L["Debugger:SelectedEvidence", selected.Sequence] · @UiTime.Format(selected.Timestamp)</p>
+                        <h3 id="debugger-inspector-title">@selected.MessageType</h3>
                     </header>
                     @if (!_messages.Any(message => message.Sequence == selected.Sequence))
                     {
-                        <p class="debugger-detached-note">@L["Debugger:DetachedSelection"]</p>
+                        <div class="debugger-detached-note" role="status">
+                            <MoIcon Icon="@MoIcons.History" Size="16px" />@L["Debugger:DetachedSelection"]
+                        </div>
                     }
-                    <MudTabs Elevation="0" Rounded="false" MinimumTabWidth="var(--datachannel-tab-min-width, 160px)" PrevIcon="@MoIcons.ChevronLeft" NextIcon="@MoIcons.ChevronRight">
+                    <MudTabs Class="debugger-tabs" Elevation="0" Rounded="false" HideSlider="true" MinimumTabWidth="0"
+                             PrevIcon="@MoIcons.ChevronLeft" NextIcon="@MoIcons.ChevronRight">
                         <MudTabPanel Text="@L["Debugger:Tabs:FormattedContent"]">
-                            <div class="debugger-inspector__tab">
-                                <h4>@L["Debugger:Tabs:FormattedContent"]</h4>
-                                <MoJson Value="@selected.FormattedContent" AllowPlainText="true" />
+                            <div class="debugger-payload">
+                                <div class="debugger-copy">
+                                    <span>@SourceLabel(selected)</span>
+                                    <MoCopyButton Value="@selected.FormattedContent" Label="@L["Design:Debugger:CopyPayload"]" />
+                                </div>
+                                <MoJson Value="@selected.FormattedContent" ShowToolbar="false" ShowStatus="false" ShowLineNumbers="false"
+                                        FormatOnDisplay="false" AllowPlainText="true" WrapLines="true" MaxHeight="300px" />
                             </div>
                         </MudTabPanel>
                         <MudTabPanel Text="@L["Debugger:Tabs:PayloadSnapshot"]">
-                            <div class="debugger-inspector__tab">
-                                <h4>@L["Debugger:Tabs:PayloadSnapshot"]</h4>
-                                <MetadataDisplay Metadata="selected.Payload" />
-                            </div>
+                            <MetadataDisplay Metadata="selected.Payload" />
                         </MudTabPanel>
                         <MudTabPanel Text="@L["Debugger:Tabs:Metadata"]">
-                            <div class="debugger-inspector__tab">
-                                <h4>@L["Debugger:Tabs:Metadata"]</h4>
-                                @if (selected.Metadata.Count == 0)
-                                {
-                                    <p class="debugger-metadata-empty">@L["Debugger:NoMetadata"]</p>
-                                } else {
+                            @if (selected.Metadata.Count == 0)
+                            {
+                                <p class="debugger-metadata-empty">@L["Debugger:NoMetadata"]</p>
+                            }
+                            else
+                            {
                                 <dl class="debugger-metadata">
                                     @foreach (var entry in selected.Metadata)
                                     {
-                                        <div>
-                                            <dt>@entry.Key</dt>
-                                            <dd>
-                                                <MetadataDisplay Metadata="entry.Value" />
-                                            </dd>
-                                        </div>
+                                        <div><dt>@entry.Key</dt><dd><MetadataDisplay Metadata="entry.Value" /></dd></div>
                                     }
                                 </dl>
                             }
-                        </div>
-                    </MudTabPanel>
-                </MudTabs>
-            </section>
-        }
-        <p class="debugger-lifetime-help">@L["Debugger:CloseHelp"]</p>
-    </div>
-</DialogContent>
+                        </MudTabPanel>
+                    </MudTabs>
+                </section>
+            }
+        </div>
+    </DialogContent>
+    <DialogActions>
+        <div class="debugger-footer"><span>@L["Debugger:CloseHelp"]</span>
+            <MudButton Variant="Variant.Outlined" OnClick="Dismiss">@L["Design:Close"]</MudButton>
+        </div>
+    </DialogActions>
 </MudDialog>
 
 @code {
@@ -137,6 +162,18 @@
     /// <summary>Gets or sets the exact identity of the channel that owns the capture middleware.</summary>
     [Parameter, EditorRequired]
     public string ChannelId { get; set; } = string.Empty;
+
+    [CascadingParameter] private IMudDialogInstance Dialog { get; set; } = null!;
+    private MudIconButton? _close;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender || _close is null) return;
+        try { await _close.FocusAsync(); }
+        catch (JSDisconnectedException) { }
+    }
+
+    private void Dismiss() => Dialog.Cancel();
 
     private readonly CancellationTokenSource _lifetime = new();
     private readonly object _retirementGate = new();
@@ -159,6 +196,7 @@
         _filterKeyword = Middleware.FilterKeyword;
         _maxQueueSize = Middleware.MaxQueueSize;
         ReadCapture();
+        _selectedMessage = _messages.LastOrDefault();
         _pollTask = PollAsync(_lifetime.Token);
     }
     private void ReadCapture()
@@ -222,6 +260,10 @@
             if (_messages.Count > 0) { Middleware.ClearDebugMessages(); }
         });
     }
+    private void SimulateMessage() => ExecuteCommand(() =>
+    {
+        if (!Middleware.CaptureSample()) Snackbar.Add(L["Design:Debugger:SampleNotCaptured"], Severity.Info);
+    });
     private void ExecuteCommand(Action command)
     {
         if (_retired || _isExecutingCommand) { return; }
@@ -252,7 +294,11 @@
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) { }
     }
-    private string SourceLabel(ChannelSide source) => L[source == ChannelSide.Inner ? "Debugger:Sources:Ingress" : "Debugger:Sources:Egress"];
+    private static bool IsSample(DebugMessageSnapshot message) =>
+        message.Metadata.TryGetValue(MessageDebuggerMiddleware.SampleMetadataKey, out var value) && value.Json == "true";
+
+    private string SourceLabel(DebugMessageSnapshot message) => L[IsSample(message) ? "Design:Debugger:Sample" :
+        message.Source == ChannelSide.Inner ? "Debugger:Sources:Ingress" : "Debugger:Sources:Egress"];
     private string Preview(string content)
     {
         if (string.IsNullOrEmpty(content)) { return L["Debugger:Values:EmptyMessage"]; }

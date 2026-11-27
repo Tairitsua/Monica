@@ -1,0 +1,134 @@
+@using Monica.UI.Shared.Components.Dialogs
+@using Monica.UI.Shared.Services
+@inject IStringLocalizer<DataChannelResource> L
+@inject MoTimeFormatter UiTime
+
+<MoSideSheet Open="true" DismissRequested="OnClose" Width="680px" Compact="true" InsetHeader="true" WrapTabs="true" FocusCloseOnOpen="true"
+             CloseLabel="@L["Design:Close"]" ActiveTabIndex="ActiveTab" ActiveTabIndexChanged="SetTab"
+             TabPanels="@(Channel is { } selected ? Tabs(selected) : null)">
+    <TitleContent>
+        <div class="dc-sheet-id">
+            <p class="eyebrow">@L["Design:Sheet:Eyebrow"]</p>
+            <div class="dc-sheet-title-row">
+                <h2 class="mono">@Query.Inspect</h2>
+                <MoCopyButton Value="@Query.Inspect" Label="@L["Design:CopyChannel"]" />
+            </div>
+            @if (Channel is { } channel)
+            {
+                <div class="dc-sheet-meta">
+                    <DataChannelInitBadge State="@channel.Initialization" />
+                    <span class="dc-outline-chip">@(channel.Group ?? L["Workbench:Ungrouped"].Value)</span>
+                    @if (channel.Setup?.Owner is { } owner)
+                    {
+                        <span class="dc-outline-chip mono">@DataChannelVisual.ShortOwner(owner)</span>
+                    }
+                    <span class="dc-sheet-summary mono">
+                        @DataChannelVisual.EndpointName(channel.Status.InnerEndpoint)
+                        <MoIcon Icon="@DataChannelVisual.DirectionIcon(channel.Direction)" Size="13px" />
+                        @DataChannelVisual.Transport(channel.Status.OuterEndpoint)
+                    </span>
+                </div>
+            }
+        </div>
+    </TitleContent>
+    <HeaderContent>
+        @if (Channel is { } channel)
+        {
+            <div class="dc-sheet-tools">
+                <p class="dc-sheet-frozen">@L["Design:Sheet:FrozenNote", UiTime.FormatTime(channel.Status.CapturedAt)]</p>
+                <div class="dc-sheet-actions">
+                    <button type="button" class="btn btn-outline btn-sm" disabled="@(!channel.CanReinitialize || IsBusy)"
+                            @onclick="() => OnReinitialize.InvokeAsync(channel.Id)">
+                        <MoIcon Icon="@MoIcons.Refresh" Size="14px" />@L["Channel:Actions:Reinitialize"]
+                    </button>
+                    <button type="button" class="btn btn-outline btn-sm" disabled="@IsBusy" @onclick="() => OnClear.InvokeAsync(channel.Id)">
+                        <MoIcon Icon="@MoIcons.ClearList" Size="14px" />@L["Design:ClearHistoryBtn"]
+                    </button>
+                    <a class="btn btn-ghost btn-sm dc-sheet-jump" href="@(new DataChannelQuery { Channel = channel.Id }.Url(!ExceptionsRoute))">
+                        <MoIcon Icon="@MoIcons.ExternalLink" Size="14px" />@L[ExceptionsRoute ? "Design:ExBackToDir" : "Design:OpenExceptionsRoute"]
+                    </a>
+                </div>
+            </div>
+        }
+    </HeaderContent>
+    <ChildContent>
+        <div class="dc-sheet-body">
+            <MoContentState Loading="IsLoading" Compact="true">
+                <span class="mo-vl-tile @(IsLoading ? "mo-vl-role--info" : "mo-vl-role--warning")">
+                    <MoIcon Icon="@(IsLoading ? MoIcons.Refresh : MoIcons.SearchOff)" Size="18px" />
+                </span>
+                <h2>@L[IsLoading ? "Workbench:Loading" : "Design:Sheet:UnknownTitle"]</h2>
+                <p>@(IsLoading ? L["Workbench:LoadingDescription"] : L["Design:Sheet:UnknownBody", Query.Inspect ?? string.Empty])</p>
+                @if (!IsLoading)
+                {
+                    <button type="button" class="btn btn-outline btn-sm" @onclick="OnClose">@L["Design:Close"]</button>
+                }
+            </MoContentState>
+        </div>
+    </ChildContent>
+</MoSideSheet>
+
+@code {
+    /// <summary>Gets or sets URL-held sheet selection, including its active tab.</summary>
+    [Parameter, EditorRequired] public DataChannelQuery Query { get; set; } = new();
+    /// <summary>Gets or sets selected detached channel evidence, or null for an unresolved identity.</summary>
+    [Parameter] public ChannelEvidence? Channel { get; set; }
+    /// <summary>Gets or sets which workbench route opened the sheet.</summary>
+    [Parameter] public bool ExceptionsRoute { get; set; }
+    /// <summary>Gets or sets whether the initial management capture is still loading.</summary>
+    [Parameter] public bool IsLoading { get; set; }
+    /// <summary>Disables mutations during an admitted command.</summary>
+    [Parameter] public bool IsBusy { get; set; }
+    /// <summary>Applies sheet filter and selection changes.</summary>
+    [Parameter] public EventCallback<DataChannelQuery> OnQuery { get; set; }
+    /// <summary>Dismisses the sheet and removes its selection from the URL.</summary>
+    [Parameter] public EventCallback OnClose { get; set; }
+    /// <summary>Reinitializes a channel through the workbench.</summary>
+    [Parameter] public EventCallback<string> OnReinitialize { get; set; }
+    /// <summary>Requests confirmation to clear the channel's shared history.</summary>
+    [Parameter] public EventCallback<string> OnClear { get; set; }
+
+    private int ActiveTab => Query.Tab switch
+    {
+        "pipeline" => 0, "endpoints" => 1, "middleware" => 2, "exceptions" => 3,
+        _ => ExceptionsRoute ? 3 : 0
+    };
+
+    private Task SetTab(int index)
+    {
+        if (index == ActiveTab) return Task.CompletedTask;
+        var tab = index switch { 1 => "endpoints", 2 => "middleware", 3 => "exceptions", _ => "pipeline" };
+        return OnQuery.InvokeAsync(Query with { Tab = tab });
+    }
+
+    private Task SelectMiddleware(string key) => OnQuery.InvokeAsync(Query with { Tab = "middleware", Component = key });
+    private Task OpenDebugger(string key) => OnQuery.InvokeAsync(Query with { Debugger = true, Component = key });
+
+    private RenderFragment Tabs(ChannelEvidence channel) => @<text>
+        <MudTabPanel Text="@L["Design:Sheet:Tabs:Pipeline"]">
+            <div class="dc-sheet-body">
+                <DataChannelPipelineSpine Channel="channel" OnOpenEndpoints="() => SetTab(1)"
+                                          OnSelectMiddleware="SelectMiddleware" OnOpenDebugger="OpenDebugger" />
+            </div>
+        </MudTabPanel>
+        <MudTabPanel Text="@L["Design:Sheet:Tabs:Endpoints"]">
+            <TabContent><span>@L["Design:Sheet:Tabs:Endpoints"]</span><span class="dc-tab-count mono">2</span></TabContent>
+            <ChildContent><div class="dc-sheet-body"><DataChannelEndpointEvidence Channel="channel" /></div></ChildContent>
+        </MudTabPanel>
+        <MudTabPanel Text="@L["Design:Sheet:Tabs:Middleware"]">
+            <TabContent><span>@L["Design:Sheet:Tabs:Middleware"]</span><span class="dc-tab-count mono">@channel.Status.Middlewares.Count</span></TabContent>
+            <ChildContent>
+                <div class="dc-sheet-body"><DataChannelMiddlewareEvidence Channel="channel" SelectedKey="@Query.Component"
+                    OnSelectMiddleware="SelectMiddleware" OnOpenDebugger="OpenDebugger" /></div>
+            </ChildContent>
+        </MudTabPanel>
+        <MudTabPanel Text="@L["Design:Sheet:Tabs:Exceptions"]">
+            <TabContent><span>@L["Design:Sheet:Tabs:Exceptions"]</span>
+                <span class="dc-tab-count mono @(channel.Retained > 0 ? "mo-vl-role--error is-hot" : null)">@channel.Retained</span>
+            </TabContent>
+            <ChildContent>
+                <div class="dc-sheet-body"><DataChannelRetainedEvidence Channel="channel" Query="Query" OnQuery="OnQuery" /></div>
+            </ChildContent>
+        </MudTabPanel>
+    </text>;
+}

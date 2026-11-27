@@ -1,0 +1,215 @@
+@using Monica.UI.Shared.Services
+@inject DataChannelFacade Facade
+@inject IStringLocalizer<DataChannelResource> L
+@inject MoTimeFormatter UiTime
+@implements IAsyncDisposable
+
+<div class="dc-tab-stack">
+    @if (_evidence is { } evidence)
+    {
+        var records = evidence.Exceptions.Where(item => Matches(item, Query.RecordSearch)).ToArray();
+        var selected = Query.Sequence is { } seq ? records.FirstOrDefault(item => item.Sequence == seq) : records.FirstOrDefault();
+        <div class="dc-ex-mini-facts">
+            <div><span>@L["Design:ExFacts:Retained"]</span><b class="mono @(evidence.CurrentExceptions > 0 ? "is-error" : null)">@evidence.CurrentExceptions.ToString("N0")</b></div>
+            <div><span>@L["Design:ExFacts:Lifetime"]</span><b class="mono">@evidence.TotalExceptions.ToString("N0")</b></div>
+            <div><span>@L["Design:ExFacts:Capacity"]</span><b class="mono">@evidence.MaxPoolSize.ToString("N0")</b></div>
+            <div><span>@L["Design:Sheet:ExShownLabel"]</span><b class="mono">@L["Design:Sheet:ExShown", evidence.Exceptions.Count, evidence.RequestedCount]</b></div>
+        </div>
+        <div class="dc-pipe-strip">
+            <span>@L["Design:ExCols:PipelineId"]</span><code class="mono">@evidence.PipelineId</code>
+            <MoCopyButton Value="@evidence.PipelineId" Label="@L["Design:CopyPipeline"]" />
+        </div>
+        <p class="dc-tab-help">
+            @L["Design:Sheet:ExSubsetHelp"]
+            @if (evidence.CurrentExceptions > evidence.RequestedCount && !Query.AllRetained)
+            {
+                <button type="button" class="dc-inline-action" @onclick="() => Change(Query with { AllRetained = true })">
+                    @L["Design:Sheet:ExLoadMore", Math.Min(evidence.CurrentExceptions, evidence.MaxPoolSize)]
+                </button>
+            }
+        </p>
+        @if (evidence.CurrentExceptions == 0)
+        {
+            <MoContentState Compact="true" Class="dc-empty">
+                <span class="mo-vl-tile mo-vl-role--success"><MoIcon Icon="@MoIcons.Success" Size="18px" /></span>
+                <h2>@L["Design:Sheet:ExEmptyTitle"]</h2>
+                <p>@(evidence.TotalExceptions > 0 ? L["Design:Sheet:ExEmptyWithLifetime", evidence.TotalExceptions] : L["Design:Sheet:ExEmptyClean"])</p>
+            </MoContentState>
+        }
+        else
+        {
+            <div class="dc-search dc-sheet-search">
+                <MoIcon Icon="@MoIcons.Search" Size="15px" />
+                <input type="search" value="@Query.RecordSearch" placeholder="@L["Design:Sheet:ExSearchPlaceholder"]"
+                       aria-label="@L["Design:Sheet:ExSearchPlaceholder"]"
+                       @oninput="e => Change(Query with { RecordSearch = EmptyToNull(e.Value?.ToString()), Sequence = null })" />
+                @if (Query.RecordSearch is not null)
+                {
+                    <button type="button" class="icon-btn" aria-label="@L["Design:ClearSearch"]"
+                            @onclick="() => Change(Query with { RecordSearch = null, Sequence = null })"><MoIcon Icon="@MoIcons.Close" Size="14px" /></button>
+                }
+            </div>
+            @if (records.Length == 0)
+            {
+                <p class="dc-empty-inline">@L["Design:Sheet:ExNoMatch"]</p>
+            }
+            else
+            {
+                <div class="dc-ex-records">
+                    @foreach (var record in records)
+                    {
+                        var pressed = record.Sequence == selected?.Sequence;
+                        <button type="button" class="dc-ex-rec @(pressed ? "is-selected" : null)" aria-pressed="@(pressed ? "true" : "false")"
+                                @key="record.Sequence" @onclick="() => Change(Query with { Sequence = record.Sequence })">
+                            <span class="dc-ex-rec-top">
+                                <span class="mono dc-ex-seq">#@record.Sequence</span><b class="mono dc-ex-type">@record.ExceptionType</b>
+                                @if (record.CaptureError is not null)
+                                {
+                                    <span class="dc-pill mo-vl-role--warning" title="@L["Design:Sheet:ExCaptureWarningTitle"]"><MoIcon Icon="@MoIcons.Warning" Size="13px" /></span>
+                                }
+                                <time class="mono dc-ex-at">@UiTime.Format(record.Timestamp)</time>
+                            </span>
+                            <span class="dc-ex-msg">@record.Message</span>
+                        </button>
+                    }
+                </div>
+                @if (selected is not null)
+                {
+                    <section class="dc-panel dc-ex-detail" @key="selected.Sequence">
+                        <header class="dc-ex-detail-head">
+                            <div>
+                                <span class="mono dc-ex-seq">#@selected.Sequence · @UiTime.Format(selected.Timestamp)</span>
+                                <h3 class="mono">@selected.ExceptionType</h3>
+                            </div>
+                            <div class="mo-vl-segment" role="group" aria-label="@L["Design:Sheet:ExEvidenceTab"]">
+                                <button type="button" aria-pressed="@(!Query.Stack ? "true" : "false")"
+                                        @onclick="() => Change(Query with { Stack = false })">@L["Design:Sheet:ExEvidenceTab"]</button>
+                                <button type="button" aria-pressed="@(Query.Stack ? "true" : "false")"
+                                        @onclick="() => Change(Query with { Stack = true })">@L["Design:Sheet:ExStackTab"]</button>
+                            </div>
+                        </header>
+                        @if (selected.CaptureError is { } error)
+                        {
+                            <MoSemanticCallout Severity="MoVisualRole.Warning" Title="@L["Design:Sheet:ExCaptureWarningTitle"]">@error</MoSemanticCallout>
+                        }
+                        @if (Query.Stack)
+                        {
+                            <div class="dc-stack-wrap">
+                                <StackTraceViewer Message="@selected.StackTrace" />
+                            </div>
+                        }
+                        else
+                        {
+                            <div class="dc-ex-ev-body">
+                                <dl class="dc-key-values">
+                                    <div><dt>@L["Design:Sheet:ExTimestamp"]</dt><dd class="mono">@UiTime.Format(selected.Timestamp)</dd></div>
+                                    <div><dt>@L["Design:Sheet:ExSeq"]</dt><dd class="mono">#@selected.Sequence</dd></div>
+                                    <div><dt>@L["Design:Sheet:ExSource"]</dt><dd>
+                                        @(string.IsNullOrEmpty(selected.SourceType) ? L["Design:Sheet:ExSourceUnavailable"].Value : selected.SourceType)
+                                    </dd></div>
+                                </dl>
+                                <div class="dc-ex-textblock"><h4>@L["Design:Sheet:ExMessage"]</h4><p class="mono">@selected.Message</p></div>
+                                @if (!string.IsNullOrWhiteSpace(selected.Description))
+                                {
+                                    <div class="dc-ex-textblock"><h4>@L["Design:Sheet:ExContext"]</h4><p>@selected.Description</p></div>
+                                }
+                            </div>
+                        }
+                    </section>
+                }
+                else if (Query.Sequence is { } missingSequence && !_loading)
+                {
+                    <p class="dc-empty-inline">@L["Design:Sheet:SequenceUnavailable", missingSequence]</p>
+                }
+            }
+        }
+    }
+    @if (_loading)
+    {
+        <MoContentState Loading="true" Compact="true"><MudProgressCircular Indeterminate="true" Size="Size.Small" />
+            <p>@L["Design:Sheet:RecordsLoading"]</p></MoContentState>
+    }
+    else if (_failure is { } failure)
+    {
+        <MoSemanticCallout Severity="@(_evidence is null ? MoVisualRole.Error : MoVisualRole.Warning)" Title="@L["Design:Sheet:RecordsFailed"]">
+            <p>@failure</p>
+            <button type="button" class="btn btn-outline btn-sm" @onclick="RetryAsync">@L["Common:Actions:Refresh"]</button>
+        </MoSemanticCallout>
+    }
+</div>
+
+@code {
+    private const int RECENT_LIMIT = 10;
+
+    /// <summary>Gets or sets the channel whose retained subset is requested.</summary>
+    [Parameter, EditorRequired] public ChannelEvidence Channel { get; set; } = null!;
+    /// <summary>Gets or sets the selected record, subview and subset preferences.</summary>
+    [Parameter, EditorRequired] public DataChannelQuery Query { get; set; } = new();
+    /// <summary>Applies record filter and selection changes to the URL.</summary>
+    [Parameter] public EventCallback<DataChannelQuery> OnQuery { get; set; }
+
+    private readonly CancellationTokenSource _lifetime = new();
+    private (string Channel, DateTime Capture, bool Expanded)? _request;
+    private long? _requestedSequence;
+    private DataChannelExceptionInfo? _evidence;
+    private string? _failure;
+    private bool _loading;
+    private int _generation;
+
+    protected override Task OnParametersSetAsync() => LoadAsync();
+
+    private async Task LoadAsync(bool retry = false)
+    {
+        var channel = Channel;
+        var key = (channel.Id, channel.Status.CapturedAt, Query.AllRetained);
+        var target = Query.Sequence;
+        var needsSequence = target is not null && target != _requestedSequence && _evidence is { } current &&
+            current.Exceptions.Count < current.CurrentExceptions && current.Exceptions.All(record => record.Sequence != target);
+        if (!retry && key == _request && !needsSequence) return;
+        var generation = ++_generation;
+        var token = _lifetime.Token;
+        var expanded = Query.AllRetained;
+        _request = key;
+        _requestedSequence = target;
+        _loading = true;
+        _failure = null;
+
+        try
+        {
+            await Task.Yield();
+            token.ThrowIfCancellationRequested();
+            var knownCount = _evidence?.CurrentExceptions ?? channel.Retained;
+            var requested = expanded ? (int)Math.Min(knownCount, channel.Capacity) : RECENT_LIMIT;
+            var result = await Facade.GetChannelExceptionsAsync(channel.Id, requested, token);
+            if (result.Data is { } recent && recent.CurrentExceptions > recent.Exceptions.Count &&
+                (expanded || target is { } sequence && recent.Exceptions.All(entry => entry.Sequence != sequence)))
+            {
+                var full = (int)Math.Min(recent.CurrentExceptions, recent.MaxPoolSize);
+                result = await Facade.GetChannelExceptionsAsync(channel.Id, full, token);
+            }
+            if (generation != _generation || token.IsCancellationRequested) return;
+            if (result.IsSuccess() && result.Data is { } evidence) _evidence = evidence;
+            else _failure = result.Message ?? L["Workbench:OperationFailed"].Value;
+        }
+        catch (OperationCanceledException) when (token.IsCancellationRequested) { }
+        finally
+        {
+            if (generation == _generation) _loading = false;
+        }
+    }
+
+    private Task RetryAsync() => LoadAsync(retry: true);
+    private Task Change(DataChannelQuery query) => OnQuery.InvokeAsync(query);
+    private static string? EmptyToNull(string? value) => string.IsNullOrEmpty(value) ? null : value;
+    private static bool Matches(ExceptionDetailInfo item, string? query) => string.IsNullOrWhiteSpace(query) ||
+        DataChannelView.Contains(item.ExceptionType, query) || DataChannelView.Contains(item.Message, query) ||
+        DataChannelView.Contains(item.Description, query);
+
+    /// <summary>Cancels the local read before the component can adopt any later result.</summary>
+    public ValueTask DisposeAsync()
+    {
+        _lifetime.Cancel();
+        _lifetime.Dispose();
+        return ValueTask.CompletedTask;
+    }
+}

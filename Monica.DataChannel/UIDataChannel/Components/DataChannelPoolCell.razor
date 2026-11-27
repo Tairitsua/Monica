@@ -1,0 +1,24 @@
+@inject IStringLocalizer<DataChannelResource> L
+
+<div class="dc-pool-cell @(Directory ? "is-dir" : null)">
+    <a class="dc-ex-btn mono @Role.ToCssClass() @(Channel.Retained > 0 ? "is-hot" : Channel.Lifetime > 0 ? "is-hist" : null)"
+       href="@Href" aria-label="@L["Design:PoolInspect", Channel.Id, Channel.Retained, Channel.Capacity]">
+        @Channel.Retained / @Channel.Capacity
+    </a>
+    <span class="dc-pool-bar" aria-hidden="true">
+        @if (Channel.Retained > 0)
+        {
+            <span class="mo-vl-role--error" style="width:@ChannelEvidence.BarWidth(Channel.Retained, Channel.Capacity, 4)"></span>
+        }
+    </span>
+</div>
+
+@code {
+    /// <summary>Gets or sets the channel's retained count and shared capacity.</summary>
+    [Parameter, EditorRequired] public ChannelEvidence Channel { get; set; } = null!;
+    /// <summary>Gets or sets the URL targeting this channel's exception evidence.</summary>
+    [Parameter, EditorRequired] public string Href { get; set; } = string.Empty;
+    /// <summary>Gets or sets whether this cell belongs to the setup directory.</summary>
+    [Parameter] public bool Directory { get; set; }
+    private MoVisualRole Role => Channel.Retained > 0 ? MoVisualRole.Error : Channel.Lifetime > 0 ? MoVisualRole.Warning : MoVisualRole.Neutral;
+}

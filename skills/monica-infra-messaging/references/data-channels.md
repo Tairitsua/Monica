@@ -115,6 +115,8 @@ Endpoints remain owned by the host. Initialization and host shutdown share one l
 
 Add the companion UI with `monica.AddDataChannelUI()` alongside the configured `AddDataChannel().UseSetup<TSetup>()` registration. Its directory is `/datachannel-manage`; `/datachannel-manage/exceptions` focuses on retained exception evidence. Host/UI operations use `DataChannelFacade` directly. The DataChannel module requires the result-envelope module for its Minimal API responses, so the smallest configured DataChannel host needs no unrelated module to execute `GetResponse()`.
 
+The directory groups channels under their owning setups and offers a flat ranking with `view=flat`. The exception view compares retained occupancy with lifetime counts and the most recent retained record. Search, filters, sorting, and exact channel scope use URL parameters. For example, `/datachannel-manage/exceptions?channel=orders&inspect=orders&tab=exceptions` scopes the ledger and opens the matching evidence drawer. Opening a drawer adds a history entry, and switching its tab, selecting a record, or extending the retained subset updates that entry. A later read failure keeps the previous complete management capture visible with its original capture time.
+
 ```csharp
 var result = await facade.GetManagementSnapshotAsync(cancellationToken);
 if (result.IsFailure())
@@ -133,7 +135,7 @@ var exceptionEvidence = capture.ExceptionSummary.ChannelSummaries.Single(channel
 
 `ModuleDataChannelOption.RecentExceptionToKeep` defaults to 10 and bounds each channel's **shared observable history**, including ordinary records and exceptions. Current exception counts describe the retained subset; lifetime totals count exception occurrences and survive both trimming and clearing. `GetChannelExceptionsAsync(id, count)` separates the requested recent detail subset from the complete retained count. Its source fields are empty when provenance was not recorded; an exception's CLR type does not identify the failing component. Complete exception messages and stack evidence remain available, including a capture error when a custom exception cannot render its evidence.
 
-The native exception inspector keeps record selection and its Evidence / Stack trace tabs. Stack text uses the shared diagnostic-text viewer in `$monica-infra-ui` (`references/stack-trace.md`), with complete encoded source, wrapping and exact-payload Copy; the inspector owns vertical scrolling. This presentation does not expand the retained subset, invent component provenance, or change the captured counters.
+Both pages use a right-side evidence drawer with Pipeline, Endpoints, Middleware, and Exceptions tabs. The Exceptions tab initially requests up to 10 recent records. Load all expands to the captured retained count, capped by the channel's shared pool capacity. An exact record sequence can resolve beyond the initial subset while its record remains retained. The ledger can search type and message text from its captured retained records, while the drawer searches the current detail subset. Stack text uses the shared diagnostic-text viewer in `$monica-infra-ui` (`references/stack-trace.md`) for wrapping and exact-payload Copy. The drawer owns vertical scrolling.
 
 `ClearChannelExceptionsAsync(id)` calls the tracker's actual `ClearHistory()`: it deletes all retained observable records for that channel, including ordinary records, while preserving lifetime counters and endpoint state. It does not acknowledge, resolve or recover a channel failure.
 
@@ -145,7 +147,11 @@ Structured metadata and debugger payloads reuse the shared JSON viewer in `$moni
 
 Use `Stage` and zero-based `Ordinal` to present actual pipeline membership and processing order. Component classification alone does not identify its stage. Use its opaque `ComponentKey` with `GetMiddlewareByKeyAsync<T>(channelId, componentKey)` for a real host-owned action. Repeated or same-short-name components have distinct keys; `GetMiddlewareAsync<T>(channelId, name)` rejects ambiguous names. Replacing or removing a component retires its old slot key, and subsequent captures issue keys for current components. Callers own synchronization when mutating public endpoint references or middleware lists. Action resolution never invents a persistent instance for transient components. `CanDebugMessages` includes derived persistent `MessageDebuggerMiddleware` registrations; transient debugger-shaped components have no persistent host queue to inspect.
 
+Use `EndpointDirection` for the endpoint's configured direction when it exposes typed communication options and `IsDebuggerActive` for the persistent debugger's captured state. An endpoint without typed configuration has unknown direction. A bidirectional pipeline executes the transforms in the same order from either side. An initialization failure may carry its own captured message independent of the bounded history.
+
 The debugger's Start/Stop, keyword filter, queue capacity and Clear controls operate on its real host-owned capture. `GetDebugMessageSnapshots()` returns immutable payload and metadata evidence frozen at middleware capture time, in queue order, with a monotonic sequence that survives Clear. A selected capture remains valid after trimming or clearing. The legacy `GetDebugMessages()` view exposes live raw/nested values and is not frozen or export-safe evidence. Closing the UI inspector retires its polling, while host capture keeps its existing state; another inspector must not stop that shared capture accidentally. The debugger observes messages before target endpoint dispatch, so a captured payload does not prove downstream receipt.
+
+The Simulate message action is available while capturing. It puts a labeled sample through the selected debugger's formatter, filter, and bounded queue. It does not dispatch through the channel or to an endpoint.
 
 ## Raw transport pipelines
 

@@ -54,6 +54,8 @@ The example's localizer, `_open` state and `EvidenceContent` belong to the calle
 
 `ChildContent` scrolls, and `FooterContent` holds stationary actions. Put related navigation in the evidence body when the workflow's primary decision belongs in the fixed footer. For tabbed evidence, supply native `MudTabPanel` children through `TabPanels` and bind `ActiveTabIndex`/`ActiveTabIndexChanged` (index defaults to zero). The shared `MudTabs` keeps the tab bar stationary and preserves tab associations and keyboard behavior. With `InsetHeader`, the active tab panel owns scrolling and starts at the top when selected.
 
+Use `WrapTabs="true"` with `InsetHeader` for a short tab list that must stay visible at phone width, such as the four DataChannel evidence tabs. The tab bar can grow by a row while retaining native tab selection and keyboard behavior.
+
 The title supplies the live accessible name. `Width` defaults to `480px` and is capped at the viewport. `CloseLabel` optionally supplies a contextual localized label. `Dismissible` defaults to true; false disables Close, Escape and backdrop dismissal while the caller completes admitted work. It does not block route retirement or cancel business work. Keep feature composition inside these slots; the shared component owns outer padding, body scrolling and reduced-motion styling. Do not add another overlay, focus trap, Escape handler or scrolling body.
 
 For an editable sheet, handle `DismissRequested` to collect any draft confirmation before closure. It covers the Close control, Escape and backdrop clicks. Set `Open` to false when the inline owner accepts dismissal. Use `Expanded` with `ExpandedWidth` to toggle a wider layout while retaining the native focus trap and current content.

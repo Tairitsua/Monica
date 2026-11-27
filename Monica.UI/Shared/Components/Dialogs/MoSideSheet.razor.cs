@@ -60,6 +60,10 @@ public partial class MoSideSheet : IAsyncDisposable
     /// <remarks>Use with an unpadded <see cref="HeaderContent"/>. Each selected tab opens at the top of its own scrolling panel.</remarks>
     [Parameter] public bool InsetHeader { get; set; }
 
+    /// <summary>Wraps a short tab list onto additional lines when the drawer is narrow. Defaults to false.</summary>
+    /// <remarks>Only applies when <see cref="InsetHeader"/> and <see cref="TabPanels"/> are supplied.</remarks>
+    [Parameter] public bool WrapTabs { get; set; }
+
     /// <summary>Gets or sets whether Close, Escape, and backdrop dismissal are enabled. Defaults to true.</summary>
     /// <remarks>Disabling dismissal does not prevent route retirement or disposal of owned business work.</remarks>
     [Parameter] public bool Dismissible { get; set; } = true;

@@ -1,11 +1,8 @@
 @page "/datachannel-manage"
 
-<DataChannelWorkbench ChannelId="@ChannelId" />
+<DataChannelWorkbench />
 
 @code {
     /// <summary>Provides the stable shell registration route.</summary>
     public const string PAGE_URL = "/datachannel-manage";
-    /// <summary>Gets or sets an exact channel identity preserved by contextual navigation.</summary>
-    [SupplyParameterFromQuery(Name = "channel")]
-    public string? ChannelId { get; set; }
 }

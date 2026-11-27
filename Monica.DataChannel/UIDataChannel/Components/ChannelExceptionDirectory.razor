@@ -1,180 +1,144 @@
-@inject Monica.UI.Shared.Services.MoTimeFormatter UiTime
-@using Monica.DataChannel.UIDataChannel.Models
-@using Monica.DataChannel.UIDataChannel.Support
+@using Monica.UI.Shared.Services
 @inject IStringLocalizer<DataChannelResource> L
-@implements IDisposable
+@inject MoTimeFormatter UiTime
 
-<section class="exception-directory" aria-labelledby="exception-directory-title">
-    <header class="exception-directory__heading">
-        <div>
-            <span>@L["ExceptionDirectory:Eyebrow"]</span>
-            <h2 id="exception-directory-title">@L["ExceptionDirectory:Title"]</h2>
-            <p>@L["ExceptionDirectory:Description"]</p>
-        </div>
-        <span>@L["Directory:Shown", FilteredRows.Count, Summary.ChannelSummaries.Count]</span>
+@{
+    var rows = View.ExceptionRows(Query).ToArray();
+    var facet = View.ExceptionRows(Query, ignoreEvidence: true).ToArray();
+    (string? Key, string Label, MoVisualRole Role, int Count)[] chips =
+    [
+        (null, L["Design:ExFilterAll"], MoVisualRole.Primary, facet.Length),
+        ("retained", L["Design:ExFilterRetained"], MoVisualRole.Error, facet.Count(c => c.Retained > 0)),
+        ("historical", L["Design:ExFilterHistorical"], MoVisualRole.Warning, facet.Count(c => c.HistoricalOnly)),
+        ("none", L["Design:ExFilterNone"], MoVisualRole.Neutral, facet.Count(c => c.Retained == 0)),
+    ];
+    var missingExact = Query.Channel is not null && !View.ById.ContainsKey(Query.Channel);
+}
+<section class="mo-vl-surface dc-ex-ledger" aria-labelledby="dc-ex-title">
+    <header class="mo-vl-surface-heading dc-dir-head">
+        <span class="mo-vl-tile mo-vl-role--error"><MoIcon Icon="@MoIcons.Warning" Size="16px" /></span>
+        <div class="surface-title"><h2 id="dc-ex-title">@L["Design:ExLedgerTitle"]</h2><p>@L["Design:ExLedgerDesc"]</p></div>
+        <span class="count mono">@L["Design:DirShown", rows.Length, View.Total]</span>
     </header>
-    @if (!string.IsNullOrEmpty(ChannelId))
+    @if (Query.Channel is { } exact)
     {
-        <div class="exception-directory__exact">
-            <span>@L["Directory:ExactChannel"]</span>
-            <code>@ChannelId</code>
-            <a href="/datachannel-manage/exceptions">@L["Directory:ShowAllChannels"]</a>
+        <div class="dc-exact">
+            <MoIcon Icon="@MoIcons.Crosshair" Size="15px" /><span>@L["Design:ExactChannel"]</span><code class="mono">@exact</code>
+            <button type="button" class="btn btn-soft btn-sm mo-vl-role--primary" @onclick="ClearScope">@L["Design:ShowAllChannels"]</button>
         </div>
     }
-    <div class="exception-directory__filters">
-        <div class="exception-directory__query">
-            <MudTextField T="string" @ref="_searchField" @bind-Value="_query" Immediate="true" Label="@L["ExceptionDirectory:Search"]" Variant="Variant.Outlined" Margin="Margin.Dense" Adornment="Adornment.Start" AdornmentIcon="@MoIcons.Search" Clearable="true" ClearIcon="@MoIcons.Close" />
-        </div>
-        <div class="exception-directory__states" aria-label="@L["ExceptionDirectory:FiltersLabel"]">
-            @foreach (var filter in Filters)
+    <div class="dc-toolbar">
+        <div class="dc-search">
+            <MoIcon Icon="@MoIcons.Search" Size="15px" />
+            <input type="search" value="@Query.Search" placeholder="@L["Design:ExSearchPlaceholder"]" aria-label="@L["Design:ExLedgerTitle"]"
+                   @oninput="e => Change(Query with { Search = Filter(e.Value?.ToString()) })" />
+            @if (!string.IsNullOrEmpty(Query.Search))
             {
-                <MudButton data-filter="@filter" aria-pressed="@(_filter == filter ? "true" : "false")" OnClick="() => _filter = filter">@L[$"ExceptionDirectory:Filters:{filter}"]<span>@FilterCount(filter)</span>
-                </MudButton>
+                <button type="button" class="icon-btn" aria-label="@L["Design:ClearSearch"]" @onclick="() => Change(Query with { Search = null })">
+                    <MoIcon Icon="@MoIcons.Close" Size="14px" />
+                </button>
             }
         </div>
-        <MudButton Size="Size.Small" OnClick="ResetAsync">@L["Directory:Reset"]</MudButton>
+        <MudSelect T="string" Class="dc-select" Value="@(Query.Sort ?? string.Empty)" ValueChanged="value => Change(Query with { Sort = Filter(value) })"
+                   Variant="Variant.Outlined" Margin="Margin.Dense" Dense="true" aria-label="@L["Design:SortLabel"]">
+            <MudSelectItem Value="@string.Empty">@L["Design:ExSorts:Retained"]</MudSelectItem>
+            <MudSelectItem Value="@("lifetime")">@L["Design:ExSorts:Lifetime"]</MudSelectItem>
+            <MudSelectItem Value="@("latest")">@L["Design:ExSorts:Latest"]</MudSelectItem>
+            <MudSelectItem Value="@("name")">@L["Design:ExSorts:Name"]</MudSelectItem>
+        </MudSelect>
+        @if (Query.Evidence is not null || !string.IsNullOrWhiteSpace(Query.Search))
+        {
+            <button type="button" class="btn btn-ghost btn-sm" @onclick="Reset">@L["Design:ResetFilters"]</button>
+        }
     </div>
-    <div class="exception-directory__table">
-        <MudDataGrid T="ExceptionDirectoryRow" Items="FilteredRows" Square="true" Elevation="0" Filterable="true" SortMode="SortMode.Multiple" Hover="true" Dense="true" ReadOnly="true" Breakpoint="Breakpoint.Xs" RowsPerPage="10" SortIcon="@MoIcons.ArrowUp" DragIndicatorIcon="@MoIcons.GripVertical" FilterIconEmpty="@MoIcons.Filter" FilterIconFilled="@MoIcons.Filter" FilterIconClear="@MoIcons.FilterOff" ColumnOptionsIcon="@MoIcons.MoreVertical">
-            <Columns>
-                <PropertyColumn Property="item => item.ChannelId" Title="@L["Exceptions:Columns:ChannelId"]">
-                    <CellTemplate>
-                        <div class="exception-channel">
-                            <code>@context.Item.ChannelId</code>
-                            <span>@DataChannelPresentation.Group(context.Item.GroupId, L)</span>
-                        </div>
-                    </CellTemplate>
-                </PropertyColumn>
-                <PropertyColumn Property="item => item.PipelineId" Title="@L["Exceptions:Columns:PipelineId"]">
-                    <CellTemplate>
-                        <code class="exception-pipeline-id">@context.Item.PipelineId</code>
-                    </CellTemplate>
-                </PropertyColumn>
-                <TemplateColumn Title="@L["ExceptionDirectory:Evidence"]" Sortable="false">
-                    <CellTemplate>
-                        <span class="exception-retention" data-retained="@(context.Item.HasExceptions ? "true" : "false")">
-                            <MoIcon Icon="@(context.Item.HasExceptions ? MoIcons.Error : MoIcons.MinusCircle)" Size="1.25rem" />@L[context.Item.HasExceptions ? "ExceptionDirectory:Retained" : "ExceptionDirectory:None"]</span>
-                    </CellTemplate>
-                </TemplateColumn>
-                <PropertyColumn Property="item => item.CurrentExceptionCount" Title="@L["Exceptions:Columns:CurrentCount"]" />
-                <PropertyColumn Property="item => item.TotalExceptionCount" Title="@L["Exceptions:Columns:HistoricalCount"]" />
-                <PropertyColumn Property="item => item.MaxPoolSize" Title="@L["Exceptions:Columns:PoolSize"]" />
-                <PropertyColumn Property="item => item.LatestException" Title="@L["Exceptions:Columns:Latest"]">
-                    <CellTemplate>
-                        <time>@(context.Item.LatestException is { } latest ? UiTime.Format(latest) : L["Common:Values:None"].Value)</time>
-                    </CellTemplate>
-                </PropertyColumn>
-                <TemplateColumn Title="@L["Common:Columns:Actions"]" Sortable="false" Filterable="false">
-                    <CellTemplate>
-                        <div class="exception-actions">
-                            <MudButton Size="Size.Small" Variant="Variant.Text" Color="Color.Primary" OnClick="() => OnInspect.InvokeAsync(context.Item.ChannelId)" aria-label="@L["Directory:InspectExceptionsFor", context.Item.ChannelId]">@L["Channel:Actions:Inspect"]</MudButton>
-                            <MudTooltip Text="@L["Channel:Actions:ClearHistory"]">
-                                <MudIconButton Icon="@MoIcons.ClearList" Color="Color.Default" Size="Size.Small" aria-disabled="@(IsBusy(context.Item.ChannelId) ? "true" : "false")" OnClick="() => ClearAsync(context.Item.ChannelId)" aria-label="@L["ExceptionDirectory:ClearFor", context.Item.ChannelId]" />
-                            </MudTooltip>
-                        </div>
-                    </CellTemplate>
-                </TemplateColumn>
-            </Columns>
-            <NoRecordsContent>
-                <div class="exception-directory__empty">
-                    <MoIcon Icon="@MoIcons.History" Size="2.25rem" />
-                    <h3>@L[MissingChannel ? "Directory:MissingChannel" : Summary.ChannelSummaries.Count == 0 ? "Directory:Empty" : "Directory:NoMatches"]</h3>
-                    <p>@L[MissingChannel ? "Directory:MissingChannelHelp" : Summary.ChannelSummaries.Count == 0 ? "Directory:EmptyHelp" : "Directory:NoMatchesHelp"]</p>
-                </div>
-            </NoRecordsContent>
-            <PagerContent>
-                <MudDataGridPager T="ExceptionDirectoryRow" />
-            </PagerContent>
-        </MudDataGrid>
+
+    <div class="dc-state-chips fchips" role="group" aria-label="@L["Design:EvidenceLabel"]">
+        @foreach (var chip in chips)
+        {
+            <MoFilterChip Pill="true" ShowDot="@(chip.Key is not null)" Class="dc-chip-mark" Label="@chip.Label" Count="@chip.Count"
+                          Role="chip.Role" Selected="@(Query.Evidence == chip.Key)" SelectedChanged="@(_ => Change(Query with { Evidence = chip.Key }))" />
+        }
     </div>
-    <p class="exception-directory__note">@L["ExceptionDirectory:CapacityHelp"]</p>
+    @if (rows.Length == 0)
+    {
+        <MoContentState Compact="true" Class="dc-empty">
+            <span class="mo-vl-tile mo-vl-role--neutral"><MoIcon Icon="@(missingExact ? MoIcons.SearchOff : MoIcons.FilterOff)" Size="18px" /></span>
+            <h2>@L[missingExact ? "Design:MissingChannelTitle" : "Design:NoMatchesTitle"]</h2>
+            <p>@L[missingExact ? "Design:MissingChannelBody" : "Design:NoMatchesBody"]</p>
+            <button type="button" class="btn btn-outline btn-sm" @onclick="@(missingExact ? ClearScope : Reset)">
+                @L[missingExact ? "Design:ShowAllChannels" : "Design:ResetFilters"]
+            </button>
+        </MoContentState>
+    }
+    else
+    {
+        <div class="table-wrap dc-table-wrap">
+            <table class="table dc-table dc-ex-table" aria-labelledby="dc-ex-title">
+                <thead>
+                    <tr>
+                        <th scope="col">@L["Design:ExCols:ChannelPipeline"]</th><th scope="col">@L["Design:ExCols:Runtime"]</th>
+                        <th scope="col">@L["Design:ExCols:Retained"]</th><th scope="col" class="is-num">@L["Design:ExCols:Lifetime"]</th>
+                        <th scope="col">@L["Design:ExCols:Latest"]</th><th scope="col" class="is-end">@L["Design:ExCols:Actions"]</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var ch in rows)
+                    {
+                        var evidence = Query.Open(ch.Id, "exceptions").Url(true);
+                        <tr class="dc-ch-row @(ch.Retained > 0 ? "is-attention" : null)" @key="ch.Id">
+                            <td data-label="@L["Design:ExCols:ChannelPipeline"]">
+                                <div class="dc-cell-channel">
+                                    <div class="dc-ex-id-row">
+                                        <a class="dc-link mono" href="@evidence">@ch.Id</a>
+                                        <span class="dc-sub">@(ch.Group ?? L["Workbench:Ungrouped"].Value)</span>
+                                    </div>
+                                    <div class="dc-pipe-id">
+                                        <code class="mono" title="@ch.PipelineId">@ch.PipelineId</code>
+                                        <MoCopyButton Value="@ch.PipelineId" Label="@L["Design:CopyPipeline"]" />
+                                    </div>
+                                </div>
+                            </td>
+                            <td data-label="@L["Design:ExCols:Runtime"]"><DataChannelInitBadge State="@ch.Initialization" /></td>
+                            <td data-label="@L["Design:ExCols:Retained"]"><DataChannelPoolCell Channel="ch" Href="@evidence" /></td>
+                            <td data-label="@L["Design:ExCols:Lifetime"]" class="is-num">
+                                <div class="dc-life-cell">
+                                    <b class="mono">@ch.Lifetime.ToString("N0")</b>
+                                    @if (ch.Trimmed > 0) { <small class="dc-evicted-note">@L["Design:ExEvictedSub", ch.Trimmed]</small> }
+                                </div>
+                            </td>
+                            <td data-label="@L["Design:ExCols:Latest"]">
+                                <time class="mono dc-latest @(ch.Latest is null ? "is-muted" : null)">@(ch.Latest is { } latest ? UiTime.Format(latest) : L["Design:None"].Value)</time>
+                            </td>
+                            <td data-label="@L["Design:ExCols:Actions"]" class="is-end">
+                                <div class="dc-row-actions">
+                                    <a class="btn btn-soft btn-sm mo-vl-role--error" href="@evidence">@L["Channel:Actions:Inspect"]</a>
+                                    <a class="icon-btn" href="@Query.Open(ch.Id, "pipeline").Url(true)" title="@L["Design:Sheet:Tabs:Pipeline"]" aria-label="@L["Design:Sheet:Tabs:Pipeline"]"><MoIcon Icon="@MoIcons.Route" Size="15px" /></a>
+                                    <button type="button" class="icon-btn" disabled="@IsBusy(ch.Id)" title="@L["Design:ClearHistoryBtn"]"
+                                            aria-label="@L["Design:ClearHistoryBtn"]" @onclick="() => OnClear.InvokeAsync(ch.Id)"><MoIcon Icon="@MoIcons.ClearList" Size="15px" /></button>
+                                </div>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    }
 </section>
 
 @code {
-    /// <summary>Gets or sets a complete exception summary captured by the owning workflow.</summary>
-    [Parameter, EditorRequired]
-    public DataChannelExceptionSummaryInfo Summary { get; set; } = null!;
+    /// <summary>Gets or sets detached channel evidence for the ledger.</summary>
+    [Parameter, EditorRequired] public DataChannelView View { get; set; } = null!;
+    /// <summary>Gets or sets URL-held ledger options.</summary>
+    [Parameter, EditorRequired] public DataChannelQuery Query { get; set; } = new();
+    /// <summary>Applies ledger filters to the URL.</summary>
+    [Parameter] public EventCallback<DataChannelQuery> OnQuery { get; set; }
+    /// <summary>Requests confirmation to clear the selected channel's history.</summary>
+    [Parameter] public EventCallback<string> OnClear { get; set; }
+    /// <summary>Reports whether a channel is busy.</summary>
+    [Parameter, EditorRequired] public Func<string, bool> IsBusy { get; set; } = null!;
 
-    /// <summary>Gets or sets an optional exact, ordinal channel identity supplied by the route.</summary>
-    [Parameter]
-    public string? ChannelId { get; set; }
-
-    /// <summary>Gets or sets the owning workflow admission check for channel operations.</summary>
-    [Parameter, EditorRequired]
-    public Func<string, bool> IsBusy { get; set; } = _ => false;
-
-    /// <summary>Gets or sets the callback that opens a native retained-exception inspector.</summary>
-    [Parameter, EditorRequired]
-    public EventCallback<string> OnInspect { get; set; }
-
-    /// <summary>Gets or sets the callback that confirms the full retained-history deletion scope.</summary>
-    [Parameter, EditorRequired]
-    public EventCallback<string> OnClear { get; set; }
-
-    private static readonly string[] Filters = ["All", "Retained", "None"];
-    private readonly Dictionary<string, ExceptionDirectoryRow> _rowsById = new(StringComparer.Ordinal);
-    private IReadOnlyList<ExceptionDirectoryRow> _rows = [];
-    private string _query = string.Empty;
-    private string _filter = "All";
-    private MudTextField<string>? _searchField;
-    private bool _retired;
-    private bool MissingChannel => !string.IsNullOrEmpty(ChannelId) && !Summary.ChannelSummaries.Any(channel => string.Equals(channel.ChannelId, ChannelId, StringComparison.Ordinal));
-    private List<ExceptionDirectoryRow> FilteredRows => _rows.Where(row => Matches(row.Capture)).ToList();
-    private bool Matches(DataChannelExceptionSummaryItem channel) =>
-        (string.IsNullOrEmpty(ChannelId) || string.Equals(channel.ChannelId, ChannelId, StringComparison.Ordinal)) &&
-        (_filter == "All" || (_filter == "Retained" ? channel.HasExceptions : !channel.HasExceptions)) &&
-        (string.IsNullOrWhiteSpace(_query) || new[] { channel.ChannelId, channel.GroupId, channel.PipelineId }.Any(value => value?.Contains(_query, StringComparison.OrdinalIgnoreCase) == true));
-    private int FilterCount(string filter) => filter == "All" ? Summary.ChannelSummaries.Count : Summary.ChannelSummaries.Count(channel => filter == "Retained" ? channel.HasExceptions : !channel.HasExceptions);
-
-    protected override void OnParametersSet()
-    {
-        var retainedIds = new HashSet<string>(StringComparer.Ordinal);
-        var rows = new List<ExceptionDirectoryRow>(Summary.ChannelSummaries.Count);
-        foreach (var capture in Summary.ChannelSummaries)
-        {
-            retainedIds.Add(capture.ChannelId);
-            if (!_rowsById.TryGetValue(capture.ChannelId, out var row))
-            {
-                row = new ExceptionDirectoryRow(capture);
-                _rowsById.Add(capture.ChannelId, row);
-            }
-            else
-            {
-                row.Capture = capture;
-            }
-            rows.Add(row);
-        }
-        foreach (var id in _rowsById.Keys.Where(id => !retainedIds.Contains(id)).ToArray())
-        {
-            _rowsById.Remove(id);
-        }
-        _rows = rows;
-    }
-
-    private Task ClearAsync(string channelId) => _retired || IsBusy(channelId)
-        ? Task.CompletedTask
-        : OnClear.InvokeAsync(channelId);
-
-    /// <summary>Retains the native grid row key while delegated properties expose the newest capture to filtering, sorting, and actions.</summary>
-    private sealed class ExceptionDirectoryRow(DataChannelExceptionSummaryItem capture)
-    {
-        /// <summary>Gets or sets the newest detached summary for this exact channel identity.</summary>
-        public DataChannelExceptionSummaryItem Capture { get; set; } = capture;
-
-        public string ChannelId => Capture.ChannelId;
-        public string? GroupId => Capture.GroupId;
-        public string PipelineId => Capture.PipelineId;
-        public bool HasExceptions => Capture.HasExceptions;
-        public long CurrentExceptionCount => Capture.CurrentExceptionCount;
-        public long TotalExceptionCount => Capture.TotalExceptionCount;
-        public int MaxPoolSize => Capture.MaxPoolSize;
-        public DateTime? LatestException => Capture.LatestException;
-    }
-    private async Task ResetAsync()
-    {
-        if (_searchField is { } field) { await field.ClearAsync(); }
-        if (_retired) { return; }
-        _query = string.Empty; _filter = "All";
-    }
-    public void Dispose() => _retired = true;
+    private Task Change(DataChannelQuery query) => OnQuery.InvokeAsync(query);
+    private Task ClearScope() => Change(Query with { Channel = null });
+    private Task Reset() => Change(Query with { Evidence = null, Search = null, Sort = null });
+    private static string? Filter(string? value) => string.IsNullOrEmpty(value) ? null : value;
 }

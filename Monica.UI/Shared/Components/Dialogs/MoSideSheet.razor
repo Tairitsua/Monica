@@ -4,7 +4,7 @@
 <MudDialog @ref="_dialog" VisibleChanged="OnVisibilityChangedAsync" Options="CurrentOptions"
            DefaultFocus="@(FocusCloseOnOpen && Dismissible ? DefaultFocus.None : DismissRequested.HasDelegate ? DefaultFocus.FirstChild : null)" OnBackdropClick="BackdropHandler"
            Gutters="false" TitleClass="pa-0" ContentClass="mo-side-sheet-content" ActionsClass="mo-side-sheet-footer"
-           Class="@($"mo-side-sheet {(Compact ? "mo-side-sheet--compact" : null)} {(InsetHeader ? "mo-side-sheet--inset-header" : null)}")"
+           Class="@($"mo-side-sheet {(Compact ? "mo-side-sheet--compact" : null)} {(InsetHeader ? "mo-side-sheet--inset-header" : null)} {(WrapTabs ? "mo-side-sheet--wrap-tabs" : null)}")"
            Style="@($"--mo-side-sheet-width: {Width}; --mo-side-sheet-expanded-width: {ExpandedWidth ?? Width};")"
            AriaLabelledBy="@_headingId">
     <TitleContent>
