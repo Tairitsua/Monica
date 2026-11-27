@@ -1,5 +1,6 @@
 @using System.Globalization
 @using Microsoft.JSInterop
+@using Monica.DevOps.FileOps.Support
 @implements IAsyncDisposable
 @inject IJSRuntime JS
 @inject IStringLocalizer<FileOpsResource> L
@@ -65,7 +66,8 @@
         if (_retired || !firstRender) return;
         try
         {
-            _import = JS.InvokeAsync<IJSObjectReference>("import", "./_content/Monica.DevOps/FileOps/Components/FileOpsWorkspace.razor.js").AsTask();
+            _import = JS.InvokeAsync<IJSObjectReference>("import",
+                $"./{Assets[FileOpsTransferInteropSession.MODULE_ASSET]}").AsTask();
             var module = await _import;
             if (!_retired) await module.InvokeVoidAsync("bindTape", _bar);
         }

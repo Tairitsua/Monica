@@ -74,7 +74,8 @@
         if (_retired) return;
         try
         {
-            _import ??= JS.InvokeAsync<IJSObjectReference>("import", "./_content/Monica.DevOps/FileOps/Components/FileOpsTextEditor.razor.js").AsTask();
+            _import ??= JS.InvokeAsync<IJSObjectReference>("import",
+                $"./{Assets["_content/Monica.DevOps/FileOps/Components/FileOpsTextEditor.razor.js"]}").AsTask();
             var module = await _import;
             if (!_retired) await module.InvokeVoidAsync("sync", _textarea, _gutter, _inputSignal);
         }

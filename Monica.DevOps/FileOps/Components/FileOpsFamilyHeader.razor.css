@@ -14,7 +14,17 @@
     font-weight: 600;
 }
 
+.fo-nav-link {
+    max-inline-size: 100%;
+}
+
+.fo-nav-label {
+    flex: none;
+    white-space: nowrap;
+}
+
 .fo-nav-count {
+    flex: none;
     padding-inline: 6px;
     border-radius: 999px;
     background: var(--mud-palette-background-gray);
@@ -33,6 +43,7 @@
 }
 
 .fo-draft-dot {
+    flex: none;
     width: 7px;
     height: 7px;
     border-radius: 50%;

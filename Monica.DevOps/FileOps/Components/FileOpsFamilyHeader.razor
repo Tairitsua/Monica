@@ -55,13 +55,15 @@
 </MoPageMasthead>
 
 <MoWorkbenchNavigation Label="@L["Design:NavLabel"]" Compact="true">
-    <a href="@FilesHref" aria-current="@(IsPolicy ? null : "page")">
-        <MoIcon Icon="@MoIcons.FolderOpen" Size="15px" />@L["Design:NavFiles"]
+    <a class="fo-nav-link" href="@FilesHref" aria-current="@(IsPolicy ? null : "page")">
+        <MoIcon Icon="@MoIcons.FolderOpen" Size="15px" />
+        <span class="fo-nav-label">@L["Design:NavFiles"]</span>
         <span class="fo-nav-count mo-vl-mono">@Shown</span>
         @if (Controller.IsDirty) { <span class="fo-draft-dot" aria-label="@L["Design:BadgeDirty"]" title="@L["Design:BadgeDirty"]"></span> }
     </a>
-    <a href="@UIFileOpsPolicyPage.PAGE_URL" aria-current="@(IsPolicy ? "page" : null)">
-        <MoIcon Icon="@(AccessDenied ? MoIcons.Lock : MoIcons.Sliders)" Size="15px" />@L["Design:NavPolicy"]
+    <a class="fo-nav-link" href="@UIFileOpsPolicyPage.PAGE_URL" aria-current="@(IsPolicy ? "page" : null)">
+        <MoIcon Icon="@(AccessDenied ? MoIcons.Lock : MoIcons.Sliders)" Size="15px" />
+        <span class="fo-nav-label">@L["Design:NavPolicy"]</span>
         <span class="fo-nav-count mo-vl-mono @(AccessDenied ? "fo-nav-denied" : null)">@(AccessDenied ? "×" : Config?.AllowedRoots.Count.ToString() ?? "—")</span>
         @if (PolicyDirty && !AccessDenied) { <span class="fo-draft-dot" aria-label="@L["Design:InspDirty"]" title="@L["Design:InspDirty"]"></span> }
     </a>
