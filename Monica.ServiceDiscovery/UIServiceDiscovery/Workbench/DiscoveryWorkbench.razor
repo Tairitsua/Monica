@@ -60,7 +60,7 @@
         {
             <section class="mo-vl-surface sv-state-panel">
                 <MoContentState Loading="@(Error is null)">
-                    <span class="tile role-@(Error is null ? "info" : "error")"><MoIcon Icon="@(Error is null ? MoIcons.Refresh : MoIcons.Error)" Size="18px" /></span>
+                    <span class="mo-vl-tile role-@(Error is null ? "info" : "error")"><MoIcon Icon="@(Error is null ? MoIcons.Refresh : MoIcons.Error)" Size="18px" /></span>
                     <h2>@T(Error is null ? IsEndpoint ? "epLoadingTitle" : "loadingTitle" : "loadFailedTitle")</h2>
                     <p>@T(Error is null ? IsEndpoint ? "epLoadingBody" : "loadingBody" : "loadFailedBody")</p>
                     @if (Error is not null)

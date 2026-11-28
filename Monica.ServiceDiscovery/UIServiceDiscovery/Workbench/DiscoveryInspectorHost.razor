@@ -2,8 +2,23 @@
 
 @if (_id is { } missingId && _frozen is null)
 {
-    <MoSideSheet @key="missingId" Open="true" OpenChanged="OnOpenChanged" DismissRequested="Dismiss" Width="560px" Compact Title="@T("sheetUnknownTitle", missingId)">
-        <div class="sv-inspector-scope"><div class="sv-empty-inline is-lg"><p>@T("sheetUnknownBody")</p><code>@missingId</code></div></div>
+    <MoSideSheet @key="missingId" Open="true" OpenChanged="OnOpenChanged" DismissRequested="Dismiss" Width="560px" Compact>
+        <TitleContent>
+            <div class="sv-inspector-scope">
+                <div class="sv-sheet-head-top">
+                    <span class="mo-vl-tile role-warning"><MoIcon Icon="@MoIcons.Warning" Size="16px" /></span>
+                    <div class="sv-sheet-id">
+                        <h2>@T("sheetUnknownTitle", missingId)</h2>
+                        <div class="sv-sheet-sub"><code>@missingId</code></div>
+                    </div>
+                </div>
+            </div>
+        </TitleContent>
+        <ChildContent>
+            <div class="sv-inspector-scope">
+                <div class="sv-empty-inline is-lg"><span class="mo-vl-tile role-warning"><MoIcon Icon="@MoIcons.Search" Size="18px" /></span><p>@T("sheetUnknownBody")</p></div>
+            </div>
+        </ChildContent>
     </MoSideSheet>
 }
 else if (_id is { } id)
@@ -12,24 +27,28 @@ else if (_id is { } id)
         <TitleContent>
             <div class="sv-inspector-scope">
                 <div class="sv-sheet-head-top">
-                    <span class="tile role-@(_frozen is { } row ? StatusRole(row.State.OverallStatus) : "warning")"><MoIcon Icon="@(_frozen is null ? MoIcons.Warning : MoIcons.Server)" Size="16px" /></span>
+                    <span class="mo-vl-tile role-@StatusRole(_frozen!.State.OverallStatus)"><MoIcon Icon="@MoIcons.Server" Size="16px" /></span>
                     <div class="sv-sheet-id">
                         <div class="sv-sheet-eyebrow-row">
-                            <span class="sv-dim">@T("sheetFrozenBadge")</span>
+                            <span class="sv-sheet-eyebrow">@T("sheetFrozenBadge")</span>
                             @if (_frozen is { } saved) { <DiscoveryBadge Role="@StatusRole(saved.State.OverallStatus)">@T("statuses:" + saved.State.OverallStatus)</DiscoveryBadge> }
                         </div>
                         <h2>@(_frozen?.Name ?? T("sheetUnknownTitle", id))</h2>
                         <div class="sv-sheet-sub"><code>@id</code><MoCopyButton Value="@id" Label="@T("copyId")" />
-                            @if (_frozen?.Skew == true) { <span class="chip role-warning">@T("versionSkew", _frozen.Versions.Count)</span> }
+                            @if (_frozen?.Skew == true) { <span class="chip role-warning"><MoIcon Icon="@MoIcons.Layers" Size="12px" />@T("versionSkew", _frozen.Versions.Count)</span> }
                         </div>
                     </div>
                 </div>
-                @if (_frozen is not null && _snapshot is not null)
-                {
-                    <p class="sv-sheet-frozen-line">@T("sheetFrozenScope", UiTime.FormatTime(_snapshot.At), UiTime.FormatTime(_snapshot.At))</p>
-                }
             </div>
         </TitleContent>
+        <HeaderContent>
+            @if (_snapshot is { } snapshot)
+            {
+                <div class="sv-sheet-capture">
+                    <p class="sv-sheet-frozen-line">@T("sheetFrozenScope", UiTime.FormatTime(snapshot.At), UiTime.FormatTime(snapshot.At))</p>
+                </div>
+            }
+        </HeaderContent>
         <TabPanels>
             @if (_frozen is { } row)
             {
@@ -38,7 +57,7 @@ else if (_id is { } id)
                         <p class="sv-sheet-note">@T("sheetInstanceNote")</p>
                         @if (row.Instances.Count == 0 && row.State.EvictedInstances.Count == 0)
                         {
-                            <div class="sv-empty-inline"><span class="mo-vl-tile role-neutral"><MoIcon Icon="@MoIcons.Cloud" Size="16px" /></span><p>@T("sheetNoInstances")</p></div>
+                            <div class="sv-empty-inline"><span class="mo-vl-tile role-neutral"><MoIcon Icon="@MoIcons.CloudOff" Size="16px" /></span><p>@T("sheetNoInstances")</p></div>
                         }
                         else
                         {
@@ -54,7 +73,7 @@ else if (_id is { } id)
                                                 <div class="sv-inst-badges">
                                                     <DiscoveryBadge Role="@StatusRole(value.Status)">@T("statuses:" + value.Status)</DiscoveryBadge>
                                                     <DiscoveryBadge Role="@(value.IsLeader ? "primary" : "neutral")" Diamond="@value.IsLeader">@T(value.IsLeader ? "leaderStatuses:Leader" : "leaderStatuses:Follower")</DiscoveryBadge>
-                                                    @if (self) { <span class="chip role-info">@T("thisHostTag")</span> }
+                                                    @if (self) { <span class="chip role-info"><MoIcon Icon="@MoIcons.Monitor" Size="13px" />@T("thisHostTag")</span> }
                                                 </div>
                                             </div>
                                             <DiscoveryBadge Role="@HeartbeatRole(instance.Health)">@T("hbHealth:" + instance.Health) · @T("ageSeconds", Num(instance.Age))</DiscoveryBadge>
@@ -84,7 +103,7 @@ else if (_id is { } id)
                                             <div class="sv-inst-id-block">
                                                 <code class="sv-inst-id mono">@evicted.InstanceId</code>
                                                 <div class="sv-inst-badges">
-                                                    <span class="chip role-warning">@T("sheetDisappearedBadge")</span>
+                                                    <span class="chip is-outline role-warning"><MoIcon Icon="@MoIcons.History" Size="13px" />@T("sheetDisappearedBadge")</span>
                                                     <DiscoveryBadge Role="@(evicted.IsLeader ? "primary" : "neutral")" Diamond="@evicted.IsLeader">@T(evicted.IsLeader ? "leaderStatuses:Leader" : "leaderStatuses:Follower")</DiscoveryBadge>
                                                 </div>
                                             </div>

@@ -1,7 +1,7 @@
-<section class="surface @Class" aria-label="@Title">
+<section class="mo-vl-surface @Class" aria-label="@Title">
     <header class="mo-vl-surface-heading">
-        <span class="tile role-@Role"><MoIcon Icon="@Icon" Size="16px" /></span>
-        <div><h2>@Title</h2>@if (Detail is not null) { <p>@Detail</p> }</div>
+        <span class="mo-vl-tile role-@Role"><MoIcon Icon="@Icon" Size="16px" /></span>
+        <div class="sv-surface-copy"><h2>@Title</h2>@if (Detail is not null) { <p>@Detail</p> }</div>
         @if (Aside is not null) { <div class="aside">@Aside</div> }
     </header>
     @ChildContent

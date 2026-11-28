@@ -1,12 +1,24 @@
 @inherits DiscoveryComponent
 
+@{
+    var incoming = FocusRole is { } role ? Call.TargetRole == role && Call.SourceRole != role :
+        FocusApp is { } app && Call.TargetApp == app && Call.SourceApp != app;
+    var peerRole = incoming ? Call.SourceRole : Call.TargetRole;
+    var peerDomain = incoming ? Call.SourceDomain : Call.TargetDomain;
+    var peerApp = incoming ? Call.SourceApp : Call.TargetApp;
+    var peerUrl = peerRole is null ? Workbench.Link(DiscoveryWorkbench.DOMAINS, ("domain", peerDomain)) :
+        Workbench.Link(DiscoveryWorkbench.REGISTRY, ("view", "atlas"), ("role", peerRole));
+}
+
 <div class="sv-rcall-item role-@(Call.Risk is { } risk ? RiskRole(risk) : RoutingRole(Call.Route))">
     <div class="sv-rcall-top">
-        <span class="sv-rcall-dir" aria-hidden="true">→</span>
-        <a class="sv-rcall-peer mono" href="@Workbench.Link(DiscoveryWorkbench.REGISTRY, ("view", "atlas"), ("role", Call.TargetRole))">@Call.TargetRole</a>
-        @if (Call.TargetApp is { } destination) { <code class="sv-rcall-app">@destination</code> }
-        <DiscoveryBadge Role="@RoutingRole(Call.Route)">@T("routesVerdict:" + Call.Route)</DiscoveryBadge>
-        @if (Call.Risk is { } danger) { <DiscoveryBadge Role="@RiskRole(danger)">@T("routingRisk:" + danger)</DiscoveryBadge> }
+        <span class="sv-rcall-dir" aria-hidden="true">@(incoming ? "←" : "→")</span>
+        <a class="sv-rcall-peer mono" href="@peerUrl">@(peerRole ?? peerDomain)</a>
+        @if (peerApp is not null) { <code class="sv-rcall-app">@peerApp</code> }
+        <DiscoveryBadge Role="@(Call.Risk is { } danger ? RiskRole(danger) : RoutingRole(Call.Route))"
+                        Title="@T(Call.Risk is { } reason ? "routingRisk:" + reason : "depRoutingLabels:" + Call.Route)">
+            @T("depRoutingShort:" + (Call.Risk ?? Call.Route))
+        </DiscoveryBadge>
     </div>
     <div class="sv-rcall-op">
         <code title="@Call.Definition.Operation">@ShortName(Call.Definition.Operation)</code>
@@ -23,4 +35,6 @@
 
 @code {
     [Parameter, EditorRequired] public CallRow Call { get; set; } = default!;
+    [Parameter] public string? FocusRole { get; set; }
+    [Parameter] public string? FocusApp { get; set; }
 }

@@ -71,7 +71,7 @@ else
             <div class="fchips" role="group" aria-label="@T("epFilterAll")">
                 @foreach (var filter in Filters)
                 {
-                    <MoFilterChip Label="@T(filter.Label)" Role="@filter.Role" Pill ShowDot="@(filter.Key != "all")"
+                    <MoFilterChip Label="@T(filter.Label)" Role="@filter.Role" Pill ShowDot="@(filter.Key != "all")" Class="mo-vl-chip--instrument"
                           Selected="@(Filter == filter.Key)" Count="@_pool.Count(target => Matches(target, filter.Key))"
                           SelectedChanged='value => Workbench.Pick("state", value && filter.Key != "all" ? filter.Key : null)' />
                 }
@@ -91,14 +91,15 @@ else
                     {
                         var current = target == Selected;
                         var state = State(target);
-                        var errors = target.Calls.Count(IsProblem);
+                        var errors = target.Calls.Count(IsHttpError);
                         <li @key="target.Target.Address" data-sv-keyrow>
                             <button type="button" class="sv-ep-item @(current ? "is-selected" : null)" aria-current="@(current ? "true" : null)" data-sv-keymark
                                     @onclick="() => Select(target)">
                                 <span class="sv-ep-item-top"><b>@target.Target.Scope / @target.Target.AppId</b><DiscoveryBadge Role="@EndpointRole(state)">@T("epStates:" + state)</DiscoveryBadge></span>
                                 <code class="sv-ep-item-uri">@Address(target)</code>
-                                <span class="sv-ep-item-meta mono">@T("epLaneCandCount", target.Candidates.Count) · @T("epCallCount", target.Calls.Count)
-                                    @if (errors > 0) { <span class="sv-ep-err-tag role-warning">@T("epCallErrors", errors)</span> }
+                                <span class="sv-ep-item-meta mono">
+                                    <span>@T("epLaneCandCount", target.Candidates.Count)</span><span class="sv-sep">·</span><span>@T("epCallCount", target.Calls.Count)</span>
+                                    @if (errors > 0) { <span class="sv-ep-err-tag role-error">@T("epCallErrors", errors)</span> }
                                 </span>
                             </button>
                         </li>
@@ -152,7 +153,7 @@ else
         new(Resolved > 0 ? "success" : "neutral", T("epFactResolved"), $"{Resolved}/{Snapshot.Targets.Count}", T("epFactResolvedSub", Snapshot.Targets.Sum(target => target.Candidates.Count), Snapshot.Providers.Count)),
         new(Calls.Length == 0 ? "neutral" : "primary", T("epFactCalls"), Calls.Length.ToString(), T("epFactCallsSub", Num(Snapshot.Retention.TotalMinutes), Snapshot.MaxCallsPerTarget), Calls.Length == 0),
         new(Calls.Any(call => call.Outcome == "Failure") ? "error" : Calls.Any(IsProblem) ? "warning" : "neutral", T("epFactFailingCalls"), Calls.Count(IsProblem).ToString(),
-            T("epFactFailingCallsSub", Calls.Count(call => call.Outcome is "Failure" or "HttpFailure"), Calls.Count(call => call.Outcome == "Canceled"))),
+            T("epFactFailingCallsSub", Calls.Count(IsHttpError), Calls.Count(call => call.Outcome == "Canceled"))),
         new(Snapshot.EnablePassThrough ? "info" : "neutral", T("epFactProcess"), $"PID {Snapshot.ProcessId}", T("epProcessFact", Num(Snapshot.ResolutionTimeout.TotalSeconds), T(Snapshot.EnablePassThrough ? "epPassThroughOn" : "epPassThroughOff")))
     ];
 
@@ -166,7 +167,7 @@ else
             new("error", "epReasonFailed", targets.Where(target => State(target) is "Failed" or "Timeout").ToArray()),
             new("warning", "epReasonEmpty", targets.Where(target => State(target) == "Empty").ToArray()),
             new("warning", "epReasonStale", targets.Where(target => State(target) == "Stale").ToArray()),
-            new("warning", "epReasonHttpErr", targets.Where(target => target.Calls.Any(IsProblem)).ToArray()),
+            new("warning", "epReasonHttpErr", targets.Where(target => target.Calls.Any(IsHttpError)).ToArray()),
             new("neutral", "epReasonUnknown", targets.Where(target => State(target) == "Unknown").ToArray())
         ];
         var needle = Workbench.Param("q")?.Trim();
@@ -174,7 +175,7 @@ else
             (string.IsNullOrEmpty(needle) || new[] { target.Target.Scope, target.Target.AppId, Address(target) }
                 .Concat(target.Candidates.SelectMany(candidate => new[] { candidate.Address, candidate.Provider }))
                 .Any(value => value?.Contains(needle, StringComparison.OrdinalIgnoreCase) == true)))
-            .OrderByDescending(target => EndpointAttention(Snapshot, target)).ThenBy(target => target.Target.Scope)
+            .OrderByDescending(target => EndpointPriority(Snapshot, target)).ThenBy(target => target.Target.Scope)
             .ThenBy(target => target.Target.AppId).ToArray();
         _visible = _pool.Where(target => Matches(target, Filter)).ToArray();
         Selected = Requested is { } selected
@@ -185,7 +186,7 @@ else
 
     private bool Matches(ServiceEndpointSnapshot target, string filter) => filter switch
     {
-        "all" => true, "problems" => EndpointAttention(Snapshot, target),
+        "all" => true, "problems" => State(target) is "Failed" or "Timeout" or "Empty" or "Stale" || LatestHttpError(target),
         _ => string.Equals(filter, State(target), StringComparison.OrdinalIgnoreCase)
     };
 

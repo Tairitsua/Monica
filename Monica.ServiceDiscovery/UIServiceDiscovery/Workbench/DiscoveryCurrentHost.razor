@@ -98,13 +98,13 @@
     <DiscoverySurface Title="@T("hostBuildTitle")" Icon="@MoIcons.Fingerprint" Role="info">
         <div class="mo-vl-surface-body">
             <dl class="kv is-single">
-                @Fact("hostFields:appName", Host.AppName)
+                @Fact("hostFields:appName", Host.AppName, mono: false)
                 @Fact("hostFields:appId", Host.AppId, true)
                 @Fact("hostFields:instanceId", Host.InstanceId, true)
-                @Fact("hostFields:project", Host.ProjectName)
+                @Fact("hostFields:project", Host.ProjectName, mono: false)
                 @Fact("hostFields:releaseVer", Host.ReleaseVersion)
                 <div><dt>@T("hostFields:domains")</dt><dd>
-                    @foreach (var domain in Host.GetDomainNames()) { <a class="chip is-outline" href="@Workbench.Link(DiscoveryWorkbench.DOMAINS, ("domain", domain))">@domain</a> }
+                    @foreach (var domain in Host.GetDomainNames()) { <a class="chip is-outline sv-host-domain" href="@Workbench.Link(DiscoveryWorkbench.DOMAINS, ("domain", domain))">@domain</a> }
                 </dd></div>
                 <div><dt>@T("hostFields:roles")</dt><dd>
                     @foreach (var role in Host.RoleIds)
@@ -189,8 +189,8 @@
         @<span>@Num(Instance.Ttl)</span>
     ];
 
-    private RenderFragment Fact(string label, string? value, bool copy = false) => @<div>
-        <dt>@T(label)</dt><dd><span class="mono">@(value ?? "—")</span>
+    private RenderFragment Fact(string label, string? value, bool copy = false, bool mono = true) => @<div>
+        <dt>@T(label)</dt><dd><span class="@(mono ? "mono" : null)">@(value ?? "—")</span>
             @if (copy && !string.IsNullOrEmpty(value)) { <MoCopyButton Value="@value" Label="@T("copyId")" /> }
         </dd>
     </div>;

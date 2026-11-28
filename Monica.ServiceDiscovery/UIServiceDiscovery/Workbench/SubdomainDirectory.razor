@@ -3,7 +3,7 @@
 <DiscoverySignature Label="@T("domDecisionLabel")" Value="@Model.HostedCatalog.ToString()" Unit="@T("domDecisionUnit", CatalogTotal)"
                     Role="@(Model.HostedCatalog < CatalogTotal ? "error" : Model.Domains.Any(domain => domain.Catalog is null) ? "warning" : "success")">
     <Reasons>
-        @foreach (var filter in Coverage)
+        @foreach (var filter in Coverage.OrderByDescending(filter => filter.Key == "hosted"))
         {
             var count = Model.Domains.Count(domain => Matches(domain, filter.Key));
             <DiscoveryReason Role="@filter.Paint" Count="@count">@T(filter.Label) @count</DiscoveryReason>
@@ -52,10 +52,10 @@
         <div class="sv-dom-rail-controls">
             <DiscoverySearch Value="@Workbench.Param("q")" Label="@T("domSearchPlaceholder")" ClearLabel="@T("clearSearch")" ValueChanged='value => Workbench.Pick("q", value.Length == 0 ? null : value, true)' />
             <div class="fchips" role="group" aria-label="@T("domFilterAll")">
-                <MoFilterChip Role="MoVisualRole.Primary" Pill Label="@T("domFilterAll")" Count="@_pool.Count" Selected="@(Filter == "all")" SelectedChanged='() => Workbench.Pick("coverage", null)' />
+                <MoFilterChip Role="MoVisualRole.Primary" Pill Class="mo-vl-chip--instrument" Label="@T("domFilterAll")" Count="@_pool.Count" Selected="@(Filter == "all")" SelectedChanged='() => Workbench.Pick("coverage", null)' />
                 @foreach (var filter in Coverage)
                 {
-                    <MoFilterChip Role="@filter.Role" Pill ShowDot Label="@T(filter.Label)" Count="@_pool.Count(domain => Matches(domain, filter.Key))" Selected="@(Filter == filter.Key)"
+                    <MoFilterChip Role="@filter.Role" Pill ShowDot Class="mo-vl-chip--instrument" Label="@T(filter.Label)" Count="@_pool.Count(domain => Matches(domain, filter.Key))" Selected="@(Filter == filter.Key)"
                         SelectedChanged='value => Workbench.Pick("coverage", value ? filter.Key : null)' />
                 }
             </div>
@@ -93,6 +93,7 @@
         }
         else
         {
+            var callers = ExternalCallers(selected);
             <header class="sv-dom-dossier-head">
                 <div class="sv-dom-dossier-id">
                     <div class="sv-dom-dossier-title-row"><h2>@Name(selected)</h2><code class="sv-dom-code">@selected.Id</code>
@@ -119,7 +120,7 @@
             </div>
             <div class="sv-dom-sections">
                 <section class="sv-dom-sec">
-                    <header><h3>@T("domOwnedTitle") <span class="sv-dim">@selected.Hosts.Count</span></h3><p>@T("domOwnedHelp")</p></header>
+                    <header><h3>@T("domOwnedTitle") <span class="sv-dom-count mono">@selected.Hosts.Count</span></h3><p>@T("domOwnedHelp")</p></header>
                     @if (selected.Hosts.Count == 0) { <p class="sv-dim">@T("domNoOwned")</p> }
                     <div class="sv-dom-svc-list">
                         @foreach (var host in selected.Hosts)
@@ -133,7 +134,7 @@
                     </div>
                 </section>
                 <section class="sv-dom-sec">
-                    <header><h3>@T("domRolesTitle") <span class="sv-dim">@ObservedRoles(selected).Count</span></h3></header>
+                    <header><h3>@T("domRolesTitle") <span class="sv-dom-count mono">@ObservedRoles(selected).Count</span></h3></header>
                     @if (ObservedRoles(selected).Count == 0) { <p class="sv-dim">@T("domNoRoles")</p> }
                     <div class="sv-pill-cloud">
                         @foreach (var role in ObservedRoles(selected))
@@ -146,24 +147,24 @@
                     </div>
                 </section>
                 <section class="sv-dom-sec">
-                    <header><h3>@T("domInboundTitle") <span class="sv-dim">@CallCount(selected.Inbound.Select(call => call.SourceApp ?? call.SourceDomain).Distinct().Count())</span></h3><p>@T("domInboundHelp")</p></header>
+                    <header><h3>@T("domInboundTitle") <span class="sv-dom-count mono">@CallCount(callers.Length)</span></h3><p>@T("domInboundHelp")</p></header>
                     @if (!Model.Topology.IsAvailable) { <p class="sv-dim">@T("depUnavailableBody")</p> }
-                    else if (selected.Inbound.Count == 0) { <p class="sv-dim">@T("domNoInbound")</p> }
+                    else if (callers.Length == 0) { <p class="sv-dim">@T("domNoInbound")</p> }
                     else
                     {
                         <div class="sv-dom-callers">
-                            @foreach (var group in selected.Inbound.GroupBy(call => (call.SourceApp, call.SourceDomain)))
+                            @foreach (var (service, calls) in callers)
                             {
                                 <div class="sv-dom-caller-card">
                                     <div class="sv-dom-caller-head">
                                         <div>
-                                            @if (group.Key.SourceApp is { } app) { <a class="sv-row-link" href="@Workbench.Here(("inspect", app), ("tab", null))">@(Model.ServiceById.GetValueOrDefault(app)?.Name ?? app)</a> }
-                                            <code>@group.Key.SourceDomain</code>
+                                            <a class="sv-row-link" href="@Workbench.Here(("inspect", service.Id), ("tab", null))">@service.Name</a>
+                                            <code>@service.Id</code>
                                         </div>
-                                        <span class="sv-dim">@T("depCallsCount", group.Count())</span>
+                                        <span class="chip is-mono role-neutral">@T("depCallsCount", calls.Length)</span>
                                     </div>
                                     <ul class="sv-dom-caller-ops">
-                                        @foreach (var call in group)
+                                        @foreach (var call in calls)
                                         {
                                             <li class="mono">
                                                 <a href="@Workbench.Link(DiscoveryWorkbench.DEPENDENCIES, ("pair", $"{call.SourceDomain}→{call.TargetDomain}"))" title="@call.Definition.Operation">
@@ -178,7 +179,7 @@
                     }
                 </section>
                 <section class="sv-dom-sec">
-                    <header><h3>@T("domOutboundTitle") <span class="sv-dim">@CallCount(selected.Outbound.Select(call => call.TargetDomain).Distinct().Count())</span></h3><p>@T("domOutboundHelp")</p></header>
+                    <header><h3>@T("domOutboundTitle") <span class="sv-dom-count mono">@CallCount(selected.Outbound.Select(call => call.TargetDomain).Distinct().Count())</span></h3><p>@T("domOutboundHelp")</p></header>
                     @if (!Model.Topology.IsAvailable || selected.Outbound.Count == 0)
                     {
                         <p class="sv-dim">@T(Model.Topology.IsAvailable ? "domNoOutbound" : "depUnavailableTitle")</p>
@@ -206,8 +207,8 @@
 @code {
     private static readonly (string Key, string Paint, MoVisualRole Role, string Label)[] Coverage =
     [
-        ("hosted", "success", MoVisualRole.Success, "domFilterHosted"), ("multi", "third", MoVisualRole.Third, "domFilterMulti"),
-        ("unhosted", "error", MoVisualRole.Error, "domFilterUnhosted"), ("unlisted", "warning", MoVisualRole.Warning, "domFilterUnlisted")
+        ("multi", "third", MoVisualRole.Third, "domFilterMulti"), ("unhosted", "error", MoVisualRole.Error, "domFilterUnhosted"),
+        ("unlisted", "warning", MoVisualRole.Warning, "domFilterUnlisted"), ("hosted", "success", MoVisualRole.Success, "domFilterHosted")
     ];
     private DiscoveryEvidence Model => Workbench.Evidence!;
     private string? Requested => Workbench.Param("domain");
@@ -236,10 +237,16 @@
 
     private static bool Matches(DomainRow domain, string filter) => filter switch
     {
-        "hosted" => domain.Catalog is not null && domain.Hosts.Count > 0,
+        "hosted" => domain.Coverage == "single",
         "multi" => domain.Coverage == "shared", "all" => true,
         _ => domain.Coverage == filter
     };
+
+    private (ServiceRow Service, CallRow[] Calls)[] ExternalCallers(DomainRow domain) => Model.Services
+        .Where(service => !service.Domains.Contains(domain.Id, StringComparer.Ordinal))
+        .Select(service => (Service: service, Calls: domain.Inbound.Where(call => call.SourceApp is { } app
+            ? app == service.Id : call.Definition.IsOwnedBy(service.State)).ToArray()))
+        .Where(caller => caller.Calls.Length != 0).ToArray();
 
     private string CallCount(int count) => Model.Topology.IsAvailable ? count.ToString() : "—";
     private static string Name(DomainRow row) => row.Catalog?.DisplayName ?? row.Id;

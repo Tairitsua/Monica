@@ -76,12 +76,12 @@ else
                         }
                     </div>
                     <div class="fchips" aria-label="@T("allStatuses")">
-                        <MoFilterChip Role="MoVisualRole.Primary" Label="@T("allStatuses")" Pill Count="@SearchPool.Count" Selected="@(Status == "all")"
+                        <MoFilterChip Role="MoVisualRole.Primary" Label="@T("allStatuses")" Pill Class="mo-vl-chip--instrument" Count="@SearchPool.Count" Selected="@(Status == "all")"
                                       SelectedChanged='() => Workbench.Pick("status", null)' />
                         @foreach (var status in StatusOrder)
                         {
                             var count = SearchPool.Count(service => service.State.OverallStatus == status);
-                            <MoFilterChip Role="@ChipRole(status)" Pill ShowDot Count="@count" Label="@T("statuses:" + status)"
+                            <MoFilterChip Role="@ChipRole(status)" Pill ShowDot Class="mo-vl-chip--instrument" Count="@count" Label="@T("statuses:" + status)"
                                           Selected="@(Status == status.ToString())"
                                           SelectedChanged='value => Workbench.Pick("status", value ? status.ToString() : null)' />
                         }
@@ -98,11 +98,14 @@ else
                 {
                     <div class="sv-table-wrap">
                         <table class="table sv-table">
-                            <thead><tr>@foreach (var label in Columns) { <th scope="col">@T(label)</th> }</tr></thead>
+                            <thead><tr>
+                                @foreach (var label in Columns) { <th scope="col">@T(label)</th> }
+                                <th scope="col" class="is-act">@T("colActions")</th>
+                            </tr></thead>
                             <tbody>
                             @foreach (var row in Visible)
                             {
-                                var addresses = Addresses(row);
+                                var addresses = ListeningAddresses(row);
                                 var metadata = RegistryMetadata(row);
                                 <tr @key="row.Id" class="@(row.Offline ? "is-offline" : null) @(Workbench.Param("inspect") == row.Id ? "is-selected" : null)">
                                     <td data-label="@T("colService")" class="sv-cell-svc">
@@ -111,7 +114,7 @@ else
                                             <DiscoveryBadge Role="@StatusRole(row.State.OverallStatus)">@T("statuses:" + row.State.OverallStatus)</DiscoveryBadge>
                                             @if (row.Id == Model.Host.CurrentInstance.AppId)
                                             {
-                                                <a class="chip role-info" href="@Workbench.Link(DiscoveryWorkbench.HOST)">@T("thisHostTag")</a>
+                                                <a class="chip role-info" href="@Workbench.Link(DiscoveryWorkbench.HOST)"><MoIcon Icon="@MoIcons.Monitor" Size="13px" />@T("thisHostTag")</a>
                                             }
                                         </div>
                                         <div class="sv-svc-sub mono">@row.Id @if (row.State.ProjectName is { } project) { <span class="sv-sep">·</span><span>@project</span> }</div>
@@ -164,7 +167,7 @@ else
                                     <td data-label="@T("colBuild")" class="sv-cell-build mono">
                                         @if (row.Skew)
                                         {
-                                            <div class="sv-build-skew"><span class="sv-skew-tag role-warning">@T("versionSkew", row.Versions.Count)</span><small>@string.Join(" / ", row.Versions)</small></div>
+                                            <div class="sv-build-skew"><span class="sv-skew-tag role-warning"><MoIcon Icon="@MoIcons.Layers" Size="12px" />@T("versionSkew", row.Versions.Count)</span><small>@string.Join(" / ", row.Versions)</small></div>
                                         }
                                         else { <span>@(row.Versions.FirstOrDefault() is { } version ? $"v{version}" : "—")</span> }
                                     </td>
@@ -196,7 +199,7 @@ else
 }
 
 @code {
-    private static readonly string[] Columns = ["colService", "colDomains", "colInstances", "colFreshness", "colBuild", "colEndpoints", "colActions"];
+    private static readonly string[] Columns = ["colService", "colDomains", "colInstances", "colFreshness", "colBuild", "colEndpoints"];
     private static readonly string[] Sorts = ["attention", "name", "instances", "heartbeat", "domains"];
     private static readonly ServiceStatus[] StatusOrder = [ServiceStatus.Running, ServiceStatus.Unhealthy, ServiceStatus.Updating, ServiceStatus.Error, ServiceStatus.Offline];
     private DiscoveryEvidence Model => Workbench.Evidence!;
@@ -265,23 +268,13 @@ else
         }
     }
 
-    private static bool IsAddressKey(string key) => key is "K8S_LISTENING_ADDRESSES" or "LISTENING_ADDRESS";
-
     private IEnumerable<KeyValuePair<string, string>> RegistryMetadata(ServiceRow service)
     {
         var keys = Workbench.UiSettings!.DisplayMetadataKeys;
         return service.Instances.SelectMany(instance => instance.State.Metadata)
-            .Where(entry => !IsAddressKey(entry.Key) && keys.Contains(entry.Key, StringComparer.Ordinal))
+            .Where(entry => !IsListeningAddress(entry.Key) && keys.Contains(entry.Key, StringComparer.Ordinal))
             .Distinct();
     }
-
-    private string[] Addresses(ServiceRow row) =>
-        Workbench.UiSettings?.DisableListeningAddressDisplay == true ? [] : row.Instances
-            .SelectMany(instance => instance.State.Metadata
-                .Where(entry => IsAddressKey(entry.Key))
-                .SelectMany(entry => entry.Value.Split([';', ','], StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries)))
-            .Where(value => Uri.TryCreate(value, UriKind.Absolute, out var uri) && uri.Scheme is "http" or "https")
-            .Distinct(StringComparer.Ordinal).ToArray();
 
     private static string MarkRole(InstanceRow instance) => instance.State.Status == ServiceStatus.Updating ? "info" : HeartbeatRole(instance.Health);
     private static MoVisualRole ChipRole(ServiceStatus status) => StatusRole(status) switch

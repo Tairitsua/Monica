@@ -76,7 +76,7 @@
 
     protected override void OnParametersSet()
     {
-        _targets = Snapshot.Targets.OrderByDescending(target => EndpointAttention(Snapshot, target))
+        _targets = Snapshot.Targets.OrderByDescending(target => EndpointPriority(Snapshot, target))
             .ThenBy(target => target.Target.Scope).ThenBy(target => target.Target.AppId).ToArray();
         _latencyScale = Snapshot.Targets.SelectMany(target => target.Calls).Select(call => call.DurationMs).Append(100).Max();
     }

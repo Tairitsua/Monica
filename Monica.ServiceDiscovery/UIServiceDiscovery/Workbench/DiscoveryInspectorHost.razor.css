@@ -41,6 +41,7 @@
 .sv-inspector-scope ::deep .kv { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); column-gap: 22px; margin: 0; }
 .sv-inspector-scope ::deep .kv > div { display: grid; grid-template-columns: minmax(92px, 36%) minmax(0, 1fr); align-items: baseline; gap: 10px; min-width: 0; padding: 9px 0; border-bottom: 1px dashed var(--mud-palette-divider); }
 .sv-inspector-scope ::deep .kv.is-single { grid-template-columns: minmax(0, 1fr); }
+.sv-inspector-scope ::deep .kv.is-single > div { grid-template-columns: 112px minmax(0, 1fr); }
 .sv-inspector-scope ::deep .kv dt { color: var(--mud-palette-text-secondary); font-size: 12.5px; }
 .sv-inspector-scope ::deep .kv dd { display: flex; align-items: center; flex-wrap: wrap; gap: 4px 8px; min-width: 0; margin: 0; font-size: 13px; overflow-wrap: anywhere; }
 .sv-inspector-scope ::deep .kv code, .sv-inspector-scope ::deep .mono { overflow-wrap: anywhere; }
@@ -52,7 +53,12 @@
 .sv-inspector-scope ::deep .sv-sheet-id h2 { margin-top: 3px; border-radius: 4px; font-size: 18px; font-weight: 600; line-height: 1.25; letter-spacing: -.015em; overflow-wrap: anywhere; }
 .sv-inspector-scope ::deep .sv-sheet-id h2:focus-visible { outline-offset: 3px; }
 .sv-inspector-scope ::deep .sv-sheet-sub { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-top: 4px; color: var(--mud-palette-text-secondary); font-size: 12px; }
-.sv-inspector-scope ::deep .sv-sheet-frozen-line { margin-top: 10px; color: var(--mud-palette-text-secondary); font-size: 12px; line-height: 1.5; }
+.sv-sheet-eyebrow { color: var(--mud-palette-text-secondary); font-size: 11.5px; line-height: 1.35; }
+.sv-sheet-capture { padding: 0 22px 10px; }
+.sv-sheet-frozen-line { color: var(--mud-palette-text-secondary); font-size: 12px; line-height: 1.5; }
+@media (max-width: 560px) {
+    .sv-sheet-capture { padding-inline: 16px; }
+}
 
 
 .sv-inspector-scope ::deep .sv-sheet-tab-content { display: flex; flex-direction: column; gap: 18px; }
@@ -112,4 +118,7 @@
 @media (max-width: 600px) {
     .sv-inspector-scope ::deep .sv-inst-facts { grid-template-columns: minmax(0, 1fr); }
     .sv-inspector-scope ::deep .sv-meta-row { grid-template-columns: minmax(0, 1fr); gap: 3px; }
+}
+@media (max-width: 420px) {
+    .sv-inspector-scope ::deep .kv.is-single > div { grid-template-columns: minmax(0, 1fr); gap: 3px; }
 }

@@ -44,7 +44,7 @@
             <div class="fchips sv-deploy-fchips" aria-label="@T("hostFields:roles")">
                 @foreach (var filter in Filters)
                 {
-                    <MoFilterChip Role="@filter.Role" Pill ShowDot="@(filter.Key != "all")" Label="@T(filter.Label)" Count="@_roles.Count(role => Matches(role, filter.Key))"
+                    <MoFilterChip Role="@filter.Role" Pill ShowDot="@(filter.Key != "all")" Class="mo-vl-chip--instrument" Label="@T(filter.Label)" Count="@_roles.Count(role => Matches(role, filter.Key))"
                                   Selected="@(Filter == filter.Key)" SelectedChanged='selected => Workbench.Pick("roleFilter", selected && filter.Key != "all" ? filter.Key : null)' />
                 }
                 @if (SelectedRole is { } active)
@@ -90,7 +90,11 @@
                                 @foreach (var app in _apps)
                                 {
                                     var roles = _roles.Where(role => role.App == app.Id).ToArray();
-                                    var visible = roles.Where(role => Matches(role, Filter)).ToArray();
+                                    var visible = roles.Where(role => Matches(role, Filter))
+                                        .OrderByDescending(role => role.Id == SelectedRole?.Id)
+                                        .ThenByDescending(role => role.Status == RoleHealthStatus.Faulted)
+                                        .ThenByDescending(role => role.Status == RoleHealthStatus.Degraded).ToArray();
+                                    var addresses = ListeningAddresses(app);
                                     var artifacts = Artifacts(app);
                                     var selective = app.Instances.Any(instance => instance.State.Diagnostics?.IncludedRoles is { } ids && ids.Count < Model.Roles.Count);
                                     <article @key="app.Id" class="sv-deploy-card role-@StatusRole(app.State.OverallStatus) @(SelectedRole is null && SelectedApp?.Id == app.Id ? "is-selected-app" : null) @(app.Offline ? "is-offline" : null) @(roles.Length > 0 && visible.Length == 0 ? "is-dim" : null)">
@@ -145,7 +149,11 @@
                                             }
                                         </div>
                                         <footer class="sv-atlas-card-foot mono">
-                                            @T("atlasRolesCount", roles.Length) · @T("atlasRemoteEdgeFoot", Model.Calls.Count(call => call.SourceApp == app.Id && call.Remote), Model.Calls.Count(call => call.TargetApp == app.Id && call.Remote))
+                                            <span>@T("atlasRolesCount", roles.Length) · @T("atlasRemoteEdgeFoot", Model.Calls.Count(call => call.SourceApp == app.Id && call.Remote), Model.Calls.Count(call => call.TargetApp == app.Id && call.Remote))</span>
+                                            @if (addresses.FirstOrDefault() is { } address)
+                                            {
+                                                <code title="@string.Join(", ", addresses)">@address@(addresses.Length > 1 ? $" +{addresses.Length - 1}" : null)</code>
+                                            }
                                         </footer>
                                     </article>
                                 }
@@ -256,7 +264,7 @@
                                 @if (DockCalls.Count == 0) { <p class="sv-deploy-empty-note sv-dim">@T("atlasNoCalls")</p> }
                                 else
                                 {
-                                    <ul class="sv-rcall-list">@foreach (var call in DockCalls) { <li><DiscoveryCallCard Call="@call" /></li> }</ul>
+                                    <ul class="sv-rcall-list">@foreach (var call in DockCalls) { <li><DiscoveryCallCard Call="@call" FocusRole="@SelectedRole?.Id" FocusApp="@SelectedApp?.Id" /></li> }</ul>
                                 }
                             </div>
                         </div>

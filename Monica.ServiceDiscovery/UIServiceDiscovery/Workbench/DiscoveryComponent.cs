@@ -4,6 +4,7 @@ using Microsoft.Extensions.Localization;
 using Monica.Core.ApplicationRoles;
 using Monica.ServiceDiscovery.Localization;
 using Monica.ServiceDiscovery.Models;
+using Monica.ServiceDiscovery.UIServiceDiscovery.State;
 using Monica.UI.Shared.Services;
 
 namespace Monica.ServiceDiscovery.UIServiceDiscovery.Workbench;
@@ -69,7 +70,31 @@ public abstract class DiscoveryComponent : ComponentBase
 
     private protected static bool EndpointAttention(ServiceEndpointDiagnosticsSnapshot snapshot, ServiceEndpointSnapshot target) =>
         EndpointState(snapshot, target) is "Failed" or "Timeout" or "Stale" or "Empty" ||
-        target.Calls.Any(call => call.Outcome is "HttpFailure" or "Failure" or "Canceled");
+        target.Calls.Any(IsHttpError);
+
+    private protected static bool IsHttpError(EndpointHttpObservation call) => call.Outcome is "Failure" or "HttpFailure";
+
+    private protected static bool LatestHttpError(ServiceEndpointSnapshot target) =>
+        target.Calls.MaxBy(call => call.At) is { } latest && IsHttpError(latest);
+
+    private protected static int EndpointPriority(ServiceEndpointDiagnosticsSnapshot snapshot, ServiceEndpointSnapshot target)
+    {
+        var resolutionPriority = EndpointState(snapshot, target) switch
+        {
+            "Failed" or "Timeout" => 100, "Empty" => 80, "Stale" => 40, "Unknown" => 5, _ => 0
+        };
+        return resolutionPriority + (LatestHttpError(target) ? 60 : 0) + (target.Calls.Any(IsHttpError) ? 25 : 0);
+    }
+
+    private protected static bool IsListeningAddress(string key) => key is "K8S_LISTENING_ADDRESSES" or "LISTENING_ADDRESS";
+
+    private protected string[] ListeningAddresses(ServiceRow service) =>
+        Workbench.UiSettings?.DisableListeningAddressDisplay == true ? [] : service.Instances
+            .SelectMany(instance => instance.State.Metadata
+                .Where(entry => IsListeningAddress(entry.Key))
+                .SelectMany(entry => entry.Value.Split([';', ','], StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries)))
+            .Where(value => Uri.TryCreate(value, UriKind.Absolute, out var uri) && uri.Scheme is "http" or "https")
+            .Distinct(StringComparer.Ordinal).ToArray();
 
     private protected static bool RetainedPrior(ServiceEndpointSnapshot target) =>
         target.Resolution is "Failed" or "Timeout" && target.ResolvedAt is not null && target.Candidates.Count != 0;
