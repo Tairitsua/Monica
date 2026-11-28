@@ -557,7 +557,6 @@
     display: flex;
     flex-wrap: wrap;
     align-items: center;
-    justify-content: space-between;
     gap: 8px 12px;
     padding: 10px 12px;
     border-top: 1px solid var(--mud-palette-divider);
@@ -567,7 +566,15 @@
     background: color-mix(in srgb, var(--mud-palette-primary) 9%, var(--mud-palette-surface));
     box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--mud-palette-primary) 38%, transparent);
 }
-.dc-sheet-body ::deep .dc-mw-select { display: flex; align-items: center; gap: 10px; flex: 1; min-width: 0; text-align: left; }
+.dc-sheet-body ::deep .dc-mw-select {
+    display: flex;
+    align-items: center;
+    justify-content: flex-start;
+    gap: 10px;
+    flex: 1 1 auto;
+    min-width: 0;
+    text-align: left;
+}
 .dc-sheet-body ::deep .dc-mw-stage {
     flex: none;
     padding: 2px 7px;
@@ -580,7 +587,7 @@
 .dc-sheet-body ::deep .dc-mw-ident { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
 .dc-sheet-body ::deep .dc-mw-ident b { font-size: 12.5px; overflow-wrap: anywhere; }
 .dc-sheet-body ::deep .dc-mw-ident small { font-size: 11.5px; color: var(--mud-palette-text-secondary); }
-.dc-sheet-body ::deep .dc-mw-row-actions { flex: none; }
+.dc-sheet-body ::deep .dc-mw-row-actions { flex: none; margin-inline-start: auto; }
 
 /* Exceptions tab inside sheet */
 .dc-sheet-body ::deep .dc-ex-mini-facts {
@@ -629,6 +636,7 @@
 .dc-sheet-body ::deep .dc-ex-rec {
     display: flex;
     flex-direction: column;
+    align-items: stretch;
     gap: 4px;
     padding: 9px 12px;
     border-top: 1px solid var(--mud-palette-divider);

@@ -392,7 +392,12 @@
 .dc-page ::deep .dc-search input { flex: 1; min-width: 0; border: 0; outline: 0; background: transparent; color: var(--mud-palette-text-primary); font-size: 13px; }
 .dc-page ::deep .dc-search input::placeholder { color: color-mix(in srgb, var(--mud-palette-text-secondary) 82%, var(--mud-palette-surface)); }
 
-.dc-page ::deep .dc-state-chips { padding: 0 20px 14px; }
+.dc-page ::deep .dc-state-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    padding: 0 20px 14px;
+}
 .dc-page ::deep .fchip.is-zero { color: color-mix(in srgb, var(--mud-palette-text-secondary) 82%, var(--mud-palette-surface)); }
 .dc-page ::deep .fchip.is-zero .status-dot { opacity: .55; }
 

@@ -77,6 +77,10 @@ Check if:
 
 MudBlazor start icons can retain a negative leading margin that assumes the button's default horizontal padding. When restyling a button as a compact navigation entry, inspect the generated icon and text against the button's own bounds. Reset that margin locally when reducing padding, and keep active indicators inside the button's clipping region. Verify the icon, text, underline and keyboard focus independently; a page with no horizontal overflow can still clip these children inside a ripple-enabled button.
 
+### Keep selectable row contents aligned
+
+MudBlazor's base button rules center flex contents. For a custom horizontal row button, set `justify-content: flex-start` to keep its leading marks and labels aligned. For a column button, set `align-items: stretch` so its heading and supporting text have the full row width. Check the content inset on short and long rows and verify the placement of trailing timestamps or actions on desktop and phone.
+
 ## Specific Fixing Steps
 
 ### Keep tab body padding off tab controls
