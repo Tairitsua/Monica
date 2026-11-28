@@ -57,7 +57,7 @@
 }
 else
 {
-    <DiscoverySurface Title="@T("epWorkspaceTitle")" Detail="@T("epShownTargets", _visible.Count, Snapshot.Targets.Count)" Class="sv-ep-work" Icon="@MoIcons.Network">
+    <DiscoverySurface Title="@T("epWorkspaceTitle")" Count="@T("epShownTargets", _visible.Count, Snapshot.Targets.Count)" Class="sv-ep-work" Icon="@MoIcons.Network">
         <div class="sv-toolbar">
             <div class="sv-toolbar-row">
                 <DiscoverySearch Value="@Workbench.Param("q")" Label="@T("epSearchPlaceholder")" ClearLabel="@T("clearSearch")" ValueChanged='value => Workbench.Pick("q", value.Length == 0 ? null : value, true)' />

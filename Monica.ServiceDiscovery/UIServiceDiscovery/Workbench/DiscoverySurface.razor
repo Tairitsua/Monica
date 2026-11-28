@@ -1,7 +1,13 @@
 <section class="mo-vl-surface @Class" aria-label="@Title">
     <header class="mo-vl-surface-heading">
         <span class="mo-vl-tile role-@Role"><MoIcon Icon="@Icon" Size="16px" /></span>
-        <div class="sv-surface-copy"><h2>@Title</h2>@if (Detail is not null) { <p>@Detail</p> }</div>
+        <div class="sv-surface-copy">
+            <div class="sv-surface-title">
+                <h2>@Title</h2>
+                @if (Count is not null) { <span class="sv-surface-count">@Count</span> }
+            </div>
+            @if (Detail is not null) { <p>@Detail</p> }
+        </div>
         @if (Aside is not null) { <div class="aside">@Aside</div> }
     </header>
     @ChildContent
@@ -11,6 +17,7 @@
     [Parameter, EditorRequired] public string Title { get; set; } = "";
     [Parameter, EditorRequired] public string Icon { get; set; } = "";
     [Parameter] public string Role { get; set; } = "primary";
+    [Parameter] public string? Count { get; set; }
     [Parameter] public string? Detail { get; set; }
     [Parameter] public string? Class { get; set; }
     [Parameter] public RenderFragment? Aside { get; set; }

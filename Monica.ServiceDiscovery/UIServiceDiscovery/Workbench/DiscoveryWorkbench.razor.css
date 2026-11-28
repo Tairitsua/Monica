@@ -96,6 +96,8 @@
 .sv-frame ::deep .sv-page { max-width: none; }
 .sv-frame ::deep .sv-page .mo-vl-surface-heading { flex-wrap: wrap; gap: 10px; }
 .sv-frame ::deep .sv-surface-copy { min-width: 0; }
+.sv-frame ::deep .sv-surface-title { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 12px; }
+.sv-frame ::deep .sv-surface-count { padding: 1px 7px; border-radius: 999px; background: var(--mud-palette-background-gray); color: var(--mud-palette-text-secondary); font: 500 11px/1.6 var(--mo-font-family-mono); }
 .sv-frame ::deep .sv-page .mo-vl-surface-heading .aside { margin-left: auto; max-width: 100%; }
 .sv-frame ::deep .sv-page .seg { max-width: 100%; flex-wrap: wrap; }
 .sv-frame ::deep .sv-auto .status-dot { width: 7px; height: 7px; }
@@ -195,6 +197,7 @@
 /* ---------- Filter toolbar & Registry table ---------- */
 .sv-frame ::deep .sv-toolbar { display: flex; flex-direction: column; gap: 10px; padding: 0 20px 14px; }
 .sv-frame ::deep .sv-toolbar-row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.sv-frame ::deep .sv-reg-select { max-width: 146px; }
 .sv-frame ::deep .sv-search { position: relative; display: flex; align-items: center; min-width: 0; }
 .sv-frame ::deep :is(.sv-toolbar-row, .sv-atlas-bar) > .sv-search { flex: 1 1 240px; min-width: 180px; max-width: 420px; }
 .sv-frame ::deep .sv-search > .mo-icon { position: absolute; inset-inline-start: 10px; color: var(--mud-palette-text-secondary); pointer-events: none; }
@@ -739,6 +742,7 @@
     .sv-frame ::deep .sv-page .mo-vl-surface-heading .seg { width: 100%; }
     .sv-frame ::deep .sv-page .mo-vl-surface-heading .seg button { flex: 1 1 auto; justify-content: center; padding: 0 8px; font-size: 12px; }
     .sv-frame ::deep :is(.sv-toolbar-row, .sv-atlas-bar) > .sv-search { flex: 1 1 100%; min-width: 0; max-width: none; }
+    .sv-frame ::deep .sv-reg-select { max-width: none; }
     .sv-frame ::deep .sv-page .kv.is-single > div { grid-template-columns: minmax(0, 1fr); gap: 3px; }
     .sv-frame ::deep .sv-dom-bars { grid-template-columns: repeat(4, minmax(0, 1fr)); }
     .sv-frame ::deep .sv-atlas-bar-ctrl .seg { width: 100%; }

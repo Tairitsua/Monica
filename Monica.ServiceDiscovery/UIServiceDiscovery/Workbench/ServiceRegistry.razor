@@ -46,29 +46,29 @@ else
                 <ServiceHeartbeatHorizon />
             </ChildContent>
         </DiscoverySignature>
-        <DiscoverySurface Title="@T("viewRoster")" Icon="@MoIcons.Server" Class="sv-inv" Detail="@T("shownServices", Visible.Count, Model.Services.Count)">
+        <DiscoverySurface Title="@T("viewRoster")" Icon="@MoIcons.Server" Class="sv-inv" Count="@T("shownServices", Visible.Count, Model.Services.Count)">
             <Aside><DiscoveryViewSwitch /></Aside>
             <ChildContent>
                 <div class="sv-toolbar">
                     <div class="sv-toolbar-row">
                         <DiscoverySearch Value="@Q" Label="@T("searchPlaceholder")" ClearLabel="@T("clearSearch")" ValueChanged='value => Workbench.Pick("q", value.Length == 0 ? null : value, true)' />
                         <MudSelect T="string" Value="@Domain" ValueChanged='value => Workbench.Pick("domain", value == "all" ? null : value)'
-                                   Class="sv-select-field" Dense Variant="Variant.Outlined" Margin="Margin.Dense" aria-label="@T("allDomains")">
-                            <MudSelectItem Value="@("all")">@T("allDomains")</MudSelectItem>
+                                   Class="sv-select-field sv-reg-select" Dense Variant="Variant.Outlined" Margin="Margin.Dense" aria-label="@T("colDomains")">
+                            <MudSelectItem Value="@("all")">@T("allDomains") (@DomainOptions.Length)</MudSelectItem>
                             <MudSelectItem Value="@("unassigned")">@T("unassignedDomain")</MudSelectItem>
-                            @foreach (var id in Model.Services.SelectMany(service => service.Domains).Distinct().Order())
+                            @foreach (var id in DomainOptions)
                             {
                                 <MudSelectItem Value="@id">@id</MudSelectItem>
                             }
                         </MudSelect>
                         <MudSelect T="string" Value="@Sort" ValueChanged='value => Workbench.Pick("sort", value == "attention" ? null : value)'
-                                   Class="sv-select-field" Dense Variant="Variant.Outlined" Margin="Margin.Dense" aria-label="@T("sortLabel")">
+                                   Class="sv-select-field sv-reg-select" Dense Variant="Variant.Outlined" Margin="Margin.Dense" aria-label="@T("sortLabel")">
                             @foreach (var value in Sorts)
                             {
                                 <MudSelectItem Value="@value">@T("sortOptions:" + value)</MudSelectItem>
                             }
                         </MudSelect>
-                        <MoFilterChip Role="MoVisualRole.Primary" Label="@T("onlyRegistered")" Pill Selected="@OnlyRegistered"
+                        <MoFilterChip Role="MoVisualRole.Primary" Label="@T("onlyRegistered")" Pill ShowDot Class="mo-vl-chip--instrument" Selected="@OnlyRegistered"
                                       SelectedChanged='value => Workbench.Pick("registered", value ? "1" : null)' />
                         @if (HasFilters)
                         {
@@ -212,6 +212,7 @@ else
     private bool HasFilters => Q is not null || Domain != "all" || Status != "all" || OnlyRegistered;
     private IReadOnlyList<ServiceRow> SearchPool { get; set; } = [];
     private IReadOnlyList<ServiceRow> Visible { get; set; } = [];
+    private string[] DomainOptions { get; set; } = [];
     private IReadOnlyList<InstanceRow> Instances { get; set; } = [];
     private int Offline => Model.Services.Count(service => service.Offline);
     private int Overdue => Model.Services.Count(service => service.Overdue);
@@ -229,6 +230,7 @@ else
 
     protected override void OnParametersSet()
     {
+        DomainOptions = Model.Services.SelectMany(service => service.Domains).Distinct(StringComparer.Ordinal).Order().ToArray();
         var q = Q?.Trim();
         var domain = Domain;
         var onlyRegistered = OnlyRegistered;

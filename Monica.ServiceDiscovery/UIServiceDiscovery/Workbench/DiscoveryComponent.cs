@@ -35,7 +35,7 @@ public abstract class DiscoveryComponent : ComponentBase
     private protected static string ShortName(string value) => value[(value.LastIndexOf('.') + 1)..];
     private protected static string StatusRole(ServiceStatus status) => status switch
     {
-        ServiceStatus.Running => "success", ServiceStatus.Error or ServiceStatus.Offline => "error",
+        ServiceStatus.Running => "success", ServiceStatus.Error => "error",
         ServiceStatus.Updating => "info", ServiceStatus.Unhealthy => "warning", _ => "neutral"
     };
 
