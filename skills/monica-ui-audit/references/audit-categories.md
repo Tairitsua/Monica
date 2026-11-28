@@ -69,6 +69,8 @@ Indicators:
 - Responsive cell CSS assumes an enum name is a media-query threshold, so a MudBlazor table stacks earlier than the page's local spacing rules
 - Stacked cells retain a desktop `colgroup`, fixed table formatting or column width, squeezing readable values into a fraction of a full-width body without producing overflow
 - A fixed/minimum height leaves unexplained blank space instead of using content-driven height with a viewport-aware cap
+- A control reuses a flex basis intended for a horizontal toolbar inside a column and creates an oversized vertical box. Compare the wrapper, input, and adjacent filters to find the actual axis owner.
+- A wide grid track or table cell contains a control that paints only at its text's intrinsic width. Measure the control against its cell and verify header orientation, focus and selection paint, and the intended local scroll owner.
 - Nested form columns fit the viewport rule but clip floating labels or entered values inside a narrow desktop card; inspect the actual owner width in both shell layouts
 - A compact provenance caption becomes an implicit grid item beside its field, squeezing the value column or moving a native reset action onto another row
 - Text, controls, table cells or empty-state messages touch an ordinary panel edge because the wrapper supplies a background but no content inset; a dialog's padded outer shell is mistaken for an inset within each nested painted tab body
@@ -119,6 +121,7 @@ Indicators:
 - Actionable controls, rows, or cards lack visible hover, focus, pressed, or selected feedback
 - A compound search exposes Clear in an empty field, puts it beyond Apply, or clears unrelated filters when the user clears its text
 - Equal-role swatches have unequal dimensions or sit off the visible text center, or a severity marker changes shape between a legend, filter and evidence badge
+- An expected glyph appears bare or a structural card becomes transparent because prototype class names lack a production style owner. Check the icon backing and card surface in the actual page and portal DOM.
 - A shared cursor menu retains a different row height, icon scale or separator layout when opened through right click and the row action button
 - Informational surfaces translate, scale, change the cursor, or use strong lift on hover, falsely implying an unavailable action; subtle border, tonal, or low-shadow spatial-focus feedback is valid
 - Motion uses large travel, bouncing, repeated flourishes, continuous ambient effects, or ignores `prefers-reduced-motion`
