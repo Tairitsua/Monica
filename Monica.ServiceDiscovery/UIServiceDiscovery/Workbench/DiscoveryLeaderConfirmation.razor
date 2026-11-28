@@ -1,0 +1,22 @@
+<MudDialog DefaultFocus="DefaultFocus.FirstChild">
+    <DialogContent>
+        <div class="d-flex flex-column gap-3">
+            <p>@Message</p>
+            <MudAlert Severity="Severity.Warning" Dense>@Warning</MudAlert>
+        </div>
+    </DialogContent>
+    <DialogActions>
+        <MudButton Variant="Variant.Text" OnClick="Cancel">@CancelText</MudButton>
+        <MudButton Variant="Variant.Filled" Color="Color.Error" OnClick="Confirm">@ConfirmText</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] private IMudDialogInstance Dialog { get; set; } = default!;
+    [Parameter, EditorRequired] public string Message { get; set; } = "";
+    [Parameter, EditorRequired] public string Warning { get; set; } = "";
+    [Parameter, EditorRequired] public string CancelText { get; set; } = "";
+    [Parameter, EditorRequired] public string ConfirmText { get; set; } = "";
+    private void Cancel() => Dialog.Cancel();
+    private void Confirm() => Dialog.Close(DialogResult.Ok(true));
+}

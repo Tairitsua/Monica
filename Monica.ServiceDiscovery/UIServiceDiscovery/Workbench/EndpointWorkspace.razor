@@ -1,0 +1,196 @@
+@inherits DiscoveryComponent
+
+<DiscoverySignature Label="@T("epDecisionLabel")" Value="@Attention.ToString()" Unit="@T("epDecisionUnit", Snapshot.Targets.Count)"
+                    Role="@(Snapshot.Targets.Count == 0 ? "neutral" : _reasons[0].Targets.Count > 0 ? "error" : Attention > 0 ? "warning" : _reasons[4].Targets.Count == Snapshot.Targets.Count ? "info" : "success")"
+                    Facts="@Facts">
+    <Reasons>
+        @foreach (var reason in _reasons)
+        {
+            <DiscoveryReason Role="@reason.Role" Count="@reason.Targets.Count">@T(reason.Label, reason.Targets.Count)</DiscoveryReason>
+        }
+    </Reasons>
+    <Finding>
+        @if (Snapshot.Targets.Count == 0) { @T("epEmptyBody") }
+        else if (_reasons[4].Targets.Count == Snapshot.Targets.Count && Calls.Length == 0) { @T("epAllUnknownLede", Snapshot.Targets.Count) }
+        else if (Attention == 0) { @T("epCalmLede", Snapshot.Targets.Count, Resolved, Calls.Length, Num(Snapshot.Retention.TotalMinutes)) }
+        else
+        {
+            @foreach (var reason in _reasons.Take(4).Where(reason => reason.Targets.Count > 0))
+            {
+                var target = reason.Targets[0];
+                <MoValueMark Role="@(reason.Role == "error" ? MoVisualRole.Error : MoVisualRole.Warning)"
+                             Href="@Workbench.Here(("target", Address(target)), ("endpoint", null))">
+                    @T(reason.Label, reason.Targets.Count) · @target.Target.Scope / @target.Target.AppId
+                </MoValueMark><text> </text>
+            }
+        }
+    </Finding>
+    <ChildContent>
+        @if (Snapshot.Targets.Count > 0)
+        {
+            <EndpointTelemetrySwimlane Snapshot="@Snapshot" Selected="@Address(Selected)" />
+        }
+    </ChildContent>
+</DiscoverySignature>
+
+<div class="sv-ep-providers mo-vl-surface" aria-label="@T("epProvidersLabel")">
+    <div class="sv-ep-prov-head">
+        <span class="sv-ep-prov-label"><MoIcon Icon="@MoIcons.Route" Size="15px" /><b>@T("epProvidersLabel")</b></span>
+        <span class="chip @(Snapshot.EnablePassThrough ? "role-info" : "is-outline")">@T(Snapshot.EnablePassThrough ? "epPassThroughOn" : "epPassThroughOff")</span>
+    </div>
+    <ol class="sv-ep-prov-chain">
+        @for (var i = 0; i < Snapshot.Providers.Count; i++)
+        {
+            <li><span class="sv-ep-prov-step mono">@(i + 1)</span><code>@Snapshot.Providers[i]</code></li>
+        }
+    </ol>
+</div>
+
+@if (Snapshot.Targets.Count == 0)
+{
+    <section class="mo-vl-surface sv-state-panel">
+        <MoContentState>
+            <span class="mo-vl-tile role-neutral"><MoIcon Icon="@MoIcons.Network" Size="18px" /></span>
+            <h2>@T("epEmptyTitle")</h2><p>@T("epEmptyBody")</p>
+        </MoContentState>
+    </section>
+}
+else
+{
+    <DiscoverySurface Title="@T("epWorkspaceTitle")" Count="@T("epShownTargets", _visible.Count, Snapshot.Targets.Count)" Class="sv-ep-work" Icon="@MoIcons.Network">
+        <div class="sv-toolbar">
+            <div class="sv-toolbar-row">
+                <DiscoverySearch Value="@Workbench.Param("q")" Label="@T("epSearchPlaceholder")" ClearLabel="@T("clearSearch")" ValueChanged='value => Workbench.Pick("q", value.Length == 0 ? null : value, true)' />
+                <MudSelect T="string" Value="@Scope" ValueChanged='value => Workbench.Pick("scope", value == "all" ? null : value)'
+                           Class="sv-select-field" Dense Variant="Variant.Outlined" Margin="Margin.Dense" aria-label="@T("epScopeAll")">
+                    <MudSelectItem Value="@("all")">@T("epScopeAll") (@Scopes.Length)</MudSelectItem>
+                    @foreach (var scope in Scopes) { <MudSelectItem Value="@scope">@scope</MudSelectItem> }
+                </MudSelect>
+                @if (HasFilters) { <button type="button" class="btn btn-ghost btn-sm" @onclick="Reset">@T("resetFilters")</button> }
+            </div>
+            <div class="fchips" role="group" aria-label="@T("epFilterAll")">
+                @foreach (var filter in Filters)
+                {
+                    <MoFilterChip Label="@T(filter.Label)" Role="@filter.Role" Pill ShowDot="@(filter.Key != "all")" Class="mo-vl-chip--instrument"
+                          Selected="@(Filter == filter.Key)" Count="@_pool.Count(target => Matches(target, filter.Key))"
+                          SelectedChanged='value => Workbench.Pick("state", value && filter.Key != "all" ? filter.Key : null)' />
+                }
+            </div>
+        </div>
+        @if (_visible.Count == 0 && Selected is null && !Missing)
+        {
+            <MoContentState><h2>@T("epNoMatchTitle")</h2><p>@T("epNoMatchBody")</p>
+                <button type="button" class="btn btn-outline btn-sm" @onclick="Reset">@T("resetFilters")</button>
+            </MoContentState>
+        }
+        else
+        {
+            <div class="sv-ep-split">
+                <ul class="sv-ep-list" data-sv-keygrid aria-label="@T("epWorkspaceTitle")">
+                    @foreach (var target in _visible)
+                    {
+                        var current = target == Selected;
+                        var state = State(target);
+                        var errors = target.Calls.Count(IsHttpError);
+                        <li @key="target.Target.Address" data-sv-keyrow>
+                            <button type="button" class="sv-ep-item @(current ? "is-selected" : null)" aria-current="@(current ? "true" : null)" data-sv-keymark
+                                    @onclick="() => Select(target)">
+                                <span class="sv-ep-item-top"><b>@target.Target.Scope / @target.Target.AppId</b><DiscoveryBadge Role="@EndpointRole(state)">@T("epStates:" + state)</DiscoveryBadge></span>
+                                <code class="sv-ep-item-uri">@Address(target)</code>
+                                <span class="sv-ep-item-meta mono">
+                                    <span>@T("epLaneCandCount", target.Candidates.Count)</span><span class="sv-sep">·</span><span>@T("epCallCount", target.Calls.Count)</span>
+                                    @if (errors > 0) { <span class="sv-ep-err-tag role-error">@T("epCallErrors", errors)</span> }
+                                </span>
+                            </button>
+                        </li>
+                    }
+                </ul>
+                @if (Missing)
+                {
+                    <div class="sv-ep-dossier"><MoContentState Compact>
+                        <h2>@T("epMissingTargetTitle", Requested!)</h2><p>@T("epMissingTargetBody")</p>
+                        <button type="button" class="btn btn-outline btn-sm" @onclick="() => Select(null)">@T("resetFilters")</button>
+                    </MoContentState></div>
+                }
+                else if (Selected is { } target)
+                {
+                    <EndpointDossier Snapshot="@Snapshot" Target="@target" />
+                }
+            </div>
+        }
+        <footer class="sv-scope-foot"><MoIcon Icon="@MoIcons.Info" Size="14px" /><span>@T("epEvidenceBoundary")</span></footer>
+    </DiscoverySurface>
+}
+
+@code {
+    private static readonly (string Key, string Label, MoVisualRole Role)[] Filters =
+    [
+        ("all", "epFilterAll", MoVisualRole.Primary), ("problems", "epFilterProblems", MoVisualRole.Error),
+        ("resolved", "epFilterResolved", MoVisualRole.Success), ("stale", "epFilterStale", MoVisualRole.Warning),
+        ("unknown", "epFilterUnknown", MoVisualRole.Neutral)
+    ];
+    private ServiceEndpointDiagnosticsSnapshot Snapshot => Workbench.Endpoints!;
+    private string Scope => Workbench.Param("scope") ?? "all";
+    private string Filter => Workbench.Param("state") ?? "all";
+    private string? Requested => Workbench.Param("target");
+    private bool HasFilters => Scope != "all" || Filter != "all" || Workbench.Param("q") is not null;
+    private bool Missing => Requested is not null && Selected is null;
+    private int Attention => Snapshot.Targets.Count(target => EndpointAttention(Snapshot, target));
+    private int Resolved => Snapshot.Targets.Count(target => State(target) == "Resolved");
+    private EndpointHttpObservation[] Calls { get; set; } = [];
+    private string[] Scopes { get; set; } = [];
+    private IReadOnlyList<Reason> _reasons = [];
+    private IReadOnlyList<ServiceEndpointSnapshot> _pool = [];
+    private IReadOnlyList<ServiceEndpointSnapshot> _visible = [];
+    private ServiceEndpointSnapshot? Selected { get; set; }
+
+    private static string? Address(ServiceEndpointSnapshot? target) => target?.Target.Address.AbsoluteUri;
+    private string State(ServiceEndpointSnapshot target) => EndpointState(Snapshot, target);
+    private static bool IsProblem(EndpointHttpObservation call) => call.Outcome is "Failure" or "HttpFailure" or "Canceled";
+
+    private IReadOnlyList<DiscoverySignature.Fact> Facts =>
+    [
+        new(Resolved > 0 ? "success" : "neutral", T("epFactResolved"), $"{Resolved}/{Snapshot.Targets.Count}", T("epFactResolvedSub", Snapshot.Targets.Sum(target => target.Candidates.Count), Snapshot.Providers.Count)),
+        new(Calls.Length == 0 ? "neutral" : "primary", T("epFactCalls"), Calls.Length.ToString(), T("epFactCallsSub", Num(Snapshot.Retention.TotalMinutes), Snapshot.MaxCallsPerTarget), Calls.Length == 0),
+        new(Calls.Any(call => call.Outcome == "Failure") ? "error" : Calls.Any(IsProblem) ? "warning" : "neutral", T("epFactFailingCalls"), Calls.Count(IsProblem).ToString(),
+            T("epFactFailingCallsSub", Calls.Count(IsHttpError), Calls.Count(call => call.Outcome == "Canceled"))),
+        new(Snapshot.EnablePassThrough ? "info" : "neutral", T("epFactProcess"), $"PID {Snapshot.ProcessId}", T("epProcessFact", Num(Snapshot.ResolutionTimeout.TotalSeconds), T(Snapshot.EnablePassThrough ? "epPassThroughOn" : "epPassThroughOff")))
+    ];
+
+    protected override void OnParametersSet()
+    {
+        var targets = Snapshot.Targets;
+        Calls = targets.SelectMany(target => target.Calls).ToArray();
+        Scopes = targets.Select(target => target.Target.Scope).Distinct().Order().ToArray();
+        _reasons =
+        [
+            new("error", "epReasonFailed", targets.Where(target => State(target) is "Failed" or "Timeout").ToArray()),
+            new("warning", "epReasonEmpty", targets.Where(target => State(target) == "Empty").ToArray()),
+            new("warning", "epReasonStale", targets.Where(target => State(target) == "Stale").ToArray()),
+            new("warning", "epReasonHttpErr", targets.Where(target => target.Calls.Any(IsHttpError)).ToArray()),
+            new("neutral", "epReasonUnknown", targets.Where(target => State(target) == "Unknown").ToArray())
+        ];
+        var needle = Workbench.Param("q")?.Trim();
+        _pool = targets.Where(target => (Scope == "all" || Scope == target.Target.Scope) &&
+            (string.IsNullOrEmpty(needle) || new[] { target.Target.Scope, target.Target.AppId, Address(target) }
+                .Concat(target.Candidates.SelectMany(candidate => new[] { candidate.Address, candidate.Provider }))
+                .Any(value => value?.Contains(needle, StringComparison.OrdinalIgnoreCase) == true)))
+            .OrderByDescending(target => EndpointPriority(Snapshot, target)).ThenBy(target => target.Target.Scope)
+            .ThenBy(target => target.Target.AppId).ToArray();
+        _visible = _pool.Where(target => Matches(target, Filter)).ToArray();
+        Selected = Requested is { } selected
+            ? Uri.TryCreate(selected, UriKind.Absolute, out var requested)
+                ? targets.FirstOrDefault(target => target.Target.Address == requested) : null
+            : _visible.FirstOrDefault();
+    }
+
+    private bool Matches(ServiceEndpointSnapshot target, string filter) => filter switch
+    {
+        "all" => true, "problems" => State(target) is "Failed" or "Timeout" or "Empty" or "Stale" || LatestHttpError(target),
+        _ => string.Equals(filter, State(target), StringComparison.OrdinalIgnoreCase)
+    };
+
+    private void Select(ServiceEndpointSnapshot? target) => Workbench.SetQuery(false, ("target", Address(target)), ("endpoint", null));
+    private void Reset() => Workbench.SetQuery(false, ("q", null), ("scope", null), ("state", null));
+    private sealed record Reason(string Role, string Label, IReadOnlyList<ServiceEndpointSnapshot> Targets);
+}

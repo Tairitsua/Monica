@@ -1,0 +1,135 @@
+@inherits DiscoveryComponent
+@implements IAsyncDisposable
+@inject IJSRuntime JS
+@inject Microsoft.Extensions.Logging.ILogger<DiscoveryDependencyGraph> Logger
+@using Microsoft.Extensions.Logging
+
+<div class="sv-d3-wrap">
+    <div class="sv-d3-stage">
+        <div class="sv-d3-canvas" @ref="_canvas"></div>
+        @if (_graphController is null || _failed)
+        {
+            <div class="sv-d3-overlay-state"><MoContentState Compact Loading="@(!_failed)"><p>@T(_failed ? "depGraphLoadError" : "loadingTitle")</p></MoContentState></div>
+        }
+        <div class="sv-d3-hud" role="toolbar" aria-label="@T("depZoomControls")">
+            <button type="button" class="icon-btn" aria-label="@T("depZoomIn")" @onclick='() => InvokeGraphAsync("zoomIn")'><MoIcon Icon="@MoIcons.Add" Size="15px" /></button>
+            <span class="sv-d3-zoom-pct mono" @ref="_zoom">100%</span>
+            <button type="button" class="icon-btn" aria-label="@T("depZoomOut")" @onclick='() => InvokeGraphAsync("zoomOut")'><MoIcon Icon="@MoIcons.Minus" Size="15px" /></button>
+            <span class="sv-d3-hud-sep"></span>
+            <button type="button" class="icon-btn" aria-label="@T("depFitView")" @onclick='() => InvokeGraphAsync("fitView")'><MoIcon Icon="@MoIcons.Focus" Size="15px" /></button>
+        </div>
+        <div class="sv-d3-hint mono" aria-hidden="true">@T("depGestureHint")</div>
+    </div>
+    <div class="sv-d3-foot">
+        <DiscoveryRoutingLegend />
+        <div class="sv-hz-readout sv-d3-readout @(ActiveReadout is null ? null : "is-active")" role="status" aria-live="polite">
+            <span class="sv-hz-readout-dot role-@(ActiveReadout?.Role ?? "neutral")"></span>
+            <span class="mono">@(ActiveReadout?.Label ?? T("depGraphReadoutIdle"))</span>
+            @if (CanClear) { <button type="button" class="btn btn-ghost btn-sm sv-readout-clear" @onclick='() => Interact.InvokeAsync(("clear", null))'>@T("depClearFocus")</button> }
+        </div>
+    </div>
+</div>
+
+@code {
+    [Parameter, EditorRequired] public object Model { get; set; } = default!;
+    [Parameter] public string? Hover { get; set; }
+    [Parameter] public bool CanClear { get; set; }
+    [Parameter] public (string Label, string Role)? ActiveReadout { get; set; }
+    [Parameter] public EventCallback<(string Kind, string? Key)> Interact { get; set; }
+
+    private readonly SemaphoreSlim _interopGate = new(1, 1);
+    private readonly CancellationTokenSource _lifetimeCancellation = new();
+    private ElementReference _canvas;
+    private ElementReference _zoom;
+    private DotNetObjectReference<DiscoveryDependencyGraph>? _dotNetReference;
+    private IJSObjectReference? _graphController;
+    private Task? _render;
+    private object? _drawn;
+    private string? _lastHover;
+    private bool _failed;
+    private bool _disposed;
+
+    protected override Task OnAfterRenderAsync(bool firstRender) =>
+        _disposed || _failed || _render is { IsCompleted: false } ? Task.CompletedTask : _render = DrawAsync();
+
+    private async Task DrawAsync()
+    {
+        try
+        {
+            var created = _graphController is null;
+            if (created)
+            {
+                await using var module = await JS.InvokeAsync<IJSObjectReference>("import", "./_content/Monica.ServiceDiscovery/UIServiceDiscovery/domainDependencyGraph.js");
+                if (_disposed) return;
+                _dotNetReference = DotNetObjectReference.Create(this);
+                _graphController = await module.InvokeAsync<IJSObjectReference>("create", _canvas, _zoom, _dotNetReference);
+            }
+            // Collect the latest parameters after interop awaits. State changes during a render are applied on the next pass.
+            var model = Model;
+            var hover = Hover;
+            if (!_disposed && !ReferenceEquals(model, _drawn))
+            {
+                await InvokeGraphAsync("update", model);
+                _drawn = model;
+            }
+            if (!_disposed && _lastHover != hover)
+            {
+                await InvokeGraphAsync("hover", hover);
+                _lastHover = hover;
+            }
+            if (!_disposed && (created || !ReferenceEquals(Model, model) || Hover != hover)) StateHasChanged();
+        }
+        catch (JSDisconnectedException) { }
+        catch (JSException error)
+        {
+            Logger.LogError(error, "The dependency graph failed to render.");
+            _failed = true;
+            if (!_disposed) StateHasChanged();
+        }
+    }
+
+    [JSInvokable]
+    public Task GraphInteraction(string kind, string? key) =>
+        _disposed ? Task.CompletedTask : InvokeAsync(() => Interact.InvokeAsync((kind, key)));
+
+    private async Task InvokeGraphAsync(string identifier, params object?[] arguments)
+    {
+        if (_disposed) return;
+        try
+        {
+            await _interopGate.WaitAsync(_lifetimeCancellation.Token);
+            try
+            {
+                if (!_disposed && _graphController is not null)
+                    await _graphController.InvokeVoidAsync(identifier, _lifetimeCancellation.Token, arguments);
+            }
+            finally { _interopGate.Release(); }
+        }
+        catch (OperationCanceledException) when (_disposed) { }
+        catch (JSDisconnectedException) { }
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        if (_disposed) return;
+        _disposed = true;
+        await _lifetimeCancellation.CancelAsync();
+        if (_render is not null) await _render;
+        await _interopGate.WaitAsync();
+        try
+        {
+            if (_graphController is not null)
+            {
+                await _graphController.InvokeVoidAsync("dispose");
+                await _graphController.DisposeAsync();
+            }
+        }
+        catch (JSDisconnectedException) { }
+        finally
+        {
+            _dotNetReference?.Dispose();
+            _interopGate.Release();
+        }
+        // Concurrent callers that entered before retirement still need to observe cancellation.
+    }
+}

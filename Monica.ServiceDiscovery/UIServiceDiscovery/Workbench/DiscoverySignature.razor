@@ -1,0 +1,43 @@
+<section class="sv-sig @(Compact ? "sv-sig-compact" : null)" aria-label="@Label">
+    <div class="sv-decision">
+        <div class="sv-decision-main">
+            <p class="display-label"><span class="sw role-@Role"></span><span>@Label</span></p>
+            <MoDisplayValue Value="@Value" Unit="@Unit" Compact />
+            @if (Reasons is not null)
+            {
+                <div class="sv-reasons">@Reasons</div>
+            }
+        </div>
+        <p class="lede">@Finding</p>
+    </div>
+    @if (Facts is { Count: > 0 })
+    {
+        <div class="sv-facts-wrap">
+            <dl class="facts" aria-label="@Label">
+                @foreach (var fact in Facts)
+                {
+                    <div class="fact">
+                        <dt><span class="sw role-@fact.Role @(fact.Hatched ? "is-hatch" : null)"></span>@fact.Label</dt>
+                        <dd>@fact.Value</dd>
+                        <span class="fact-sub" title="@fact.Detail">@fact.Detail</span>
+                    </div>
+                }
+            </dl>
+        </div>
+    }
+    @ChildContent
+</section>
+
+@code {
+    [Parameter, EditorRequired] public string Label { get; set; } = "";
+    [Parameter, EditorRequired] public string Value { get; set; } = "";
+    [Parameter] public string? Unit { get; set; }
+    [Parameter] public string Role { get; set; } = "primary";
+    [Parameter] public bool Compact { get; set; }
+    [Parameter] public RenderFragment? Reasons { get; set; }
+    [Parameter] public RenderFragment? Finding { get; set; }
+    [Parameter] public IReadOnlyList<Fact>? Facts { get; set; }
+    [Parameter] public RenderFragment? ChildContent { get; set; }
+
+    public sealed record Fact(string Role, string Label, string Value, string Detail, bool Hatched = false);
+}

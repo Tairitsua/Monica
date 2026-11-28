@@ -1,0 +1,120 @@
+@inherits DiscoveryComponent
+
+<section class="sv-ep-dossier" aria-label="@Target.Target.AppId">
+    <header class="sv-ep-dossier-head">
+        <div class="sv-ep-dossier-id">
+            <div class="sv-ep-dossier-title"><h2>@Target.Target.Scope / @Target.Target.AppId</h2><DiscoveryBadge Role="@EndpointRole(State)">@T("epStates:" + State)</DiscoveryBadge></div>
+            <div class="sv-ep-uri-row"><code>@Target.Target.Address.AbsoluteUri</code><MoCopyButton Value="@Target.Target.Address.AbsoluteUri" Label="@T("epCopyUri")" /></div>
+        </div>
+        @if (Workbench.Evidence?.ServiceById.ContainsKey(Target.Target.AppId) == true)
+        {
+            <a class="btn btn-outline btn-sm" title="@T("epInspectRegistryTip")" href="@Workbench.Here(("inspect", Target.Target.AppId), ("tab", null))"><MoIcon Icon="@MoIcons.Server" Size="14px" />@T("epInspectRegistry")</a>
+        }
+    </header>
+    <section class="sv-ep-sec">
+        <div class="sv-ep-sec-head"><h3>@T("epSecResolution")</h3><span class="sv-ep-sec-sub mono">@T("epLaneCandCount", Target.Candidates.Count)</span></div>
+        <dl class="kv sv-ep-res-kv">
+            <div><dt>@T("epLastAttempt")</dt><dd class="mono">@(Target.AttemptedAt is { } attempted ? UiTime.Format(attempted) : T("epNotObserved"))</dd></div>
+            <div><dt>@T("epLastSuccess")</dt><dd class="mono">@(Target.ResolvedAt is { } resolved ? UiTime.Format(resolved) : T("epNotObserved"))</dd></div>
+        </dl>
+        @if (RetainedPrior(Target))
+        {
+            <MoSemanticCallout Severity="MoVisualRole.Warning" Title="@T("epRetainedWarnTitle")">
+                @T("epRetainedWarnBody", UiTime.FormatTime(Target.AttemptedAt), UiTime.FormatTime(Target.ResolvedAt))
+            </MoSemanticCallout>
+        }
+        @if (Target.Candidates.Any(candidate => PassThrough(candidate.Provider)))
+        {
+            <MoSemanticCallout Severity="MoVisualRole.Info" Title="@T("epPassThroughOn")">@T("epPassThroughNote")</MoSemanticCallout>
+        }
+        @if (Target.Candidates.Count == 0) { <p class="sv-ep-empty-note">@T("epNoCandidates")</p> }
+        else
+        {
+            <ul class="sv-ep-cands">
+                @foreach (var candidate in Target.Candidates)
+                {
+                    <li class="sv-ep-cand">
+                        <div class="sv-ep-cand-addr"><code>@candidate.Address</code><MoCopyButton Value="@candidate.Address" Label="@T("epCopyEndpoint")" /></div>
+                        <span class="chip mono @(PassThrough(candidate.Provider) ? "role-info" : "is-outline")">@candidate.Provider</span>
+                    </li>
+                }
+            </ul>
+        }
+        <p class="sv-ep-cap-note">@T("epCandidateLimit")</p>
+    </section>
+    <section class="sv-ep-sec">
+        <div class="sv-ep-sec-head">
+            <h3>@T("epSecCalls")</h3>
+            @if (P95(Target) is { } p95) { <span class="chip role-primary mono">@T("epP95Label", Latency(p95))</span> }
+        </div>
+        @if (Target.Calls.Count == 0)
+        {
+            <div class="sv-empty-inline"><h4>@T("epNoCallsTitle")</h4><p class="sv-dim">@T("epNoCallsBody")</p></div>
+        }
+        else
+        {
+            @if (Groups.Count > 1 || Filter is not null)
+            {
+                <div class="sv-ep-dist" role="group" aria-label="@T("epSelectedDist")">
+                    <MoFilterChip Role="MoVisualRole.Primary" Pill Label="@T("epAllSelected")" Count="@Target.Calls.Count" Selected="@(Filter is null)" SelectedChanged='() => Workbench.Pick("endpoint", null)' />
+                    @foreach (var group in Groups)
+                    {
+                        <MoFilterChip Role="@(group.Any(call => call.Outcome != "HttpSuccess") ? MoVisualRole.Warning : MoVisualRole.Neutral)"
+                                      Pill Label="@(group.Key == "__none__" ? T("epNoSelection") : group.Key)" Count="@group.Count()"
+                                      Selected="@(Filter == group.Key)" SelectedChanged='value => Workbench.Pick("endpoint", value ? group.Key : null)' />
+                    }
+                </div>
+            }
+            @if (Calls.Count == 0)
+            {
+                <MoContentState Compact><p>@T("epExchangeNoMatch")</p></MoContentState>
+            }
+            else
+            {
+                <div class="sv-ep-calls-wrap">
+                    <table class="table sv-table sv-ep-calls-table">
+                        <thead><tr>@foreach (var column in Columns) { <th scope="col">@T(column)</th> }</tr></thead>
+                        <tbody>
+                            @foreach (var call in Calls)
+                            {
+                                <tr>
+                                    <td data-label="@T("epColOutcome")"><DiscoveryBadge Role="@OutcomeRole(call.Outcome)">@T("epOutcomes:" + call.Outcome) @call.StatusCode</DiscoveryBadge></td>
+                                    <td data-label="@T("epColTime")" class="mono" title="@UiTime.Format(call.At)">@UiTime.FormatTime(call.At)</td>
+                                    <td data-label="@T("epColDuration")" class="mono">@Latency(call.DurationMs) ms</td>
+                                    <td data-label="@T("epColSelected")" class="sv-ep-cell-sel mono"><code>@(call.Endpoint ?? T("epNoSelection"))</code></td>
+                                    <td data-label="@T("epColTrace")" class="mono">
+                                        @if (call.TraceId is { } trace)
+                                        {
+                                            <span class="sv-ep-trace"><code title="@trace">@(trace.Length > 8 ? $"{trace[..8]}…" : trace)</code><MoCopyButton Value="@trace" Label="@T("epCopyTrace")" /></span>
+                                        }
+                                        else { <span class="sv-dim">—</span> }
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            }
+        }
+    </section>
+</section>
+
+@code {
+    [Parameter, EditorRequired] public ServiceEndpointDiagnosticsSnapshot Snapshot { get; set; } = default!;
+    [Parameter, EditorRequired] public ServiceEndpointSnapshot Target { get; set; } = default!;
+    private static readonly string[] Columns = ["epColOutcome", "epColTime", "epColDuration", "epColSelected", "epColTrace"];
+    private string State => EndpointState(Snapshot, Target);
+    private string? Filter => Workbench.Param("endpoint");
+    private IReadOnlyList<IGrouping<string, EndpointHttpObservation>> Groups { get; set; } = [];
+    private IReadOnlyList<EndpointHttpObservation> Calls { get; set; } = [];
+
+    protected override void OnParametersSet()
+    {
+        Groups = Target.Calls.GroupBy(Key).OrderByDescending(group => group.Count()).ThenBy(group => group.Key).ToArray();
+        var active = Filter;
+        Calls = Target.Calls.Where(call => active is null || Key(call) == active).OrderByDescending(call => call.At).ToArray();
+    }
+
+    private static string Key(EndpointHttpObservation call) => call.Endpoint ?? "__none__";
+    private static bool PassThrough(string provider) => provider.Contains("PassThrough", StringComparison.Ordinal);
+}

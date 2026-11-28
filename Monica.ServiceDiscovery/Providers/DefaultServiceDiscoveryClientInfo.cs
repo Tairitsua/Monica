@@ -3,6 +3,7 @@ using System.Reflection;
 using Microsoft.AspNetCore.Hosting.Server.Features;
 using Microsoft.Extensions.Options;
 using Monica.Core;
+using Monica.Core.ApplicationRoles;
 using Monica.ApplicationModel.Abstractions;
 using Monica.Modules;
 using Monica.ServiceDiscovery.Abstractions;
@@ -19,7 +20,8 @@ public class DefaultServiceDiscoveryClientInfo(
     IOptions<ModuleServiceDiscoveryOption> options,
     IMonicaApplicationOptions application,
     IServerAddressesFeature? serverAddressesFeature = null,
-    IApplicationModel? applicationModel = null) : IServiceDiscoveryClientInfo
+    IApplicationModel? applicationModel = null,
+    IRoleHealthStateProvider? roleHealth = null) : IServiceDiscoveryClientInfo
 {
     private readonly ModuleServiceDiscoveryOption _options = options.Value;
 
@@ -81,7 +83,16 @@ public class DefaultServiceDiscoveryClientInfo(
             return instanceState;
         }
 
-        // Add metadata for full registration (not added for heartbeat)
+        if (instanceState.Diagnostics is { } diagnostics && roleHealth is not null)
+        {
+            instanceState.Diagnostics = diagnostics with
+            {
+                RoleHealth = roleHealth.GetSnapshot().Roles.Where(role => role.IsActiveOnCurrentHost)
+                    .Select(role => new RegisteredRoleHealth(role.RoleId, role.Status, role.LastTransitionAt)).ToArray()
+            };
+        }
+
+        // Full registrations include the current environment and listening addresses.
         AddEnvironmentVariablesMetadata(instanceState);
         AddListeningAddressesMetadata(instanceState);
 
@@ -117,6 +128,8 @@ public class DefaultServiceDiscoveryClientInfo(
             DomainName = model is null ? application.ResolveDomainName(options.DomainName) : domains.Count == 1 ? domains[0] : null,
             DomainNames = domains,
             RoleIds = roles?.Select(role => role.Id).Order(StringComparer.Ordinal).ToList() ?? [],
+            Diagnostics = new ServiceInstanceDiagnostics(entryAssembly?.GetName().Name, options.Election.HeartbeatPeriod,
+                options.Election.RegistrationTTL, model?.Roles.Keys.Where(model.IsRoleAvailable).Order(StringComparer.Ordinal).ToArray(), null),
             BuildTime = ResolveBuildTimeUtc(options.BuildTime, entryAssembly),
             AssemblyVersion = options.AssemblyVersion ?? GetAssemblyVersion(entryAssembly),
             ReleaseVersion = application.ResolveAppVersion(options.ReleaseVersion),
@@ -211,6 +224,7 @@ public class DefaultServiceDiscoveryClientInfo(
             AppId = original.AppId,
             DomainNames = original.DomainNames.ToList(),
             RoleIds = original.RoleIds.ToList(),
+            Diagnostics = original.Diagnostics,
             InstanceId = original.InstanceId,
             AppName = original.AppName,
             ProjectName = original.ProjectName,

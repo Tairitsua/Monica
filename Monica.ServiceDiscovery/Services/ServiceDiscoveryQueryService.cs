@@ -1,3 +1,5 @@
+using Monica.Core;
+using Monica.Core.ApplicationRoles;
 using Monica.Core.Domains.Abstractions;
 using Monica.ApplicationModel.Abstractions;
 using Microsoft.Extensions.DependencyInjection;
@@ -62,9 +64,18 @@ public sealed class ServiceDiscoveryQueryService(IServiceProvider serviceProvide
             var domain = role?.DomainId ?? model.Domains.Values.Single(domain => domain.AssemblyName == dependency.SourceAssemblyName).Id;
             var target = model.GetOperation(dependency.RequestType);
             return new DomainDependencyInfo(domain, role?.Id, target.DomainId, target.RoleId,
-                dependency.RequestType.FullName ?? dependency.RequestType.Name, dependency.SourceTypeName);
+                dependency.RequestType.FullName ?? dependency.RequestType.Name, dependency.SourceTypeName)
+            {
+                RequiredRole = target.RequiredRole,
+                IsLocallyAvailable = model.LocalHandlers.ContainsKey(dependency.RequestType)
+            };
         }).ToArray();
-        return new(true, Array.AsReadOnly(dependencies));
+        return new(true, Array.AsReadOnly(dependencies))
+        {
+            Deployment = model.Deployment,
+            Roles = model.Roles,
+            LocalRoleHealth = serviceProvider.GetService<IRoleHealthStateProvider>()?.GetSnapshot()
+        };
     }
 
     public async Task<DomainDetailInfo> GetDomainDetailAsync(string domainName)
@@ -116,7 +127,8 @@ public sealed class ServiceDiscoveryQueryService(IServiceProvider serviceProvide
             CurrentTermId = leaderService.CurrentTermId,
             ClusterLeaderState = lease is null ? null : new LeaderState
             {
-                AppId = lease.AppId, InstanceId = lease.InstanceId, BecomeLeaderTime = lease.BecomeLeaderTime
+                AppId = lease.AppId, InstanceId = lease.InstanceId, BecomeLeaderTime = lease.BecomeLeaderTime,
+                ExpiresAt = lease.ExpiresAt
             }
         };
     }
@@ -167,7 +179,7 @@ public sealed class ServiceDiscoveryQueryService(IServiceProvider serviceProvide
     public Task<bool> ReleaseLeaderAsync()
     {
         var leaderService = GetLeaderService();
-        if (!leaderService.IsLeader)
+        if (serviceProvider.GetService<MonicaApplication>()?.Application.AutonomousWork == false || !leaderService.IsLeader)
         {
             return Task.FromResult(false);
         }

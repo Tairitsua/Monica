@@ -1,0 +1,12 @@
+@inherits DiscoveryComponent
+
+<div class="seg" role="group" aria-label="@T("viewRoster")">
+    <button type="button" aria-pressed="@DiscoveryWorkbench.Bool(!Atlas)" @onclick="ShowRoster"><MoIcon Icon="@MoIcons.Table" Size="15px" />@T("viewRoster")</button>
+    <button type="button" aria-pressed="@DiscoveryWorkbench.Bool(Atlas)" @onclick="ShowAtlas"><MoIcon Icon="@MoIcons.ChartScatter" Size="15px" />@T("viewAtlas")</button>
+</div>
+
+@code {
+    private bool Atlas => Workbench.Param("view") == "atlas";
+    private void ShowRoster() => Workbench.SetQuery(false, ("view", null), ("app", null), ("role", null));
+    private void ShowAtlas() => Workbench.Pick("view", "atlas");
+}

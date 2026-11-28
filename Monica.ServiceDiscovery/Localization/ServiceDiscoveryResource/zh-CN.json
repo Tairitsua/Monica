@@ -4,371 +4,10 @@
       "Title": "服务发现"
     }
   },
-  "Shared": {
-    "Actions": {
-      "Cancel": "取消",
-      "Clear": "清除",
-      "Close": "关闭",
-      "Refresh": "刷新",
-      "SelectAll": "全选",
-      "ViewDetails": "查看详情"
-    },
-    "Formats": {
-      "SecondsValue": "{0} 秒",
-      "StatusCount": "{0} ({1})"
-    },
-    "HeartbeatHealth": {
-      "Healthy": "健康",
-      "Offline": "离线",
-      "Unhealthy": "不健康"
-    },
-    "Labels": {
-      "AutoRefresh": "自动刷新",
-      "RefreshIntervalSeconds": "刷新间隔(秒)"
-    },
-    "LeaderStatuses": {
-      "Follower": "Follower",
-      "Leader": "Leader",
-      "Looking": "选举中",
-      "Unknown": "未知"
-    },
-    "ServiceStatuses": {
-      "Error": "异常",
-      "Offline": "离线",
-      "Running": "运行中",
-      "Unhealthy": "不健康",
-      "Unknown": "未知",
-      "Updating": "更新中"
-    },
-    "Values": {
-      "Roles": "已观测角色",
-      "NotAvailable": "不可用",
-      "NotSet": "未设置",
-      "NotSpecified": "未指定",
-      "Unknown": "未知"
-    }
-  },
-  "Page": {},
   "CurrentInstance": {
     "Errors": {
       "ClientInfoNotConfigured": "当前服务未配置注册中心客户端信息",
       "LoadFailed": "获取实例信息失败: {0}"
-    },
-    "Fields": {
-      "AppName": "应用名称",
-      "AssemblyVersion": "程序集版本",
-      "BuildTime": "构建时间",
-      "CurrentTermId": "当前任期",
-      "CurrentStatus": "当前状态",
-      "InstanceId": "实例 ID",
-      "LastHeartbeat": "最后心跳",
-      "LeaderBecomeTime": "成为 Leader 时间",
-      "LeaderInstanceId": "Leader 实例 ID",
-      "Metadata": "元数据",
-      "RegistrationTime": "注册时间",
-      "ReleaseVersion": "发布版本",
-      "AppId": "App ID"
-    },
-    "HeaderTitle": "当前实例信息",
-    "Sections": {
-      "ClusterLeaderInfo": "集群 Leader 信息",
-      "LeaderStatus": "Leader 状态"
-    },
-    "States": {
-      "LeaderElectionDisabled": "Leader 选举服务未启用"
-    }
-  },
-  "DomainFilter": {
-    "Labels": {
-      "DomainFilter": "子域筛选",
-      "Search": "搜索子域",
-      "SearchHelp": "支持搜索：域名、显示名称、描述",
-      "ShowOnlyWithDependencies": "仅显示有依赖",
-      "ShowOnlyWithServices": "仅显示有服务"
-    }
-  },
-  "DomainLayout": {
-    "Labels": {
-      "LayoutType": "布局类型",
-      "NodeSpacing": "节点间距: {0}",
-      "RepulsionStrength": "斥力强度: {0}"
-    },
-    "Types": {
-      "Circular": "环形",
-      "Force": "力导向",
-      "Hierarchy": "层次",
-      "RadialTree": "径向树"
-    }
-  },
-  "DomainList": {
-    "Counts": {
-      "OwnedServices": "{0} 个服务",
-      "RelatedDependencies": "+{0} 依赖"
-    },
-    "Messages": {
-      "LoadFailed": "获取域列表失败: {0}",
-      "RefreshFailed": "刷新域列表失败: {0}"
-    },
-    "States": {
-      "Empty": "暂无域信息",
-      "Loading": "正在加载域信息..."
-    },
-    "Summary": {
-      "DependentBy": "被依赖: {0} 个",
-      "DomainName": "域名: {0}",
-      "OwnedServices": "本域服务: {0} 个"
-    },
-    "Title": "子域列表"
-  },
-  "DomainDetail": {
-    "Actions": {
-      "BackToList": "返回域列表"
-    },
-    "Counts": {
-      "Services": "{0} 个"
-    },
-    "Fields": {
-      "DependentServices": "依赖本域服务",
-      "DisplayName": "显示名称",
-      "Name": "域名称",
-      "OwnedServices": "本域服务",
-      "RunningServices": "运行中服务"
-    },
-    "Messages": {
-      "LoadFailed": "获取域详情失败: {0}",
-      "Refreshed": "域详情已刷新"
-    },
-    "Sections": {
-      "BasicInfo": "域基本信息"
-    },
-    "ServiceCard": {
-      "Domain": "所属域: {0}",
-      "ExternalDependency": "外部依赖",
-      "Id": "ID: {0}",
-      "InstancesRunning": "{0}/{1} 实例运行中",
-      "Project": "项目: {0}"
-    },
-    "States": {
-      "LoadFailed": "加载域详情失败",
-      "LoadingDetail": "正在加载域详情...",
-      "LoadingServices": "正在加载服务信息...",
-      "NoDependentServices": "未发现承载此领域 API 调用方的外部服务。",
-      "NoOwnedServices": "该域暂无归属微服务"
-    },
-    "Tabs": {
-      "DependentServices": "依赖服务 ({0})",
-      "OwnedServices": "本域服务 ({0})"
-    }
-  },
-  "DomainGraph": {
-    "ContextMenu": {
-      "ClearFilters": "清除所有筛选",
-      "CopyDomainName": "复制域名",
-      "FilterDomainServices": "筛选此域服务",
-      "FocusDomain": "聚焦此域",
-      "ShowDependencies": "显示依赖关系",
-      "ViewDomainDetails": "查看域详情"
-    },
-    "Graph": {
-      "Labels": {
-        "AndMore": "等 {0} 个",
-        "ClickToViewDetails": "点击查看详情",
-        "DependencyServiceCount": "API 使用证据",
-        "NoRelatedServices": "暂无相关微服务",
-        "RelatedServices": "相关微服务 ({0})",
-        "ServiceCount": "服务数",
-        "StatusCount": "{0}: {1} 个"
-      }
-    },
-    "Messages": {
-      "ClearedFilters": "已清除所有筛选",
-      "CopiedDomainName": "已复制域名到剪贴板",
-      "FilteredDomain": "已筛选域: {0}",
-      "LoadFailed": "加载域数据失败: {0}",
-      "ShowingDependencies": "显示与 {0} 相关的依赖关系"
-    },
-    "Title": "子域依赖关系图"
-  },
-  "ServiceFilter": {
-    "Labels": {
-      "DomainFilter": "域筛选",
-      "Search": "搜索微服务",
-      "SearchHelp": "支持搜索：服务名、AppId、项目名、域名",
-      "ShowOnlyWithInstances": "仅显示有实例的服务",
-      "StatusFilter": "服务状态筛选"
-    }
-  },
-  "ServiceLayout": {
-    "Labels": {
-      "LayoutType": "布局类型",
-      "NodeSpacing": "节点间距: {0}",
-      "RepulsionStrength": "斥力强度: {0}"
-    },
-    "Types": {
-      "Circular": "环形",
-      "Force": "力导向",
-      "Grid": "网格",
-      "Hierarchy": "层次"
-    }
-  },
-  "ServiceList": {
-    "Columns": {
-      "AppId": "App ID",
-      "AssemblyVersion": "程序集版本",
-      "BuildTime": "构建时间",
-      "Domain": "领域",
-      "InstanceCount": "实例数",
-      "LastHeartbeat": "最后心跳",
-      "OverallStatus": "整体状态",
-      "ProjectName": "项目名",
-      "ServiceName": "服务名称"
-    },
-    "Dialogs": {
-      "ServiceDetailTitle": "服务详情"
-    }
-  },
-  "ServiceDetailDialog": {
-    "Title": "服务详情 - {0}"
-  },
-  "ServiceGraph": {
-    "ContextMenu": {
-      "ClearFilters": "清除所有筛选",
-      "CopyServiceId": "复制服务 ID",
-      "CopyServiceName": "复制服务名",
-      "FilterSameDomain": "筛选同域",
-      "FilterSameProject": "筛选同项目",
-      "FilterSameStatus": "筛选同状态",
-      "FocusService": "聚焦此服务",
-      "ViewServiceDetails": "查看服务详情"
-    },
-    "Graph": {
-      "Labels": {
-        "AppId": "AppId",
-        "Domain": "域",
-        "Instances": "实例",
-        "Project": "项目",
-        "Status": "状态",
-        "Version": "版本"
-      }
-    },
-    "Messages": {
-      "ClearedFilters": "已清除所有筛选",
-      "CopiedServiceId": "已复制服务 ID 到剪贴板",
-      "CopiedServiceName": "已复制服务名到剪贴板",
-      "FilteredDomain": "已筛选域: {0}",
-      "FilteredProject": "已筛选项目: {0}",
-      "FilteredStatus": "已筛选状态: {0}",
-      "LoadException": "加载服务数据异常: {0}"
-    },
-    "Summary": {
-      "ShowingServices": "显示 {0} / {1} 个微服务"
-    },
-    "Title": "微服务架构图"
-  },
-  "ServiceDetail": {
-    "Configuration": {
-      "Fields": {
-        "AdditionalSeconds": "附加秒数",
-        "CalculatedValue": "计算值",
-        "HeartbeatJitterHelper": "心跳发送时的随机抖动范围",
-        "HeartbeatJitterMilliseconds": "心跳抖动 (毫秒)",
-        "HeartbeatPeriodHelper": "实例定期发送心跳的间隔",
-        "HeartbeatPeriodSeconds": "心跳周期 (秒)",
-        "InstanceTtl": "实例 TTL",
-        "LeaderTtl": "Leader TTL",
-        "Multiplier": "倍率",
-        "HostRole": "主机角色",
-        "StateStoreMode": "状态存储模式"
-      },
-      "Messages": {
-        "StateTransition": "成员心跳与租约续租独立运行。心跳重试耗尽后停止续租并取消 Leader 工作；宿主继续运行。"
-      },
-      "Sections": {
-        "ElectionConfig": "选举配置",
-        "RuntimeMode": "运行模式",
-        "TtlConfig": "TTL 配置"
-      },
-      "Values": {
-        "DistributedStorage": "分布式状态存储",
-        "ExternalKeyedStorage": "外部键控状态存储",
-        "MemoryStorage": "进程内内存状态存储",
-        "RegistryRole": "注册中心控制平面",
-        "StandaloneRole": "独立控制平面与工作节点",
-        "WorkerRole": "工作节点"
-      }
-    },
-    "Dialogs": {
-      "ConfirmActionTitle": "确认操作",
-      "ConfirmDelete": "确定删除"
-    },
-    "ElectionStatus": {
-      "Actions": {
-        "ForceDeleteLeader": "强制删除 Leader"
-      },
-      "Descriptions": {
-        "Follower": "当前实例是跟随者，等待成为 Leader",
-        "Leader": "当前实例是集群领导者，负责协调工作",
-        "Looking": "正在进行 Leader 选举中"
-      },
-      "Fields": {
-        "BecameLeaderAt": "成为 Leader 时间:",
-        "CurrentTermId": "当前任期:"
-      },
-      "Sections": {
-        "CurrentStatus": "当前选举状态",
-        "Description": "选举状态说明",
-        "Management": "Leader 管理操作"
-      },
-      "Tooltips": {
-        "CurrentTermId": "每次获取租约的唯一标识，续租保持不变"
-      },
-      "Warnings": {
-        "ForceDeleteLeader": "强制删除 Leader 将导致当前 Leader 实例丢失 Leader 状态，并触发新一轮选举。此操作主要用于开发测试 Leader 变更场景。"
-      }
-    },
-    "Instances": {
-      "Columns": {
-        "AssemblyVersion": "程序集版本",
-        "BuildTime": "构建时间",
-        "HeartbeatHealth": "心跳健康度",
-        "InstanceId": "实例 ID",
-        "LastHeartbeat": "最后心跳",
-        "RegistrationTime": "注册时间",
-        "ReleaseVersion": "发布版本",
-        "Role": "角色",
-        "Status": "状态"
-      }
-    },
-    "Messages": {
-      "DeleteLeaderFailed": "删除 Leader 失败: {0}",
-      "DeleteLeaderSucceeded": "已成功删除 Leader，新一轮选举即将开始"
-    },
-    "Metadata": {
-      "InstanceTitle": "实例 {0} 元数据",
-      "States": {
-        "NoInstances": "没有可显示的实例信息",
-        "NoMetadata": "该实例没有元数据信息"
-      }
-    },
-    "Overview": {
-      "Fields": {
-        "AppId": "App ID",
-        "DomainName": "领域名",
-        "ProjectName": "项目名称",
-        "ServiceName": "服务名称"
-      }
-    },
-    "Status": {
-      "RunningInstances": "运行实例: {0}",
-      "Title": "服务状态",
-      "TotalInstances": "总实例数: {0}"
-    },
-    "Tabs": {
-      "Configuration": "配置信息",
-      "ElectionStatus": "选举状态",
-      "Instances": "实例列表 ({0})",
-      "Metadata": "元数据信息",
-      "Overview": "服务概览"
     }
   },
   "Service": {
@@ -387,225 +26,659 @@
   },
   "Workbench": {
     "ReadFailed": "选定提供程序无法提供服务发现快照，请查看主机日志中的读取失败记录。",
-    "Eyebrow": "Monica / 服务发现图谱",
-    "Navigation": "服务发现工作区",
     "Views": {
       "Registry": {
-        "Title": "服务注册目录",
-        "Label": "注册目录",
         "Description": "查看当前成员注册、比较实例上报的证据，并检查尚无注册实例的预定义服务。"
       },
       "Atlas": {
         "Title": "服务图谱",
-        "Label": "服务图谱",
         "Description": "通过图谱探索服务目录，并在原生列表中查看完整服务证据。"
       },
       "Dependencies": {
         "Title": "子域依赖",
-        "Label": "依赖声明",
         "Description": "查看编译期跨领域 API 调用及其来源类型。此图不表示实时调用流量。"
       },
       "Domains": {
         "Title": "子域目录",
-        "Label": "子域目录",
         "Description": "查看统一领域信息、实际承载服务，以及 API 调用方所属的服务。"
       },
       "Host": {
         "Title": "当前主机",
-        "Label": "当前主机",
         "Description": "在应用和选定存储的范围内检查此实例的注册与选举证据。"
       },
       "Endpoints": {
         "Title": "端点发现",
-        "Label": "端点",
         "Description": "解析逻辑目标，查看实际 HTTP 调用证据。"
       }
-    },
-    "RegistryScope": "选定存储 / 当前快照",
-    "Membership": "注册成员",
-    "RegistryComposition": "{0} 个已注册服务 · {1} 个实例",
-    "MembershipHelp": "未过期的注册表示当前存储中的成员关系，与主机就绪状态和健康探针分别记录。",
-    "RegistryReadFailed": "注册目录读取失败",
-    "RegistryTitle": "服务与实例证据",
-    "ExpectedCount": "{0} 个预定义服务当前没有注册实例",
-    "LoadingRegistry": "正在读取注册信息",
-    "EmptyRegistry": "本次快照中没有服务",
-    "EmptyRegistryHelp": "提供程序读取成功，未返回注册记录或预定义服务。",
-    "FilterMiss": "没有匹配的证据",
-    "FilterMissHelp": "调整搜索或筛选条件以查看快照中的服务。",
-    "ResetFilters": "重置筛选",
-    "ShownCount": "显示 {0} / {1} 个服务",
-    "ObservedInstanceHelp": "构建和心跳单元格显示一个观测实例；打开服务检查器可查看所有实例。",
-    "Registered": "已注册",
-    "ExpectedOnly": "仅预定义",
-    "HeartbeatReportedLeader": "心跳上报的领导实例",
-    "ObservedBuild": "观测构建",
-    "Actions": "操作",
-    "CopyId": "复制应用 ID {0}",
-    "InspectService": "检查服务 {0}",
-    "CatalogScope": "目录 / 只读",
-    "DomainCatalog": "子域目录",
-    "CatalogHelp": "领域信息来自统一领域目录，服务归属来自注册快照。",
-    "CatalogReadFailed": "目录读取失败",
-    "FindDomain": "查找子域",
-    "CatalogEntries": "目录条目",
-    "CatalogEmpty": "目录未返回子域。",
-    "SelectedDomain": "所选子域",
-    "NoCatalogDescription": "目录未提供描述。",
-    "DomainServicesFailed": "无法读取关联服务证据",
-    "DomainServicesUnavailable": "目录身份仍然可用；本次刷新失败，无法提供服务归属和依赖证据。",
-    "Ownership": "归属",
-    "OwnedServices": "归属服务",
-    "OwnedServicesHelp": "将此子域上报为自身归属的注册服务。",
-    "InstancesCount": "{0} 个已注册实例",
-    "NoOwnedServices": "快照中没有服务将此子域上报为归属。",
-    "Declarations": "编译期 API 调用",
-    "DependentServices": "外部调用方服务",
-    "DependentServicesHelp": "按观测到的角色或领域归属，列出包含此领域 API 调用的服务；不代表调用已经发生。",
-    "NoDependentServices": "未发现承载此领域 API 调用方的外部服务。",
-    "ChooseDomain": "选择子域",
-    "ChooseDomainHelp": "选择目录条目以检查其身份与服务关系。",
-    "DomainUnlisted": "此端点不在目录中",
-    "DomainUnlistedHelp": "{0} 没有匹配的目录定义；依赖声明本身不代表已注册子域。",
-    "QueryingHost": "查询主机",
-    "CurrentHostScope": "查看当前主机的身份、注册证据和本地选举状态，并对照应用在提供程序中的领导租约。",
-    "CurrentHostReadFailed": "当前主机快照读取失败",
-    "LastSuccessfulCapture": "下方保留上一次成功读取的快照。",
-    "CapturedUTC": "快照时间",
-    "FrozenUTC": "固定时间",
-    "RegistrationEvidence": "注册证据",
-    "LocalTimes": "事件时间以本地时区显示。",
-    "HeartbeatAgeAtCapture": "快照时的心跳年龄",
-    "HeartbeatAgeSeconds": "{0:N0} 秒",
-    "BuildIdentity": "构建身份",
-    "LocalElectionScope": "本地选举状态属于查询主机，与提供程序中应用当前的领导租约分别记录。",
-    "LeaseScope": "快照时提供程序中的应用租约；续约保持本次任期的获取时间不变。",
-    "NoLeaderLease": "成功读取提供程序时未发现领导租约。",
-    "MetadataScope": "此主机在快照时提供的元数据。",
-    "NoCurrentHostCapture": "尚无当前主机快照",
-    "NoCurrentHostCaptureHelp": "刷新以读取此主机及其应用在提供程序中的租约。",
-    "FrozenServiceCapture": "固定服务快照",
-    "FrozenServiceHelp": "此检查器保留所选服务的读取结果；目录轮询不会替换其中的注册和元数据证据。",
-    "InstanceEvidenceScope": "领导标记来自快照中的注册心跳；消失记录是此界面的观察结果，并非提供程序的驱逐记录。",
-    "HeartbeatInferenceScope": "心跳健康度按快照时间及查询主机的心跳周期和注册 TTL 计算；事件时间以本地时区显示。",
-    "HeartbeatInferenceFrozenScope": "心跳健康度在检查器固定所选读取结果时，按查询主机的心跳周期和注册 TTL 计算。原始读取时间不可用；事件时间以本地时区显示。",
-    "ObservedDisappearance": "观察到消失",
-    "DisappearanceObservedAt": "观察到消失的时间",
-    "ConfigurationScope": "这些设置属于查询主机，并在检查器打开时读取；它们不代表所选远程服务的配置。",
-    "ForceDeleteScope": "撤销应用 {0} 当前的领导租约；成员注册保持不变，主机可能在下一次选举尝试时获取新任期。",
-    "LeaderDeleteCaptureUnchanged": "删除已完成；此固定快照保持不变，请刷新目录以读取新的提供程序证据。",
-    "ForceDeleteConfirmation": "是否删除应用 {0} 当前的领导键？即使快照后领导身份发生变化，操作仍针对该应用键。它不会删除注册或停止主机，租约也可能被再次获取。",
-    "CatalogUnavailable": "目录证据不可用，请刷新重试；读取失败不能表明此端点不存在。",
-    "SortBy": "排序方式",
-    "ReverseSort": "反转排序方向"
-  },
-  "Atlas": {
-    "Shared": {
-      "Layout": "布局",
-      "Filters": "筛选",
-      "FitView": "适应视图",
-      "Loading": "正在读取注册表…",
-      "Refreshing": "正在更新快照…",
-      "RetainedSnapshot": "更新失败 · 保留上一次快照",
-      "CaptureFailed": "无法获取注册表快照",
-      "RetryHint": "点击刷新以重新读取提供程序。",
-      "GraphUnavailable": "图谱无法加载",
-      "NativeAlternative": "可通过图谱旁的证据列表查看同一份快照中的记录。",
-      "FilterMiss": "没有匹配筛选条件的记录",
-      "FilterMissHint": "清除或调整筛选条件以重新显示记录。",
-      "NativeEvidence": "可读证据",
-      "RecordActions": "{0} 的操作",
-      "Captured": "快照读取时间",
-      "GestureHint": "拖动平移 · 滚动缩放 · 点击节点查看详情",
-      "StatusLegend": "注册表状态图例",
-      "ClipboardFailed": "浏览器无法复制此值，可从可读证据中直接复制。"
-    },
-    "Services": {
-      "Eyebrow": "服务成员图谱",
-      "Description": "浏览注册表中可见的服务，查看其实例注册信息与身份。",
-      "MapLabel": "服务地图",
-      "Roster": "服务名册",
-      "RosterHint": "同一组筛选后的服务，可直接阅读和操作，无需使用图谱。",
-      "InstanceCount": "{0} 个注册实例",
-      "NoEdges": "此处展示注册表中的服务成员；不会根据领域归属推断服务之间的依赖关系。",
-      "MembershipHint": "注册表中的存在表示成员关系，不代表应用健康或可用。",
-      "Empty": "当前快照中没有服务",
-      "EmptyHint": "提供程序返回已注册服务或预加载目录条目后，将显示在此处。"
-    },
-    "Domains": {
-      "Eyebrow": "静态 API 依赖图谱",
-      "Description": "追踪编译应用目录中的发布 API 使用关系；部署位置与实例注册分别提供证据。",
-      "MapLabel": "领域有向图",
-      "MapSummary": "{0}/{1} 个领域 · {2}/{3} 条关系",
-      "Evidence": "依赖证据",
-      "Ledger": "API 调用",
-      "Roster": "领域",
-      "LedgerHint": "每行表示源领域 → 目标领域关系；展开证据可查看调用来源类型和目标操作。",
-      "RosterHint": "当前视图中的目录领域和观测领域，包含未采集到 API 依赖的领域。",
-      "ServiceCount": "此领域中有 {0} 个服务",
-      "Declarations": "{0} 条 API 使用证据",
-      "Unlisted": "未列入目录的端点",
-      "UnlistedEdge": "包含未列入领域目录的端点",
-      "UnlistedDescription": "此标识出现在观测归属或依赖信息中，但不在领域目录中。",
-      "UnlistedSummary": "{0} 未登记在统一领域目录中。",
-      "FocusRelationship": "查看相关 API 调用",
-      "EdgeHint": "箭头表示编译期 API 使用关系，不表示观测到的流量；本视图省略同一领域内部的调用。",
-      "CatalogNode": "目录领域",
-      "SnapshotHint": "依赖来自当前宿主的编译产品目录；服务数量与成员状态来自注册快照。",
-      "Empty": "没有可显示的领域",
-      "EmptyHint": "配置共享领域元数据或引入生成应用目录后，可在此查看。",
-      "EmptyRoster": "当前视图中没有端点",
-      "EmptyLedger": "当前视图未采集到跨领域 API 调用",
-      "Unassigned": "未归属",
-      "UnassignedScope": "{0} 个服务没有观测到所属领域，可在“未归属”中查看；不会根据应用名称推断依赖归属。",
-      "UnassignedHint": "列出尚未观测到领域归属的应用，不根据应用身份推断静态调用来源。",
-      "NoOwner": "没有归属领域",
-      "UnassignedDeclarations": "按观测来源角色确定的 API 目标",
-      "NoUnassignedDeclarations": "没有与此服务关联的已采集 API 调用方。",
-      "NoUnassignedServices": "当前快照中没有未归属服务。",
-      "Unavailable": "当前宿主没有可用的编译期应用依赖信息。"
-    }
-  },
-  "Endpoints": {
-    "KnownTargets": "已声明的调用目标",
-    "Scope": "证据来源：{0} · 进程 {1}",
-    "Retention": "最近 {0} 分钟 · 每个目标最多保留 {1} 条 HTTP 观测",
-    "Captured": "采集时间",
-    "Refresh": "刷新解析",
-    "EvidenceBoundary": "注册、解析、HTTP 响应与业务成功是不同证据。本页仅显示当前进程。刷新只解析已知目标，不发送业务请求；DNS 地址不代表实际处理请求的 Pod。",
-    "Filter": "筛选范围、AppId 或逻辑服务",
-    "FailuresOnly": "仅失败或无端点",
-    "Empty": "尚未声明目标。请配置 ModuleServiceEndpointDiscoveryOption.Targets 后查看。",
-    "NoMatch": "没有符合筛选条件的目标。",
-    "CallCount": "{0} 条 HTTP 观测",
-    "Resolution": "解析证据",
-    "LastAttempt": "最近尝试",
-    "LastSuccess": "最近成功采集",
-    "Providers": "提供程序顺序",
-    "Candidates": "候选端点",
-    "CandidateLimit": "最多展示 128 个候选地址，省略路径、凭据与查询串。刷新失败时保留上次成功的候选快照。",
-    "Calls": "已观测的 HTTP 交换",
-    "NoCalls": "没有保留的 HTTP 观测，可达性与业务成功状态未知。",
-    "Percentile": "保留样本到响应头的 p95：{0} ms",
-    "NoSelection": "未选择端点",
-    "Trace": "追踪",
-    "NotObserved": "尚未观测",
-    "States": {
-      "Unknown": "尚未观测",
-      "Resolved": "解析成功",
-      "Empty": "无端点",
-      "Failed": "解析失败",
-      "Timeout": "解析超时",
-      "Stale": "证据已过期"
-    },
-    "Outcomes": {
-      "HttpSuccess": "HTTP 2xx",
-      "HttpFailure": "HTTP 错误",
-      "Failure": "传输或解析失败",
-      "Canceled": "已取消"
     }
   },
   "Navigation": {
     "Category": "服务发现"
+  },
+  "Discovery": {
+    "ageSeconds": "{0} 秒",
+    "allDomains": "全部子域",
+    "allStatuses": "全部状态",
+    "atlasCalm": "当前部署与角色健康证据覆盖 {1} 个服务的 {0} 个角色。",
+    "atlasChooseRole": "选择服务或角色",
+    "atlasClearHighlight": "清除聚焦",
+    "atlasDecisionLabel": "已部署承载角色",
+    "atlasDecisionUnit": "/ {0} 个部署服务",
+    "atlasFilterAll": "全部角色",
+    "atlasFilterDegraded": "降级 (Degraded)",
+    "atlasFilterFaulted": "已隔离 (Faulted)",
+    "atlasFilterRemote": "含跨服远程调用",
+    "atlasFilterRequired": "核心 Required",
+    "atlasGroupApp": "按部署服务",
+    "atlasGroupDomain": "按子域分组",
+    "atlasHighlightRole": "已聚焦角色「{0}」的关联调用",
+    "atlasInstancesShort": "{0}/{1} 实例",
+    "atlasNoCalls": "当前选择没有匹配的编译调用。",
+    "atlasNoEdgesNote": "Monica 架构中，部署服务只决定角色激活与隔离边界；未标注 [RunOnRole] 的普通调用在统一制品（如 Fips.Host）中默认进程内本地执行，仅 [RunOnRole] 跨服调用或精简制品缺失实现时才发生真实远程 HTTP 调用。",
+    "atlasNoPlacement": "当前主机未提供编译角色承载证据。仍可查看注册实例。",
+    "atlasNoRolesAssigned": "此服务未配置激活角色（如边缘网关仅承载流量转发）。",
+    "atlasNoRolesMatchFilter": "当前角色筛选条件下此服务无匹配角色。",
+    "atlasOpenDeps": "角色依赖图谱",
+    "atlasOpenRoleHealthBoard": "角色健康工作台",
+    "atlasPickNotFound": "所选记录未出现在当前快照中",
+    "atlasReasonDegraded": "降级 {0}",
+    "atlasReasonFaulted": "已隔离 (503) {0}",
+    "atlasReasonHealthy": "健康 {0}",
+    "atlasReasonRemote": "跨服远程调用 {0}",
+    "atlasRemoteCapableTip": "存在真实跨服远程调用（[RunOnRole] 或精简制品）",
+    "atlasRemoteEdgeFoot": "跨服远程 ↑{0} ↓{1}",
+    "atlasRolesCount": "{0} 个角色",
+    "atlasRoleUnavailableCount": "{0} 离线不可用",
+    "atlasSelectiveArtifact": "精简制品",
+    "atlasTitle": "部署服务与角色承载拓扑",
+    "autoFailing": "轮询异常",
+    "autoOff": "自动刷新已停",
+    "autoOn": "自动 · {0} 秒",
+    "cancel": "取消",
+    "captured": "快照时间",
+    "clearSearch": "清除搜索",
+    "colActions": "操作",
+    "colBuild": "构建版本",
+    "colDomains": "承载子域",
+    "colEndpoints": "监听地址（元数据）",
+    "colFreshness": "心跳新鲜度",
+    "colInstances": "实例与领导",
+    "colService": "服务与身份",
+    "confirmForceAction": "确定撤销租约",
+    "confirmForceBody": "确定删除应用 {0} 当前的 Leader 租约键？即使快照后领导者发生变化，操作仍针对该应用键生效。成员注册不会被删除，主机也不会停止，下一次选举周期可能重新获取租约。",
+    "confirmForceTitle": "确认强制撤销 Leader 租约",
+    "confirmForceWarn": "强制删除 Leader 将使当前 Leader 实例失去领导权并触发新一轮选举，主要用于开发调试或异常恢复。",
+    "confirmReleaseAction": "确认释放",
+    "confirmReleaseBody": "确定让当前主机 {0} 优雅放弃 Leader 角色？本机将停止租约续约并取消依赖 Leader 的后台任务，等待租约自然过期后由集群接管。",
+    "confirmReleaseTitle": "确认释放本机 Leader 状态",
+    "confirmReleaseWarn": "当前租约自然到期后，后继实例才能取得 Leader。",
+    "copyStoreKey": "复制存储键 {0}",
+    "copyId": "复制 App ID",
+    "coverage": {
+      "shared": "多服务承载",
+      "single": "单服务承载",
+      "unhosted": "无在线承载",
+      "unlisted": "未列入目录"
+    },
+    "criticality": {
+      "Optional": "可选",
+      "Required": "必需"
+    },
+    "criticalityShort": {
+      "Optional": "可选",
+      "Required": "必需"
+    },
+    "depCallsCount": "{0} 条 API 使用证据",
+    "depCatalogNodeTag": "目录子域",
+    "depClearFocus": "显示全部",
+    "depDecisionLabel": "跨服真实远程调用（子域聚合）",
+    "depDecisionLabelRole": "跨服真实远程调用（角色展开）",
+    "depDecisionUnit": "/ {0} 对（{1}/{2} 远程）",
+    "depDockCount": "{0} / {1} 条关系",
+    "depDockCountAll": "{0} 条关系",
+    "depDockInbound": "入向被调 ({0})",
+    "depDockOutbound": "出向调用 ({0})",
+    "depDomainCoreCaller": "领域核心调用方",
+    "Dependencies": {
+      "Nav": "子域依赖",
+      "Title": "子域依赖"
+    },
+    "depExpandCanvas": "展开画布",
+    "depFactLocalOrdinary": "普通默认本地关系",
+    "depFactLocalOrdinarySub": "统一制品内进程内直调",
+    "depFactRemote": "真实跨服远程调用",
+    "depFactRemoteSub": "涉及 {0} 条跨服关系",
+    "depFactRisk": "异常 / 隔离 / 目录外",
+    "depFactRiskSub": "503 {0} · 离线 {1} · 目录外 {2}",
+    "depFactRunOnRole": "[RunOnRole] 约束调用",
+    "depFactRunOnRoleSub": "共涉及 {0} 条关系（含同服）",
+    "depFilterShort": {
+      "local": "普通本地",
+      "remote": "仅真实远程",
+      "risk": "异常/隔离",
+      "runonrole": "含 [RunOnRole]",
+      "remoteartifact": "精简制品"
+    },
+    "depFinding": "共观察到 {0} 对编译期依赖，其中 {1} 使用跨服务 HTTP。{2} 其他普通调用可在制品包含处理器时本地执行。",
+    "depFitView": "重置视图",
+    "depFlowTab": "依赖图",
+    "depFlowTitle": "子域与角色依赖有向图",
+    "depFocusNode": "已聚焦邻域：{0}",
+    "depGestureHint": "滚轮缩放 · 拖拽画布或节点 · 虚线=普通本地直调 · 实线=[RunOnRole]/精简制品远程",
+    "depGranDomain": "按子域",
+    "depGranRole": "按角色",
+    "depGranularityLabel": "图谱粒度",
+    "depGraphLoadError": "D3.js 图谱引擎加载失败，可切换至耦合矩阵查看同一份快照。",
+    "depGraphReadoutIdle": "悬停或点击节点与有向边，右侧同步显示调用角色、[RunOnRole] 约束与真实执行路径；可点「仅真实远程」过滤本地直调。",
+    "depLayoutLabel": "D3 布局算法",
+    "depLayouts": {
+      "force": "结构力导向",
+      "layered": "分层流图",
+      "radial": "环形辐射"
+    },
+    "depLedgerSearch": "搜索子域、角色、AppId、[RunOnRole] 或契约名…",
+    "depLedgerTitle": "编译期 API 调用证据账本",
+    "depLegendRiskErr": "目标离线 / 503 隔离",
+    "depLegendRiskWarn": "目标降级 / 目录外",
+    "depMatrixTab": "耦合矩阵",
+    "depMatrixTitle": "API 耦合矩阵（源 → 目标）",
+    "depMatrixAxis": "源 \\ 目标",
+    "depNodeSvcBadge": "{0} 服务",
+    "depNoLedgerMatch": "当前筛选条件下没有匹配的编译期 API 调用。",
+    "depNoPairsBody": "应用模型已加载，当前粒度没有跨边界依赖对。",
+    "depNoPairsTitle": "当前范围没有编译依赖对",
+    "depNoTopology": "本宿主未提供 IApplicationModel 编译期依赖证据；静态 API 调用关系不可用，下方仍保留注册表观测到的领域归属。",
+    "depOmittedArtifactTag": "精简制品 · 缺失实现",
+    "depOpenDeployAtlas": "部署与角色视图",
+    "depOpenDomain": "在子域目录查看",
+    "depOpenRoleInAtlas": "在部署拓扑查看角色",
+    "depReadoutCell": "{0} → {1} · {2} 处调用 · {3}（{4}）",
+    "depReadoutNode": "{0}（{1}）· {2} · 入向 {3} / 出向 {4} 处编译期调用",
+    "depRealPairs": "{0} 对",
+    "depReasonLocalRunOn": "[RunOnRole] 同服 {0}",
+    "depReasonOrdinary": "普通默认本地 {0}",
+    "depReasonRemoteArtifact": "精简制品远程 {0}",
+    "depReasonRemoteRunOn": "[RunOnRole] 跨服 {0}",
+    "depReasonRisk": "异常/隔离 {0}",
+    "depRoutingAll": "全部关系",
+    "depRoutingLabels": {
+      "unknown": "待证实路径",
+      "unlisted": "未列入目录端点",
+      "localordinary": "普通 · 默认本地直调",
+      "localrunonrole": "[RunOnRole] 同服本地",
+      "remoteartifact": "精简制品远程",
+      "remoterunonrole": "[RunOnRole] 跨服远程",
+      "targetdegraded": "目标角色降级",
+      "targetfaulted": "目标角色已隔离 (503)",
+      "targetoffline": "远程目标离线"
+    },
+    "depSplitView": "并排视图",
+    "depRoutingShort": {
+      "remoterunonrole": "跨服远程",
+      "remoteartifact": "制品远程",
+      "localrunonrole": "同服约束",
+      "localordinary": "默认本地",
+      "targetoffline": "目标离线",
+      "targetfaulted": "503 隔离",
+      "targetdegraded": "目标降级",
+      "unlisted": "目录外",
+      "unknown": "未知"
+    },
+    "depStaticScopeNote": "编译期 API 声明不代表运行时流量。未标 [RunOnRole] 的普通操作在统一制品中优先进程内本地执行；产品权威路由策略（如一二级节点转发）于运行时按请求决定，不在此静态推演。",
+    "depTabEvidence": "API 证据",
+    "depTabUnassigned": "未归属 ({0})",
+    "depTierHubs": "双向核心枢纽",
+    "depTierTargets": "被调目标 / 目录外",
+    "depTierUpstream": "上游调用方",
+    "depUnassignedNote": "当前快照中有 {0} 个服务未上报所属子域。系统严格不根据应用名称推断其静态依赖来源。",
+    "depUnavailableBody": "本宿主未提供 IApplicationModel 编译期依赖证据；静态 API 调用关系不可用，下方仍保留注册表观测到的领域归属。",
+    "depUnavailableTitle": "当前宿主缺少编译期应用拓扑",
+    "depUnknownPaths": "{0} 处调用缺少制品证据。",
+    "depWorkbenchLabel": "子域与角色依赖图谱及编译期 API 证据工作台",
+    "depZoomControls": "画布缩放控制",
+    "depZoomIn": "放大",
+    "depZoomOut": "缩小",
+    "directions": {
+      "remote": "跨服务远程（{0}）",
+      "localrun": "同服 [RunOnRole]（{0}）",
+      "ordinary": "普通本地优先（{0}）"
+    },
+    "domainBarReadout": "{0} · {1} 个服务 · 入向 {2} · 出向 {3}",
+    "domainDirectoryEmpty": "没有子域记录",
+    "domainDirectoryEmptyBody": "请选择列表中的子域，或调整目录筛选以查找证据。",
+    "Domains": {
+      "Nav": "子域目录",
+      "Title": "子域目录"
+    },
+    "domDecisionLabel": "目录子域在线承载",
+    "domDecisionUnit": "/ {0} 个目录子域",
+    "domFactInbound": "入向 API 调用",
+    "domFactInstances": "承载实例",
+    "domFactOutbound": "出向 API 调用",
+    "domFactOwned": "归属服务",
+    "domFilterAll": "全部子域",
+    "domFilterHosted": "已承载",
+    "domFilterMulti": "多服务共载",
+    "domFilterUnhosted": "无在线承载",
+    "domFilterUnlisted": "目录外端点",
+    "domFinding": "{1} 个目录子域中有 {0} 个已观测到承载。",
+    "domInboundHelp": "按已观测角色或领域归属，列出包含指向此子域 API 调用的外部服务；不代表调用已经执行。",
+    "domInboundTitle": "外部调用方服务与入向 API",
+    "domMissingBody": "该子域不在共享目录中，也未出现在当前快照的观测归属或依赖证据里。",
+    "domMissingTitle": "未找到子域「{0}」",
+    "domNoDesc": "统一领域目录未提供描述。",
+    "domNoInbound": "未发现承载指向此子域 API 调用的外部服务。",
+    "domNoOutbound": "此子域未声明跨领域出向 API 调用。",
+    "domNoOwned": "当前快照中没有在线服务声明归属此子域。",
+    "domNoRoles": "当前在线实例未上报该子域的细粒度角色。",
+    "domOutboundHelp": "此子域在编译期声明调用的其他目标子域。",
+    "domOutboundTitle": "本子域发出的跨领域 API 调用",
+    "domOwnedHelp": "在当前注册快照中声明承载该子域的服务；点击打开固定服务检查器。",
+    "domOwnedTitle": "归属服务",
+    "domRolesTitle": "本子域已观测角色",
+    "domSearchPlaceholder": "按域名、中文名或描述查找子域…",
+    "domStripDesc": "每个标记对应一个子域，高度编码入向被依赖条数；点击任一子域查看归属服务、已观测角色及入/出向 API 声明。",
+    "domStripTitle": "子域承载与耦合覆盖条",
+    "domUnlistedBadge": "目录外端点",
+    "domUnlistedWarnBody": "{0} 出现在观测归属或编译期依赖声明中，但未登记于共享领域目录；依赖声明本身不代表已注册子域。",
+    "domUnlistedWarnTitle": "此端点不在统一领域目录中",
+    "domViewInDeps": "在依赖视图聚焦",
+    "emptyBody": "提供程序读取成功，未返回任何已注册实例或预定义服务。",
+    "emptyStatus": "空注册表",
+    "emptyTitle": "本次快照中没有服务",
+    "Endpoints": {
+      "Nav": "端点发现",
+      "Title": "端点发现"
+    },
+    "endpointStaleBody": "仍显示于 {0} 捕获的上一次端点证据。",
+    "epAllSelected": "全部选定端点",
+    "epAllUnknownLede": "当前进程声明的 {0} 个调用目标尚未执行解析或捕获 HTTP 观测；点击右上角「刷新解析」即可按本机提供程序链解析地址（不发送业务请求）。",
+    "epCallCount": "{0} 条 HTTP 观测",
+    "epCallErrors": "错误 {0}",
+    "epCalmLede": "全部 {1} / {0} 个已声明调用目标均解析成功且位于最近 {3} 分钟保留窗口内，共捕获 {2} 条 HTTP 观测，未发现传输或响应错误。",
+    "epCandidateLimit": "最多展示 128 个候选地址，省略路径、凭据与查询串。刷新失败时保留上次成功的候选快照。",
+    "epColDuration": "到响应头耗时",
+    "epColOutcome": "结果与状态码",
+    "epColSelected": "选定端点",
+    "epColTime": "观测时间",
+    "epColTrace": "TraceId",
+    "epCopyEndpoint": "复制端点地址",
+    "epCopyTrace": "复制 TraceId",
+    "epCopyUri": "复制逻辑地址",
+    "epDecisionLabel": "需关注的调用目标",
+    "epDecisionUnit": "/ {0} 个已声明目标",
+    "epEmptyBody": "请配置 ModuleServiceEndpointDiscoveryOption.Targets 后查看本进程的端点解析与 HTTP 观测证据。",
+    "epEmptyStatus": "未声明目标",
+    "epEmptyTitle": "尚未声明调用目标",
+    "epEvidenceBoundary": "注册、解析、HTTP 响应与业务成功是不同证据。本页仅显示当前进程。刷新只解析已知目标（单目标 5 秒、总计 30 秒预算），不发送业务请求；HTTP 2xx 仅代表收到响应头，DNS 地址不代表实际处理请求的 Pod。",
+    "epExchangeNoMatch": "所选端点暂无保留的交换记录。",
+    "epFactCalls": "保留 HTTP 观测",
+    "epFactCallsSub": "最近 {0} 分钟 · 每目标上限 {1} 条",
+    "epFactFailingCalls": "异常 / 取消调用",
+    "epFactFailingCallsSub": "{0} 条 HTTP/传输失败 · {1} 条已取消",
+    "epFactProcess": "证据进程与透传策略",
+    "epFactResolved": "解析成功目标",
+    "epFactResolvedSub": "共 {0} 个候选端点 · {1} 个提供程序",
+    "epFilterAll": "全部目标",
+    "epFilterProblems": "仅失败或无端点",
+    "epFilterResolved": "解析成功",
+    "epFilterStale": "证据已过期",
+    "epFilterUnknown": "尚未观测",
+    "epHostChip": "主机 · {0} (PID {1})",
+    "epInspectRegistry": "在注册目录检查",
+    "epInspectRegistryTip": "注册表成员与端点解析属于独立证据平面",
+    "epLaneAgo": "-{0} 分钟",
+    "epLaneCandCount": "{0} 候选",
+    "epLaneColMeta": "候选 / p95",
+    "epLaneColTarget": "调用目标与状态",
+    "epLaneDesc": "按当前进程最近 {0} 分钟保留窗口定位解析尝试与实际 HTTP 交换（单目标解析截止 {1} 秒）。",
+    "epLaneLegendAttempt": "最近解析尝试",
+    "epLaneLegendCancel": "已取消",
+    "epLaneLegendFail": "传输/解析失败",
+    "epLaneLegendHttpErr": "HTTP 错误",
+    "epLaneLegendRetained": "保留的成功捕获",
+    "epLaneLegendSuccess": "HTTP 2xx（仅响应头）",
+    "epLaneNoCalls": "无保留 HTTP 观测 · 可达性未知",
+    "epLaneNow": "此刻",
+    "epLaneReadoutIdle": "悬停或使用方向键浏览目标泳道，按 Enter 在下方检查候选端点与 HTTP 交换详情。",
+    "epLaneTitle": "解析时效与 HTTP 观测窗口",
+    "epLastAttempt": "最近尝试",
+    "epLastSuccess": "最近成功采集",
+    "epLoadingBody": "正在捕获本进程声明的目标与保留的观测。",
+    "epLoadingTitle": "正在读取端点发现证据",
+    "epMissingTargetBody": "该逻辑地址未声明在当前进程的 ModuleServiceEndpointDiscoveryOption.Targets 中。",
+    "epMissingTargetTitle": "未找到目标「{0}」",
+    "epNoCallsBody": "当前保留窗口内尚未捕获到此目标的 HTTP 交换；可达性与业务成功状态未知，不代表零错误率。",
+    "epNoCallsTitle": "没有保留的 HTTP 观测",
+    "epNoCandidates": "当前无可用候选端点。",
+    "epNoMatchBody": "请调整状态、范围或搜索条件，以查看当前进程声明的其他调用目标。",
+    "epNoMatchTitle": "没有符合筛选条件的目标",
+    "epNoSelection": "未选择端点",
+    "epNotObserved": "尚未观测",
+    "epOutcomes": {
+      "Canceled": "已取消",
+      "Failure": "传输或解析失败",
+      "HttpFailure": "HTTP 错误",
+      "HttpSuccess": "HTTP 2xx"
+    },
+    "epP95Label": "保留样本到响应头的 p95：{0} ms",
+    "epPassThroughNote": "由 PassThroughServiceEndpointProvider 描述的 DNS 目标：解析阶段不发起 DNS 查询，也不代表就绪状态或具体处理请求的 Pod。",
+    "epPassThroughOff": "未启用 DNS 透传",
+    "epPassThroughOn": "DNS 透传已启用",
+    "epProcessFact": "超时 {0} 秒 · {1}",
+    "epProcessStatus": "仅当前进程",
+    "epProvidersLabel": "提供程序顺序",
+    "epReadFailed": "无法捕获进程端点证据。",
+    "epReasonEmpty": "无候选端点 {0}",
+    "epReasonFailed": "解析失败/超时 {0}",
+    "epReasonHttpErr": "含 HTTP 失败 {0}",
+    "epReasonStale": "证据已过期 {0}",
+    "epReasonUnknown": "尚未观测 {0}",
+    "epRefreshAction": "刷新解析",
+    "epRetainedWarnBody": "最近一次解析尝试于 {0} 失败；下方仍展示 {1} 成功采集的候选端点，请核对配置或上游提供程序。",
+    "epRetainedWarnTitle": "最近刷新失败或超时 · 已保留上次成功候选",
+    "epScopeAll": "全部范围",
+    "epSearchPlaceholder": "筛选范围、AppId、逻辑地址或候选端点…",
+    "epSecCalls": "已观测的 HTTP 交换",
+    "epSecResolution": "解析证据与候选端点",
+    "epSelectedDist": "按选定端点筛选",
+    "epShownTargets": "显示 {0} / {1} 个目标",
+    "epStates": {
+      "Empty": "无端点",
+      "Failed": "解析失败",
+      "Resolved": "解析成功",
+      "Stale": "证据已过期",
+      "Timeout": "解析超时",
+      "Unknown": "尚未观测"
+    },
+    "epTimelineReadout": "{0} / {1} · {2} · {3} 个候选 · {4} 条观测 · p95 {5} 毫秒",
+    "epWorkspaceTitle": "已声明的调用目标",
+    "expectedOnly": "仅预定义",
+    "eyebrow": "Monica / 服务发现",
+    "failedStatus": "读取失败",
+    "faultStage": {
+      "HostedServiceStartup": "托管服务启动",
+      "PipelineSetup": "管线配置",
+      "Runtime": "运行时",
+      "RuntimeResource": "运行时资源",
+      "SeederExecution": "播种执行",
+      "StartupConfiguration": "启动配置"
+    },
+    "freshHb": "{0} 秒前",
+    "hbHealth": {
+      "Healthy": "心跳正常",
+      "Offline": "已超 TTL",
+      "Unhealthy": "心跳逾期",
+      "Unknown": "不可用"
+    },
+    "Host": {
+      "Nav": "当前主机",
+      "Title": "当前主机"
+    },
+    "hostAgreementLabel": {
+      "match": "领导租约一致",
+      "none": "无活跃提供程序租约",
+      "sibling": "同应用实例持有租约",
+      "split": "本机与租约不一致"
+    },
+    "hostAgreementMatch": "双平面一致 · 当前主机持有应用 Leader 租约",
+    "hostAgreementNone": "当前无活跃应用租约",
+    "hostAgreementSibling": "双平面一致 · 租约由同应用其他实例持有 ({0})",
+    "hostAgreementSplit": "观察到双平面分歧 · 本机仍认为自己是 Leader，但提供程序租约已归属 {0}",
+    "hostAuthority": "租约权威存储",
+    "hostBuildTitle": "构建与身份证据",
+    "hostConfigDesc": "以下配置归属当前查询主机，用于评估心跳健康度与租约窗口，不代表远端其他服务的实际配置。",
+    "hostConfigTitle": "查询主机选举与 TTL 配置",
+    "hostDecisionLabel": "当前查询主机心跳年龄",
+    "hostDecisionUnit": "秒",
+    "hostElectionDisabled": "当前主机角色为工作节点，Leader 选举服务未启用。",
+    "hostFields": {
+      "appId": "App ID",
+      "appName": "应用名称",
+      "assemblyVer": "程序集版本",
+      "becameLeaderAt": "成为 Leader 时间",
+      "buildTime": "构建时间",
+      "domains": "承载子域",
+      "hbAge": "快照心跳年龄",
+      "hbJitter": "心跳随机抖动",
+      "hbPeriod": "心跳周期",
+      "hostRole": "主机角色",
+      "instanceId": "实例 ID",
+      "instTtl": "实例注册 TTL",
+      "lastHb": "最后心跳",
+      "leaderTtl": "Leader 租约 TTL",
+      "leaseAcquired": "租约获取时间",
+      "leaseApp": "租约应用 ID",
+      "leaseHolder": "租约持有实例",
+      "localStatus": "本地选举状态",
+      "project": "项目名称",
+      "regTime": "注册时间",
+      "releaseVer": "发布版本",
+      "roles": "已观测角色",
+      "status": "当前状态",
+      "storageMode": "状态存储模式",
+      "termId": "当前任期标识"
+    },
+    "hostFinding": "查询主机 {0}（{1}）上次心跳距今 {2}（周期 {3} 秒 / 注册 TTL {4} 秒）。",
+    "hostLeasePlane": "提供程序应用租约（IExclusiveLeaseStore）",
+    "hostLocalPlane": "本机选举状态（LeaderElectionService）",
+    "hostMetadataDesc": "此实例在本次快照时写入状态存储的键值对元数据。",
+    "hostMetadataTitle": "本机上报元数据",
+    "hostNoLease": "成功读取提供程序时，该应用当前未持有活跃 Leader 租约。",
+    "hostOpenParentSheet": "打开完整服务检查器",
+    "hostPlaneDesc": "本机内存选举状态与提供程序中的应用租约彼此独立读取，避免将局部状态误判为全局租约。",
+    "hostPlaneTitle": "双平面领导状态对照",
+    "hostRelease": "主动释放本机 Leader",
+    "hostReleaseDone": "本机已释放领导状态，提供程序租约将自然过期。",
+    "hostReleaseFailed": "本机领导状态已变化或释放失败，请刷新主机快照。",
+    "hostRoles": {
+      "Registry": "注册中心控制平面",
+      "Standalone": "独立控制平面与工作节点",
+      "Worker": "工作节点"
+    },
+    "hostRunwayDesc": "实时对照本机最后一次成功心跳与查询主机配置的周期、逾期线、Leader TTL 及注册过期 TTL。",
+    "hostRunwayTitle": "本机心跳与租约 TTL 标尺",
+    "hostSiblingsDesc": "来自注册快照中 {0} 的全部实例，用于横向核对版本、心跳新鲜度、监听地址与领导角色。",
+    "hostSiblingsTitle": "同应用集群实例对照",
+    "hostSplitMissing": "本机选举上报 Leader，但提供程序未返回活跃租约。",
+    "hostStateTransitionNote": "成员心跳与租约续租独立运行。心跳重试耗尽后将停止续租并取消 Leader 工作，宿主进程本身保持运行。",
+    "hzDesc": "按当前查询主机配置（周期 {0} 秒 · 逾期线 {1} 秒 · Leader TTL {2} 秒 · 注册 TTL {3} 秒）定位每个实例。",
+    "hzDisappearedTag": "消失 {0}",
+    "hzLeaderFlag": "{0} 秒 Leader TTL",
+    "hzLegendDisappeared": "本会话观察消失",
+    "hzLegendFresh": "心跳正常（< 1.5×周期）",
+    "hzLegendLeader": "心跳上报 Leader",
+    "hzLegendOverdue": "心跳逾期（临近 TTL）",
+    "hzLegendPredefined": "仅预定义（无注册实例）",
+    "hzLegendUpdating": "更新中",
+    "hzNoInstances": "无在线实例（预定义）",
+    "hzPeriodFlag": "{0} 秒周期",
+    "hzReadoutIdle": "悬停或使用方向键浏览实例标记，按 Enter 打开固定服务检查器。",
+    "hzReadoutInst": "{0} · {1} · 心跳年龄 {2} 秒（{3}）· {4} · v{5}",
+    "hzReadoutPredefined": "{0} ({1}) · 仅预定义，当前无活跃注册实例",
+    "hzRegFlag": "{0} 秒注册 TTL",
+    "hzSkewBadge": "{0} 个版本",
+    "hzTitle": "实例心跳年龄与 TTL 视界",
+    "hzWarnFlag": "{0} 秒逾期",
+    "inspect": "检查",
+    "leaderStatuses": {
+      "Follower": "Follower",
+      "Leader": "Leader",
+      "Looking": "选举中",
+      "Unknown": "未知"
+    },
+    "leaseAdminUnavailable": "当前租约权威不支持管理撤销。",
+    "leaseExpires": "租约过期时间",
+    "leaseOperationTimeout": "租约操作超时",
+    "leaseStandbyInterval": "待命检查间隔",
+    "live": "自动轮询",
+    "loadFailedBody": "选定提供程序无法提供服务发现快照，请检查主机日志中的读取失败记录。",
+    "loadFailedTitle": "无法读取服务发现快照",
+    "loadingBody": "正在从状态存储、领域目录与编译拓扑捕获当前证据。",
+    "loadingStatus": "读取中",
+    "loadingTitle": "正在读取注册表快照",
+    "manualBody": "注册表、拓扑与主机查询保持可用；本机心跳、选举与撤销 Leader 租约等写操作均已禁用。",
+    "manualStatus": "手动模式 · 仅只读",
+    "manualTitle": "自治工作已挂起（Application:AutonomousWork = false）",
+    "membershipScopeNote": "未过期的注册记录仅代表状态存储中的成员关系，与主机就绪状态及健康探针分别独立记录；多实例服务默认展示最旧心跳与版本差异。",
+    "msUnit": "{0} 毫秒",
+    "navLabel": "服务发现工作区",
+    "noHb": "无心跳",
+    "noMatchBody": "请调整状态、子域或关键词筛选，以查看当前快照中的其他服务。",
+    "noMatchTitle": "没有匹配的服务",
+    "notAvailable": "不可用",
+    "notCaptured": "尚未捕获",
+    "notSpecified": "未指定",
+    "onlyRegistered": "仅含在线实例",
+    "openOtherDomains": "查看其余 {0} 个子域",
+    "openLocalRoleHealth": "查看本机角色健康",
+    "ordinaryContract": "普通调用",
+    "paused": "手动快照",
+    "provenance": {
+      "Heartbeat": "心跳摘要",
+      "Local": "本机实时",
+      "Offline": "离线 / 不可用",
+      "Unknown": "未上报"
+    },
+    "refresh": "刷新",
+    "regDecisionLabel": "需要关注的服务",
+    "regDecisionUnit": "/ {0} 个服务",
+    "regFactDisappeared": "本会话观察消失",
+    "regFactDisappearedSub": "仅界面轮询差值观察，非提供程序驱逐日志",
+    "regFactInstances": "在线实例",
+    "regFactInstancesSub": "{0} 个心跳上报 Leader · {1} 个心跳正常",
+    "regFactOverdue": "心跳逾期实例",
+    "regFactRegistered": "已注册服务",
+    "regFactRegisteredSub": "{0} 个预定义服务当前无实例",
+    "Registry": {
+      "Nav": "注册目录",
+      "Title": "服务注册目录"
+    },
+    "registryPolicyHint": "优先按各实例上报的心跳与 TTL 策略判定",
+    "regFindingBuildCount": "{0} 个混合构建版本",
+    "regFindingDisappeared": "本会话观察到{0}，例如 {1}。",
+    "regFindingDisappearedCount": "{0} 个实例从注册表消失",
+    "regFindingError": "{0}，可查看 {1} 的注册状态。",
+    "regFindingOffline": "{0}，例如 {1}。",
+    "regFindingOfflineCount": "{0} 个预定义服务无在线实例",
+    "regFindingOverdue": "{0}。{1} 最旧的心跳已 {2} 秒未刷新，该实例的注册 TTL 为 {3} 秒。",
+    "regFindingOverdueCount": "{0} 个实例心跳逾期",
+    "regFindingSkew": "{0} 存在{1}（{2}）。",
+    "regReasonDisappeared": "曾观察消失 {0}",
+    "regReasonError": "服务异常 {0}",
+    "regReasonOffline": "预定义离线 {0}",
+    "regReasonOverdue": "心跳逾期 {0}",
+    "regReasonSkew": "版本不一致 {0}",
+    "regReasonUpdating": "更新中 {0}",
+    "resetFilters": "重置筛选",
+    "retry": "重试读取",
+    "roleCallsHeading": "角色间编译期 API 调用",
+    "roleHealthExplanation": {
+      "Heartbeat": "这里显示已注册实例为此角色上报的最高严重等级。请打开目标主机查看完整准入证据。",
+      "Local": "证据来自当前查询进程的角色准入状态。",
+      "Offline": "分配到的服务当前无在线注册。",
+      "Unknown": "在线实例未上报角色健康。请到目标主机查看该角色。"
+    },
+    "roleHealthHeading": "角色健康与隔离",
+    "roleHealthShort": {
+      "Degraded": "降级",
+      "Faulted": "隔离",
+      "Healthy": "健康",
+      "Inactive": "未激活",
+      "Initializing": "初始化",
+      "Unavailable": "不可用"
+    },
+    "roleHealthStatuses": {
+      "Degraded": "降级",
+      "Faulted": "已隔离",
+      "Healthy": "健康",
+      "Inactive": "未激活",
+      "Initializing": "初始化中",
+      "Unavailable": "不可用"
+    },
+    "roleTransition": "上次状态变更 {0}",
+    "routesVerdict": {
+      "unknown": "执行路径待证实",
+      "localordinary": "进程内本地调用",
+      "localrunonrole": "必需角色同服",
+      "remoteartifact": "远程 · 制品未包含处理器",
+      "remoterunonrole": "远程 · 必需角色"
+    },
+    "routingBoundaryNote": "编译声明体现角色部署与处理器可用性。请求级授权策略可改变实际目的地。",
+    "routingRisk": {
+      "unlisted": "未列入目录端点",
+      "targetdegraded": "目标角色降级",
+      "targetfaulted": "目标角色已隔离 (503)",
+      "targetoffline": "远程目标离线"
+    },
+    "scopeChip": "存储 · {0}",
+    "searchPlaceholder": "搜索服务名、App ID、项目、子域或角色…",
+    "secUnit": "{0} 秒",
+    "sheetDeleteDisabledManual": "手动模式下已禁用写操作",
+    "sheetDeleteDisabledNoLeader": "当前快照中无心跳上报 Leader",
+    "sheetDeleteDone": "撤销请求已完成。此固定快照保持不变，请刷新目录获取最新提供程序证据。",
+    "sheetDeleteFailed": "租约权威未能撤销此应用的租约。",
+    "sheetDisappearedAt": "观察消失于",
+    "sheetDisappearedBadge": "界面观察消失",
+    "sheetForceDelete": "强制撤销 Leader 租约",
+    "sheetFrozenBadge": "固定服务快照",
+    "sheetFrozenScope": "快照 {0} · 固定于 {1}。后续目录轮询不会替换此检查器中的注册与元数据证据。",
+    "sheetHostConfigRef": "查询主机心跳与 TTL 基准（非远端服务配置）",
+    "sheetInstanceNote": "领导标记来自快照中的注册心跳；消失记录是本界面的轮询差值观察，并非提供程序驱逐日志。心跳健康度按查询主机的周期与注册 TTL 计算。",
+    "sheetNoInstances": "此服务在当前快照中没有注册实例。",
+    "sheetNoMetadata": "此实例未上报任何元数据。",
+    "sheetOpenDeps": "在依赖视图查看关联调用",
+    "sheetOpenHost": "前往当前主机查看完整配置",
+    "sheetTabIdentity": "身份与承载",
+    "sheetTabInstances": "实例与心跳 ({0})",
+    "sheetTabMetadata": "元数据",
+    "sheetUnknownBody": "当前注册表快照中不存在该 App ID，可能已过期下线或链接拼写有误。",
+    "sheetUnknownTitle": "未找到服务「{0}」",
+    "shownServices": "显示 {0} / {1} 个服务",
+    "sortLabel": "排序",
+    "sortOptions": {
+      "attention": "按关注优先级",
+      "domains": "按承载子域数",
+      "heartbeat": "按最旧心跳",
+      "instances": "按实例数",
+      "name": "按服务名称"
+    },
+    "staleBody": "选定提供程序未能返回最新快照，下方仍显示 {0} 的快照证据，心跳年龄已冻结。",
+    "staleStatus": "保留上次快照",
+    "staleTitle": "刷新失败 · 已保留上一次完整快照",
+    "statuses": {
+      "Error": "异常",
+      "Offline": "离线",
+      "Running": "运行中",
+      "Unhealthy": "不健康",
+      "Unknown": "未知",
+      "Updating": "更新中"
+    },
+    "storageModes": {
+      "Distributed": "分布式状态存储",
+      "ExternalKeyed": "外部键控状态存储",
+      "Memory": "进程内内存状态存储"
+    },
+    "storageScopeModes": {
+      "Distributed": "分布式",
+      "ExternalKeyed": "外部键控存储",
+      "Memory": "进程内存"
+    },
+    "thisHostTag": "当前主机",
+    "ttlFormula": "{0} × {1} + {2} = {3} 秒",
+    "tzChip": "部署时区 · {0}",
+    "unassignedDomain": "未声明子域",
+    "versionSkew": "混合 {0} 版本",
+    "viewAtlas": "部署与角色图谱",
+    "viewRoster": "服务名册",
+    "worstHb": "最旧 {0} 秒前",
+    "regCalmObserved": "{0} 个服务有 {1} 个注册实例，其中 {2} 个实例心跳正常。",
+    "roleInspectorTitle": "角色与调用检查器",
+    "atlasAppInspector": "部署服务",
+    "atlasAppRoleHealth": "角色健康概览",
+    "atlasLocalRunHint": "必需角色部署在同一应用。若拆分部署，此调用将使用 HTTP。",
+    "atlasOrdinaryHint": "源制品包含处理器时，普通调用在进程内执行。证据不完整的调用会单独标记。",
+    "targetInstanceEvidence": "观测到 {0} 个目标实例",
+    "splitImpact": "拆分后将通过 HTTP 路由"
   }
 }

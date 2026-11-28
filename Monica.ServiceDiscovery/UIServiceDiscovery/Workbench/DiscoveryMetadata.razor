@@ -1,0 +1,38 @@
+@inherits DiscoveryComponent
+
+@if (Metadata.Count == 0)
+{
+    <p class="sv-sheet-note">@T("sheetNoMetadata")</p>
+}
+else
+{
+    <dl class="sv-meta-dl">
+        @foreach (var (key, value) in Metadata.OrderBy(entry => entry.Key, StringComparer.Ordinal))
+        {
+            var addresses = key.Contains("ADDRESS", StringComparison.OrdinalIgnoreCase)
+                ? value.Split([';', ','], StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries) : [];
+            <div class="sv-meta-row">
+                <dt class="mono">@key</dt>
+                <dd>
+                    @if (addresses.Length > 1)
+                    {
+                        <div class="sv-addr-list">
+                            @foreach (var address in addresses)
+                            {
+                                <span class="sv-addr-chip mono"><span>@address</span><MoCopyButton Value="@address" Label="@T("copyId")" /></span>
+                            }
+                        </div>
+                    }
+                    else
+                    {
+                        <div class="sv-meta-scalar"><code>@value</code><MoCopyButton Value="@value" Label="@T("copyId")" /></div>
+                    }
+                </dd>
+            </div>
+        }
+    </dl>
+}
+
+@code {
+    [Parameter, EditorRequired] public IReadOnlyDictionary<string, string> Metadata { get; set; } = default!;
+}

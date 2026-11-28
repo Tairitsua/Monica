@@ -29,4 +29,11 @@ public sealed record ServiceEndpointSnapshot(
 /// <summary>Host-owned evidence with explicit process identity, capture time and retention limits.</summary>
 public sealed record ServiceEndpointDiagnosticsSnapshot(
     string Host, int ProcessId, DateTimeOffset CapturedAt, TimeSpan Retention, int MaxCallsPerTarget,
-    IReadOnlyList<string> Providers, IReadOnlyList<ServiceEndpointSnapshot> Targets);
+    IReadOnlyList<string> Providers, IReadOnlyList<ServiceEndpointSnapshot> Targets)
+{
+    /// <summary>The configured deadline per declared destination in an explicit refresh.</summary>
+    public TimeSpan ResolutionTimeout { get; init; }
+
+    /// <summary>Whether the host includes the native pass-through DNS endpoint provider.</summary>
+    public bool EnablePassThrough { get; init; }
+}

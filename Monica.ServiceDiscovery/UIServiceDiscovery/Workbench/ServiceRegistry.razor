@@ -1,0 +1,343 @@
+@inherits DiscoveryComponent
+
+@if (Model.Services.Count == 0)
+{
+    <section class="mo-vl-surface sv-state-panel">
+        <MoContentState>
+            <span class="mo-vl-tile role-neutral"><MoIcon Icon="@MoIcons.Cloud" Size="18px" /></span>
+            <h2>@T("emptyTitle")</h2>
+            <p>@T("emptyBody")</p>
+            <button type="button" class="btn btn-outline" @onclick="Workbench.RefreshAsync">@T("retry")</button>
+        </MoContentState>
+    </section>
+}
+else
+{
+    @if (Atlas)
+    {
+        <ServicePlacementAtlas />
+    }
+    else
+    {
+        <DiscoverySignature Label="@T("regDecisionLabel")" Value="@Model.Attention.ToString()" Unit="@T("regDecisionUnit", Model.Services.Count)"
+                            Role="@(Offline > 0 || Errors > 0 ? "error" : Model.Attention > 0 ? "warning" : "success")" Facts="@Facts">
+            <Reasons>
+                <DiscoveryReason Role="error" Count="@Offline">@T("regReasonOffline", Offline)</DiscoveryReason>
+                <DiscoveryReason Role="warning" Count="@Overdue">@T("regReasonOverdue", Overdue)</DiscoveryReason>
+                <DiscoveryReason Role="warning" Count="@Skew">@T("regReasonSkew", Skew)</DiscoveryReason>
+                @if (Errors > 0)
+                {
+                    <DiscoveryReason Role="error" Count="@Errors">@T("regReasonError", Errors)</DiscoveryReason>
+                }
+                <DiscoveryReason Role="info" Count="@Updating">@T("regReasonUpdating", Updating)</DiscoveryReason>
+                <DiscoveryReason Role="neutral" Count="@Disappearances">@T("regReasonDisappeared", Disappearances)</DiscoveryReason>
+            </Reasons>
+            <Finding>
+                @if (Model.Attention == 0)
+                {
+                    @T("regCalmObserved", Model.Services.Count, Instances.Count, Instances.Count(instance => instance.Health == "Healthy"))
+                }
+                else
+                {
+                    @foreach (var finding in Findings())
+                    {
+                        @finding@(" ")
+                    }
+                }
+            </Finding>
+            <ChildContent>
+                <ServiceHeartbeatHorizon />
+            </ChildContent>
+        </DiscoverySignature>
+        <DiscoverySurface Title="@T("viewRoster")" Icon="@MoIcons.Server" Class="sv-inv" Count="@T("shownServices", Visible.Count, Model.Services.Count)">
+            <Aside><DiscoveryViewSwitch /></Aside>
+            <ChildContent>
+                <div class="sv-toolbar">
+                    <div class="sv-toolbar-row">
+                        <DiscoverySearch Value="@Q" Label="@T("searchPlaceholder")" ClearLabel="@T("clearSearch")" ValueChanged='value => Workbench.Pick("q", value.Length == 0 ? null : value, true)' />
+                        <MudSelect T="string" Value="@Domain" ValueChanged='value => Workbench.Pick("domain", value == "all" ? null : value)'
+                                   Class="sv-select-field sv-reg-select" Dense Variant="Variant.Outlined" Margin="Margin.Dense" aria-label="@T("colDomains")">
+                            <MudSelectItem Value="@("all")">@T("allDomains") (@DomainOptions.Length)</MudSelectItem>
+                            <MudSelectItem Value="@("unassigned")">@T("unassignedDomain")</MudSelectItem>
+                            @foreach (var id in DomainOptions)
+                            {
+                                <MudSelectItem Value="@id">@id</MudSelectItem>
+                            }
+                        </MudSelect>
+                        <MudSelect T="string" Value="@Sort" ValueChanged='value => Workbench.Pick("sort", value == "attention" ? null : value)'
+                                   Class="sv-select-field sv-reg-select" Dense Variant="Variant.Outlined" Margin="Margin.Dense" aria-label="@T("sortLabel")">
+                            @foreach (var value in Sorts)
+                            {
+                                <MudSelectItem Value="@value">@T("sortOptions:" + value)</MudSelectItem>
+                            }
+                        </MudSelect>
+                        <MoFilterChip Role="MoVisualRole.Primary" Label="@T("onlyRegistered")" Pill ShowDot Class="mo-vl-chip--instrument" Selected="@OnlyRegistered"
+                                      SelectedChanged='value => Workbench.Pick("registered", value ? "1" : null)' />
+                        @if (HasFilters)
+                        {
+                            <button type="button" class="btn btn-ghost btn-sm" @onclick="Reset">@T("resetFilters")</button>
+                        }
+                    </div>
+                    <div class="fchips" aria-label="@T("allStatuses")">
+                        <MoFilterChip Role="MoVisualRole.Primary" Label="@T("allStatuses")" Pill Class="mo-vl-chip--instrument" Count="@SearchPool.Count" Selected="@(Status == "all")"
+                                      SelectedChanged='() => Workbench.Pick("status", null)' />
+                        @foreach (var status in StatusOrder)
+                        {
+                            var count = SearchPool.Count(service => service.State.OverallStatus == status);
+                            <MoFilterChip Role="@ChipRole(status)" Pill ShowDot Class="mo-vl-chip--instrument" Count="@count" Label="@T("statuses:" + status)"
+                                          Selected="@(Status == status.ToString())"
+                                          SelectedChanged='value => Workbench.Pick("status", value ? status.ToString() : null)' />
+                        }
+                    </div>
+                </div>
+                @if (Visible.Count == 0)
+                {
+                    <MoContentState Compact>
+                        <h3>@T("noMatchTitle")</h3><p>@T("noMatchBody")</p>
+                        <button type="button" class="btn btn-outline btn-sm" @onclick="Reset">@T("resetFilters")</button>
+                    </MoContentState>
+                }
+                else
+                {
+                    <div class="sv-table-wrap">
+                        <table class="table sv-table">
+                            <thead><tr>
+                                @foreach (var label in Columns) { <th scope="col">@T(label)</th> }
+                                <th scope="col" class="is-act">@T("colActions")</th>
+                            </tr></thead>
+                            <tbody>
+                            @foreach (var row in Visible)
+                            {
+                                var addresses = ListeningAddresses(row);
+                                var metadata = RegistryMetadata(row);
+                                <tr @key="row.Id" class="@(row.Offline ? "is-offline" : null) @(Workbench.Param("inspect") == row.Id ? "is-selected" : null)">
+                                    <td data-label="@T("colService")" class="sv-cell-svc">
+                                        <div class="sv-svc-main">
+                                            <a class="sv-row-link" href="@Workbench.Here(("inspect", row.Id), ("tab", null))">@row.Name</a>
+                                            <DiscoveryBadge Role="@StatusRole(row.State.OverallStatus)">@T("statuses:" + row.State.OverallStatus)</DiscoveryBadge>
+                                            @if (row.Id == Model.Host.CurrentInstance.AppId)
+                                            {
+                                                <a class="chip role-info" href="@Workbench.Link(DiscoveryWorkbench.HOST)"><MoIcon Icon="@MoIcons.Monitor" Size="13px" />@T("thisHostTag")</a>
+                                            }
+                                        </div>
+                                        <div class="sv-svc-sub mono">@row.Id @if (row.State.ProjectName is { } project) { <span class="sv-sep">·</span><span>@project</span> }</div>
+                                    </td>
+                                    <td data-label="@T("colDomains")" class="sv-cell-dom">
+                                        @if (row.Domains.Count == 0) { <span class="sv-dim">@T("unassignedDomain")</span> }
+                                        else
+                                        {
+                                            <div class="sv-dom-list">
+                                                @foreach (var domain in row.Domains.Take(3))
+                                                {
+                                                    <a class="sv-dom-chip" href="@Workbench.Link(DiscoveryWorkbench.DOMAINS, ("domain", domain))">@domain</a>
+                                                }
+                                                @if (row.Domains.Count > 3)
+                                                {
+                                                    var remaining = row.Domains.Count - 3;
+                                                    <a class="sv-dom-more" aria-label="@T("openOtherDomains", remaining)"
+                                                       href="@Workbench.Here(("inspect", row.Id), ("tab", "identity"))"><span>+@remaining</span></a>
+                                                }
+                                            </div>
+                                        }
+                                    </td>
+                                    <td data-label="@T("colInstances")" class="sv-cell-inst">
+                                        @if (row.Offline) { <span class="sv-offline-tag hatch">@T("expectedOnly")</span> }
+                                        else
+                                        {
+                                            <div class="sv-inst-cell">
+                                                <strong class="mono">@row.State.RunningInstanceCount/@row.Instances.Count</strong>
+                                                <div class="sv-inst-marks">
+                                                    @foreach (var instance in row.Instances)
+                                                    {
+                                                        <span class="sw role-@MarkRole(instance) @(instance.State.IsLeader ? "is-diamond" : null)"
+                                                            title="@T("hzReadoutInst", row.Name, instance.State.InstanceId, Num(instance.Age), T("hbHealth:" + instance.Health), T(instance.State.IsLeader ? "leaderStatuses:Leader" : "leaderStatuses:Follower"), instance.Version ?? "—")"></span>
+                                                    }
+                                                    @if (row.State.EvictedInstances.Count > 0)
+                                                    {
+                                                        <span class="sv-dis-pill role-warning">@T("hzDisappearedTag", row.State.EvictedInstances.Count)</span>
+                                                    }
+                                                </div>
+                                            </div>
+                                        }
+                                    </td>
+                                    <td data-label="@T("colFreshness")" class="sv-cell-hb mono">
+                                        @if (row.Oldest is { } oldest)
+                                        {
+                                            <span class="sv-hb-val role-@HeartbeatRole(oldest.Health)">
+                                                <span class="sw"></span>@T(row.Instances.Count > 1 ? "worstHb" : "freshHb", Num(oldest.Age))
+                                            </span>
+                                        }
+                                        else { <span class="sv-dim">@T("noHb")</span> }
+                                    </td>
+                                    <td data-label="@T("colBuild")" class="sv-cell-build mono">
+                                        @if (row.Skew)
+                                        {
+                                            <div class="sv-build-skew"><span class="sv-skew-tag role-warning"><MoIcon Icon="@MoIcons.Layers" Size="12px" />@T("versionSkew", row.Versions.Count)</span><small>@string.Join(" / ", row.Versions)</small></div>
+                                        }
+                                        else { <span>@(row.Versions.FirstOrDefault() is { } version ? $"v{version}" : "—")</span> }
+                                    </td>
+                                    <td data-label="@T("colEndpoints")" class="sv-cell-addr mono">
+                                        @if (addresses.Length == 0)
+                                        {
+                                            <span class="sv-dim">—</span>
+                                        }
+                                        else
+                                        {
+                                            <ul class="sv-reg-addresses">
+                                                @foreach (var address in addresses)
+                                                {
+                                                    <li>
+                                                        <a class="sv-reg-address" href="@address.AbsoluteUri" target="_blank" rel="noopener noreferrer">
+                                                            <span>@ListeningAddressLabel(address)</span><MoIcon Icon="@MoIcons.ArrowUpRight" Size="12px" />
+                                                        </a>
+                                                    </li>
+                                                }
+                                            </ul>
+                                        }
+                                        @foreach (var tag in metadata)
+                                        {
+                                            <div class="sv-registry-meta"><small>@tag.Key</small> <code title="@tag.Value">@tag.Value</code></div>
+                                        }
+                                    </td>
+                                    <td data-label="@T("colActions")" class="sv-cell-act">
+                                        <div class="sv-row-actions">
+                                            <MoCopyButton Value="@row.Id" Label="@T("copyId")" />
+                                            <a class="btn btn-outline btn-sm" href="@Workbench.Here(("inspect", row.Id), ("tab", null))">@T("inspect")</a>
+                                        </div>
+                                    </td>
+                                </tr>
+                            }
+                            </tbody>
+                        </table>
+                    </div>
+                }
+                <footer class="sv-scope-foot"><MoIcon Icon="@MoIcons.Info" Size="14px" /><span>@T("membershipScopeNote")</span></footer>
+            </ChildContent>
+        </DiscoverySurface>
+    }
+}
+
+@code {
+    private static readonly string[] Columns = ["colService", "colDomains", "colInstances", "colFreshness", "colBuild", "colEndpoints"];
+    private static readonly string[] Sorts = ["attention", "name", "instances", "heartbeat", "domains"];
+    private static readonly ServiceStatus[] StatusOrder = [ServiceStatus.Running, ServiceStatus.Unhealthy, ServiceStatus.Updating, ServiceStatus.Error, ServiceStatus.Offline];
+    private DiscoveryEvidence Model => Workbench.Evidence!;
+    private bool Atlas => Workbench.Param("view") == "atlas";
+    private string? Q => Workbench.Param("q");
+    private string Domain => Workbench.Param("domain") ?? "all";
+    private string Sort => Workbench.Param("sort") ?? "attention";
+    private string Status => Workbench.Param("status") ?? "all";
+    private bool OnlyRegistered => Workbench.Param("registered") == "1";
+    private bool HasFilters => Q is not null || Domain != "all" || Status != "all" || OnlyRegistered;
+    private IReadOnlyList<ServiceRow> SearchPool { get; set; } = [];
+    private IReadOnlyList<ServiceRow> Visible { get; set; } = [];
+    private string[] DomainOptions { get; set; } = [];
+    private IReadOnlyList<InstanceRow> Instances { get; set; } = [];
+    private int Offline => Model.Services.Count(service => service.Offline);
+    private int Overdue => Model.Services.Count(service => service.Overdue);
+    private int Skew => Model.Services.Count(service => service.Skew);
+    private int Updating => Model.Services.Count(service => service.State.OverallStatus == ServiceStatus.Updating);
+    private int Errors => Model.Services.Count(service => service.State.OverallStatus == ServiceStatus.Error);
+    private int OverdueInstances => Instances.Count(IsOverdue);
+    private int Disappearances => Model.Services.Sum(service => service.State.EvictedInstances.Count);
+
+    private IReadOnlyList<DiscoverySignature.Fact> Facts =>
+    [
+        new("success", T("regFactRegistered"), $"{Model.Services.Count - Offline}/{Model.Services.Count}", T("regFactRegisteredSub", Offline)),
+        new("primary", T("regFactInstances"), Instances.Count.ToString(), T("regFactInstancesSub", Instances.Count(instance => instance.State.IsLeader), Instances.Count(instance => instance.Health == "Healthy"))),
+        new(Overdue > 0 ? "warning" : "neutral", T("regFactOverdue"), OverdueInstances.ToString(), T("registryPolicyHint")),
+        new(Disappearances > 0 ? "warning" : "neutral", T("regFactDisappeared"), Disappearances.ToString(), T("regFactDisappearedSub"), Disappearances == 0)
+    ];
+
+    protected override void OnParametersSet()
+    {
+        DomainOptions = Model.Services.SelectMany(service => service.Domains).Distinct(StringComparer.Ordinal).Order().ToArray();
+        var q = Q?.Trim();
+        var domain = Domain;
+        var onlyRegistered = OnlyRegistered;
+        SearchPool = Model.Services.Where(service =>
+            (!onlyRegistered || !service.Offline) &&
+            (domain == "all" || (domain == "unassigned" ? service.Domains.Count == 0 : service.Domains.Contains(domain))) &&
+            (string.IsNullOrEmpty(q) || new[] { service.Name, service.Id, service.State.ProjectName }
+                .Concat(service.Domains).Concat(service.State.RoleIds)
+                .Any(value => value?.Contains(q, StringComparison.OrdinalIgnoreCase) == true))).ToArray();
+        var pool = SearchPool.Where(service => Status == "all" || service.State.OverallStatus.ToString() == Status);
+        Visible = (Sort switch
+        {
+            "name" => pool.OrderBy(service => service.Name, StringComparer.OrdinalIgnoreCase),
+            "instances" => pool.OrderByDescending(service => service.Instances.Count),
+            "heartbeat" => pool.OrderByDescending(service => service.Oldest?.Age ?? double.MaxValue),
+            "domains" => pool.OrderByDescending(service => service.Domains.Count),
+            _ => pool
+        }).ToArray();
+        Instances = Model.Services.SelectMany(service => service.Instances).ToArray();
+    }
+
+    private void Reset() => Workbench.SetQuery(false, ("q", null), ("status", null), ("domain", null), ("registered", null));
+
+    private IEnumerable<RenderFragment> Findings()
+    {
+        var services = Model.Services;
+        if (services.FirstOrDefault(row => row.Offline) is { } offline)
+        {
+            yield return MoRichFinding.Compose(T("regFindingOffline"),
+                FindingMark(MoVisualRole.Error, T("regFindingOfflineCount", Offline)),
+                FindingMark(MoVisualRole.Error, offline.Name, offline.Id));
+        }
+
+        var oldest = services.SelectMany(service => service.Instances.Where(IsOverdue)
+                .Select(instance => (Service: service, Instance: instance)))
+            .OrderByDescending(item => item.Instance.Age).FirstOrDefault();
+        if (oldest.Instance is { } heartbeat)
+        {
+            yield return MoRichFinding.Compose(T("regFindingOverdue"),
+                FindingMark(MoVisualRole.Warning, T("regFindingOverdueCount", OverdueInstances)),
+                FindingMark(MoVisualRole.Warning, oldest.Service.Name, oldest.Service.Id),
+                FindingText(Num(heartbeat.Age)), FindingText(Num(heartbeat.Ttl)));
+        }
+
+        if (services.FirstOrDefault(row => row.Skew) is { } skew)
+        {
+            yield return MoRichFinding.Compose(T("regFindingSkew"),
+                FindingMark(MoVisualRole.Warning, skew.Name, skew.Id),
+                FindingMark(MoVisualRole.Warning, T("regFindingBuildCount", skew.Versions.Count)),
+                FindingText(string.Join(" / ", skew.Versions)));
+        }
+
+        if (services.FirstOrDefault(row => row.State.OverallStatus == ServiceStatus.Error) is { } failed)
+        {
+            yield return MoRichFinding.Compose(T("regFindingError"),
+                FindingMark(MoVisualRole.Error, T("regReasonError", Errors)),
+                FindingMark(MoVisualRole.Error, failed.Name, failed.Id));
+        }
+
+        if (services.FirstOrDefault(row => row.State.EvictedInstances.Count > 0) is { } disappeared)
+        {
+            yield return MoRichFinding.Compose(T("regFindingDisappeared"),
+                FindingMark(MoVisualRole.Neutral, T("regFindingDisappearedCount", Disappearances)),
+                FindingMark(MoVisualRole.Neutral, disappeared.Name, disappeared.Id));
+        }
+    }
+
+    private RenderFragment FindingMark(MoVisualRole role, string text, string? appId = null) =>
+        @<MoValueMark Role="@role" Href="@(appId is null ? null : Workbench.Here(("inspect", appId), ("tab", null)))">@text</MoValueMark>;
+
+    private static RenderFragment FindingText(string value) => @<span>@value</span>;
+
+    private static bool IsOverdue(InstanceRow instance) => instance.Health is "Unhealthy" or "Offline";
+
+    private IEnumerable<KeyValuePair<string, string>> RegistryMetadata(ServiceRow service)
+    {
+        var keys = Workbench.UiSettings!.DisplayMetadataKeys;
+        return service.Instances.SelectMany(instance => instance.State.Metadata)
+            .Where(entry => !IsListeningAddress(entry.Key) && keys.Contains(entry.Key, StringComparer.Ordinal))
+            .Distinct();
+    }
+
+    private static string MarkRole(InstanceRow instance) => instance.State.Status == ServiceStatus.Updating ? "info" : HeartbeatRole(instance.Health);
+    private static MoVisualRole ChipRole(ServiceStatus status) => StatusRole(status) switch
+    {
+        "success" => MoVisualRole.Success, "error" => MoVisualRole.Error, "info" => MoVisualRole.Info,
+        "warning" => MoVisualRole.Warning, _ => MoVisualRole.Neutral
+    };
+}

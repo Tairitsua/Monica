@@ -1,0 +1,222 @@
+@inherits DiscoveryComponent
+
+@if (_id is { } missingId && _frozen is null)
+{
+    <MoSideSheet @key="missingId" Open="true" OpenChanged="OnOpenChanged" DismissRequested="Dismiss" Width="560px" Compact>
+        <TitleContent>
+            <div class="sv-inspector-scope">
+                <div class="sv-sheet-head-top">
+                    <span class="mo-vl-tile role-warning"><MoIcon Icon="@MoIcons.Warning" Size="16px" /></span>
+                    <div class="sv-sheet-id">
+                        <h2>@T("sheetUnknownTitle", missingId)</h2>
+                        <div class="sv-sheet-sub"><code>@missingId</code></div>
+                    </div>
+                </div>
+            </div>
+        </TitleContent>
+        <ChildContent>
+            <div class="sv-inspector-scope">
+                <div class="sv-empty-inline is-lg"><span class="mo-vl-tile role-warning"><MoIcon Icon="@MoIcons.Search" Size="18px" /></span><p>@T("sheetUnknownBody")</p></div>
+            </div>
+        </ChildContent>
+    </MoSideSheet>
+}
+else if (_id is { } id)
+{
+    <MoSideSheet @key="id" Open="true" OpenChanged="OnOpenChanged" DismissRequested="Dismiss" Width="560px" Compact ActiveTabIndex="@ActiveTab" ActiveTabIndexChanged="SetTab">
+        <TitleContent>
+            <div class="sv-inspector-scope">
+                <div class="sv-sheet-head-top">
+                    <span class="mo-vl-tile role-@StatusRole(_frozen!.State.OverallStatus)"><MoIcon Icon="@MoIcons.Server" Size="16px" /></span>
+                    <div class="sv-sheet-id">
+                        <div class="sv-sheet-eyebrow-row">
+                            <span class="sv-sheet-eyebrow">@T("sheetFrozenBadge")</span>
+                            @if (_frozen is { } saved) { <DiscoveryBadge Role="@StatusRole(saved.State.OverallStatus)">@T("statuses:" + saved.State.OverallStatus)</DiscoveryBadge> }
+                        </div>
+                        <h2>@(_frozen?.Name ?? T("sheetUnknownTitle", id))</h2>
+                        <div class="sv-sheet-sub"><code>@id</code><MoCopyButton Value="@id" Label="@T("copyId")" />
+                            @if (_frozen?.Skew == true) { <span class="chip role-warning"><MoIcon Icon="@MoIcons.Layers" Size="12px" />@T("versionSkew", _frozen.Versions.Count)</span> }
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </TitleContent>
+        <HeaderContent>
+            @if (_snapshot is { } snapshot)
+            {
+                <div class="sv-sheet-capture">
+                    <p class="sv-sheet-frozen-line">@T("sheetFrozenScope", UiTime.FormatTime(snapshot.At), UiTime.FormatTime(snapshot.At))</p>
+                </div>
+            }
+        </HeaderContent>
+        <TabPanels>
+            @if (_frozen is { } row)
+            {
+                <MudTabPanel Text="@T("sheetTabInstances", row.Instances.Count + row.State.EvictedInstances.Count)">
+                    <div class="sv-inspector-scope sv-sheet-tab-content">
+                        <p class="sv-sheet-note">@T("sheetInstanceNote")</p>
+                        @if (row.Instances.Count == 0 && row.State.EvictedInstances.Count == 0)
+                        {
+                            <div class="sv-empty-inline"><span class="mo-vl-tile role-neutral"><MoIcon Icon="@MoIcons.CloudOff" Size="16px" /></span><p>@T("sheetNoInstances")</p></div>
+                        }
+                        else
+                        {
+                            <div class="sv-inst-cards">
+                                @foreach (var instance in row.Instances)
+                                {
+                                    var value = instance.State;
+                                    var self = row.Id == _snapshot!.Host.CurrentInstance.AppId && value.InstanceId == _snapshot.Host.CurrentInstance.InstanceId;
+                                    <article class="sv-inst-card @(self ? "is-self" : null)">
+                                        <header class="sv-inst-card-head">
+                                            <div class="sv-inst-id-block">
+                                                <div class="sv-inst-id-row"><code class="sv-inst-id mono">@value.InstanceId</code><MoCopyButton Value="@value.InstanceId" Label="@T("copyId")" /></div>
+                                                <div class="sv-inst-badges">
+                                                    <DiscoveryBadge Role="@StatusRole(value.Status)">@T("statuses:" + value.Status)</DiscoveryBadge>
+                                                    <DiscoveryBadge Role="@(value.IsLeader ? "primary" : "neutral")" Diamond="@value.IsLeader">@T(value.IsLeader ? "leaderStatuses:Leader" : "leaderStatuses:Follower")</DiscoveryBadge>
+                                                    @if (self) { <span class="chip role-info"><MoIcon Icon="@MoIcons.Monitor" Size="13px" />@T("thisHostTag")</span> }
+                                                </div>
+                                            </div>
+                                            <DiscoveryBadge Role="@HeartbeatRole(instance.Health)">@T("hbHealth:" + instance.Health) · @T("ageSeconds", Num(instance.Age))</DiscoveryBadge>
+                                        </header>
+                                        <div class="sv-mini-runway">
+                                            <div class="sv-mini-track">
+                                                <span class="sv-mini-warn-zone" style="left:@Pct(instance.Warn, instance.Ttl);right:0"></span>
+                                                <span class="sv-mini-fill role-@HeartbeatRole(instance.Health)" style="width:@Pct(instance.Age ?? 0, instance.Ttl)"></span>
+                                                <span class="sv-mini-mark" style="left:@Pct(instance.Warn, instance.Ttl)"></span>
+                                            </div>
+                                            <div class="sv-mini-axis mono"><span>0s</span><span>@T("secUnit", Num(instance.Warn))</span><span>@T("hzRegFlag", Num(instance.Ttl))</span></div>
+                                        </div>
+                                        <dl class="sv-inst-facts">
+                                            @Fact("hostFields:assemblyVer", value.AssemblyVersion)
+                                            @Fact("hostFields:releaseVer", value.ReleaseVersion)
+                                            @Fact("hostFields:buildTime", UiTime.Format(KnownTime(value.BuildTime)))
+                                            @Fact("hostFields:lastHb", UiTime.Format(KnownTime(value.LastHeartbeatTime)))
+                                            @Fact("hostFields:regTime", UiTime.Format(KnownTime(value.RegistrationTime)))
+                                            @Fact("colEndpoints", Address(value))
+                                        </dl>
+                                    </article>
+                                }
+                                @foreach (var evicted in row.State.EvictedInstances)
+                                {
+                                    <article class="sv-inst-card is-evicted">
+                                        <header class="sv-inst-card-head">
+                                            <div class="sv-inst-id-block">
+                                                <code class="sv-inst-id mono">@evicted.InstanceId</code>
+                                                <div class="sv-inst-badges">
+                                                    <span class="chip is-outline role-warning"><MoIcon Icon="@MoIcons.History" Size="13px" />@T("sheetDisappearedBadge")</span>
+                                                    <DiscoveryBadge Role="@(evicted.IsLeader ? "primary" : "neutral")" Diamond="@evicted.IsLeader">@T(evicted.IsLeader ? "leaderStatuses:Leader" : "leaderStatuses:Follower")</DiscoveryBadge>
+                                                </div>
+                                            </div>
+                                            <span class="sv-ev-time mono">@T("sheetDisappearedAt") @UiTime.FormatTime(evicted.EvictionTime)</span>
+                                        </header>
+                                        <dl class="sv-inst-facts">
+                                            @Fact("hostFields:assemblyVer", evicted.AssemblyVersion)
+                                            @Fact("hostFields:lastHb", UiTime.Format(KnownTime(evicted.LastHeartbeatTime)))
+                                            @Fact("hostFields:regTime", UiTime.Format(KnownTime(evicted.RegistrationTime)))
+                                            @Fact("sheetDisappearedAt", UiTime.Format(evicted.EvictionTime))
+                                        </dl>
+                                    </article>
+                                }
+                            </div>
+                        }
+                        <section class="sv-sheet-danger">
+                            <div class="sv-sheet-danger-copy"><h4>@T("sheetForceDelete")</h4><p>@T("confirmForceBody", row.Id)</p></div>
+                            <div class="sv-sheet-danger-act"><DiscoveryLeaderAction AppId="@row.Id" Disabled="@(DeleteReason is not null)" DisabledReason="@DeleteReason" /></div>
+                        </section>
+                    </div>
+                </MudTabPanel>
+                <MudTabPanel Text="@T("sheetTabIdentity")">
+                    <div class="sv-inspector-scope sv-sheet-tab-content">
+                        <section class="sv-sheet-sec">
+                            <h3>@T("colService")</h3>
+                            <dl class="kv is-single">
+                                @Fact("hostFields:appId", row.Id)
+                                @Fact("hostFields:appName", row.Name)
+                                @Fact("hostFields:project", row.State.ProjectName)
+                                @Fact("colInstances", $"{row.State.RunningInstanceCount} / {row.Instances.Count}")
+                            </dl>
+                        </section>
+                        <section class="sv-sheet-sec">
+                            <h3>@T("colDomains") <span class="sv-dim">@row.Domains.Count</span></h3>
+                            <div class="sv-pill-cloud">
+                                @if (row.Domains.Count == 0) { <span class="sv-dim">@T("unassignedDomain")</span> }
+                                @foreach (var domain in row.Domains)
+                                {
+                                    <a class="chip role-primary" href="@Workbench.Link(DiscoveryWorkbench.DOMAINS, ("domain", domain))">@domain</a>
+                                }
+                            </div>
+                        </section>
+                        <section class="sv-sheet-sec">
+                            <h3>@T("hostFields:roles") <span class="sv-dim">@row.State.RoleIds.Count</span></h3>
+                            <div class="sv-pill-cloud">
+                                @if (row.State.RoleIds.Count == 0) { <span class="sv-dim">@T("notSpecified")</span> }
+                                @foreach (var role in row.State.RoleIds)
+                                {
+                                    <a class="chip mono role-@HealthRole(_snapshot!.RoleById.GetValueOrDefault(role)?.Status)" href="@Workbench.Link(DiscoveryWorkbench.REGISTRY, ("view", "atlas"), ("role", role))">@role</a>
+                                }
+                            </div>
+                        </section>
+                        <div class="sv-sheet-links">
+                            <a class="btn btn-outline btn-sm" href="@Workbench.Link(DiscoveryWorkbench.REGISTRY, ("view", "atlas"), ("app", row.Id))">@T("viewAtlas")</a>
+                            <a class="btn btn-outline btn-sm" href="@Workbench.Link(DiscoveryWorkbench.DEPENDENCIES, ("granularity", "role"), ("q", row.Id))">@T("sheetOpenDeps")</a>
+                            <a class="btn btn-ghost btn-sm" href="@Workbench.Link(DiscoveryWorkbench.HOST)">@T("sheetOpenHost")</a>
+                        </div>
+                        <section class="sv-sheet-sec sv-host-ref">
+                            <header class="sv-host-ref-head"><MoIcon Icon="@MoIcons.Sliders" Size="15px" /><h3>@T("sheetHostConfigRef")</h3></header>
+                            <DiscoveryElectionPolicy Policy="@_snapshot!.Election" Settings="@(Workbench.Settings!)" Compact />
+                        </section>
+                    </div>
+                </MudTabPanel>
+                <MudTabPanel Text="@T("sheetTabMetadata")">
+                    <div class="sv-inspector-scope sv-sheet-tab-content">
+                        @if (row.Instances.Count == 0) { <p class="sv-empty-inline">@T("sheetNoInstances")</p> }
+                        @foreach (var instance in row.Instances)
+                        {
+                            <section class="sv-meta-group">
+                                <header class="sv-meta-group-head"><code>@instance.State.InstanceId</code><DiscoveryBadge Role="@StatusRole(instance.State.Status)">@T("statuses:" + instance.State.Status)</DiscoveryBadge></header>
+                                <DiscoveryMetadata Metadata="@instance.State.Metadata" />
+                            </section>
+                        }
+                    </div>
+                </MudTabPanel>
+            }
+        </TabPanels>
+    </MoSideSheet>
+}
+
+@code {
+    private static readonly string[] Tabs = ["instances", "identity", "metadata"];
+    private string? _id;
+    private ServiceRow? _frozen;
+    private DiscoveryEvidence? _snapshot;
+    private int ActiveTab => Math.Max(0, Array.IndexOf(Tabs, Workbench.Param("tab")));
+    private string? DeleteReason => !Workbench.Autonomous ? T("sheetDeleteDisabledManual")
+        : !Workbench.CanRevoke ? T("leaseAdminUnavailable")
+        : _frozen?.Instances.Any(instance => instance.State.IsLeader) != true ? T("sheetDeleteDisabledNoLeader") : null;
+
+    protected override void OnParametersSet()
+    {
+        var id = Workbench.Param("inspect");
+        if (id == _id && _snapshot is not null) return;
+        _id = id;
+        _snapshot = id is null ? null : Workbench.Evidence;
+        _frozen = id is null ? null : _snapshot?.ServiceById.GetValueOrDefault(id);
+    }
+
+    private void SetTab(int index)
+    {
+        if (_frozen is not null && index >= 0 && index < Tabs.Length && index != ActiveTab)
+            Workbench.Pick("tab", index == 0 ? null : Tabs[index]);
+    }
+
+    private void OnOpenChanged(bool open)
+    {
+        if (!open) Dismiss();
+    }
+
+    private void Dismiss() => Workbench.SetQuery(false, ("inspect", null), ("tab", null));
+
+    private RenderFragment Fact(string label, string? value) => @<div><dt>@T(label)</dt><dd class="mono">@(value ?? "—")</dd></div>;
+    private static string? Address(InstanceState state) =>
+        state.Metadata.GetValueOrDefault("K8S_LISTENING_ADDRESSES") ?? state.Metadata.GetValueOrDefault("LISTENING_ADDRESS");
+}

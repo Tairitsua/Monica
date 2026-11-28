@@ -2,7 +2,7 @@ using System.Reflection;
 using AwesomeAssertions;
 using Microsoft.JSInterop;
 using Monica.Framework.UI.UIBuildingBlocks.Components;
-using Monica.ServiceDiscovery.UIServiceDiscovery.Components;
+using Monica.ServiceDiscovery.UIServiceDiscovery.Workbench;
 using Xunit;
 
 namespace Test.Monica.Framework.UI.Interop;
@@ -12,8 +12,7 @@ public sealed class GraphVisualizationLifetimeTests
     public static TheoryData<Type> GraphTypes => new()
     {
         typeof(BuildingBlockVisualization),
-        typeof(ServiceVisualization),
-        typeof(DomainDependencyVisualization)
+        typeof(DiscoveryDependencyGraph)
     };
 
     [Theory]

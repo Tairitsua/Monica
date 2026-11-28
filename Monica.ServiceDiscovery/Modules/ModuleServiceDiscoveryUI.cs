@@ -49,7 +49,7 @@ public class ModuleServiceDiscoveryUI : MonicaModule<ModuleServiceDiscoveryUIOpt
                     descriptionKey: "Workbench:Views:Registry:Description");
                 navigation.RegisterLocalizedPage<UIServiceDiscoveryAtlasPage, ServiceDiscoveryResource>(
                     UIServiceDiscoveryAtlasPage.PAGE_URL, "Workbench:Views:Atlas:Title", MoIcons.ChartScatter,
-                    category, addToNav: true, navOrder: 41, descriptionKey: "Workbench:Views:Atlas:Description");
+                    category, addToNav: false, navOrder: 41, descriptionKey: "Workbench:Views:Atlas:Description");
                 navigation.RegisterLocalizedPage<UIServiceDiscoveryDependenciesPage, ServiceDiscoveryResource>(
                     UIServiceDiscoveryDependenciesPage.PAGE_URL, "Workbench:Views:Dependencies:Title", MoIcons.Workflow,
                     category, addToNav: true, navOrder: 42, descriptionKey: "Workbench:Views:Dependencies:Description");
@@ -64,10 +64,8 @@ public class ModuleServiceDiscoveryUI : MonicaModule<ModuleServiceDiscoveryUIOpt
 
     public override void ConfigureServices(ModuleContext<ModuleServiceDiscoveryUIOption> context)
     {
-        context.Services.AddScoped<ServiceDiscoveryDomainColorResolver>();
         context.Services.AddScoped<ServiceInstanceEvictionTracker>();
         context.Services.AddScoped<ServiceDiscoveryPageState>();
-        context.Services.AddScoped<CurrentInstanceInfoState>();
     }
 }
 

@@ -1,5 +1,0 @@
-.metadata-urls { min-width: 0; overflow-wrap: anywhere; }
-.metadata-urls ::deep :is(.mud-chip-color-primary, .mud-link) {
-    color: color-mix(in srgb, var(--mud-palette-primary) 60%, var(--mud-palette-text-primary));
-}
-.metadata-urls ::deep .mud-link { min-width: 0; overflow-wrap: anywhere; }

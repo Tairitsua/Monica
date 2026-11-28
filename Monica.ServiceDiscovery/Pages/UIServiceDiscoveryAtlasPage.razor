@@ -1,13 +1,14 @@
 @namespace Monica.ServiceDiscovery.Pages
 @attribute [Route(PAGE_URL)]
-@using Monica.ServiceDiscovery.UIServiceDiscovery.Components
-@using Monica.ServiceDiscovery.Localization
-@using Monica.ServiceDiscovery.Models
-@inject IStringLocalizer<ServiceDiscoveryResource> L
-<PageTitle>@L["Workbench:Views:Atlas:Title"]</PageTitle>
-<DiscoveryWorkbench View="Atlas"><ServiceVisualization OnServiceClick="InspectAsync" /><DiscoveryInspectorHost @ref="_inspector" /></DiscoveryWorkbench>
+@inject NavigationManager Nav
+
 @code {
     public const string PAGE_URL = "/service-discovery-manage/service-map";
-    private DiscoveryInspectorHost? _inspector;
-    private Task InspectAsync(RegisteredServiceStatus service) => _inspector?.ShowAsync(service) ?? Task.CompletedTask;
+
+    protected override void OnInitialized()
+    {
+        var destination = Nav.GetUriWithQueryParameter("view", "atlas");
+        var query = Nav.ToAbsoluteUri(destination).Query;
+        Nav.NavigateTo("service-discovery-manage" + query, new NavigationOptions { ReplaceHistoryEntry = true });
+    }
 }

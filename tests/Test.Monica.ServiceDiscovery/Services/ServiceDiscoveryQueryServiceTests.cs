@@ -30,7 +30,13 @@ public sealed class ServiceDiscoveryQueryServiceTests
         });
         model.Dependencies.Returns(new[] { new ApplicationDependencyDefinition("Roles.Flight", "Flight.FindOwner", typeof(FindUser)) });
         model.GetOperation(typeof(FindUser)).Returns(new ApplicationOperationDefinition(typeof(FindUser),
-            "User.FindUserHandler", "Roles.User", "User", "user.api", null));
+            "User.FindUserHandler", "Roles.User", "User", "user.api", "user.api"));
+        model.LocalHandlers.Returns(new Dictionary<Type, Type> { [typeof(FindUser)] = typeof(FindUser) });
+        var deployment = ApplicationDeployment.Create("combined", new Dictionary<string, ApplicationPlacement>
+        {
+            ["combined"] = new() { Roles = ["flight.api", "user.api"] }
+        });
+        model.Deployment.Returns(deployment);
         var registry = Substitute.For<IRegistrationStateManager>();
         var instances = new List<InstanceState>();
         registry.GetAllInstancesAsync(Arg.Any<CancellationToken>()).Returns(_ => Task.FromResult(instances));
@@ -43,6 +49,9 @@ public sealed class ServiceDiscoveryQueryServiceTests
         edge.SourceDomainId.Should().Be("Flight");
         edge.TargetDomainId.Should().Be("User");
         edge.SourceType.Should().Be("Flight.FindOwner");
+        edge.RequiredRole.Should().Be("user.api");
+        edge.IsLocallyAvailable.Should().BeTrue();
+        combined.Deployment.Should().BeSameAs(deployment);
 
         model.RoleApplications.Returns(new Dictionary<string, string> { ["flight.api"] = "flight", ["user.api"] = "user" });
         instances.AddRange(Enumerable.Range(1, 3).Select(index => new InstanceState

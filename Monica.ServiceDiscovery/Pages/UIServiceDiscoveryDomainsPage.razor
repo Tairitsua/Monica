@@ -1,11 +1,9 @@
 @namespace Monica.ServiceDiscovery.Pages
 @attribute [Route(PAGE_URL)]
-@using Monica.ServiceDiscovery.UIServiceDiscovery.Components
-@using Monica.ServiceDiscovery.Localization
-@inject IStringLocalizer<ServiceDiscoveryResource> L
-<PageTitle>@L["Workbench:Views:Domains:Title"]</PageTitle>
-<DiscoveryWorkbench View="Domains"><DiscoveryDomainsWorkspace SelectedDomainName="@Domain" /></DiscoveryWorkbench>
+@using Monica.ServiceDiscovery.UIServiceDiscovery.Workbench
+
+<DiscoveryWorkbench View="Domains" />
+
 @code {
     public const string PAGE_URL = "/service-discovery-manage/subdomains";
-    [SupplyParameterFromQuery(Name = "domain")] public string? Domain { get; set; }
 }

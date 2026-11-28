@@ -1,0 +1,25 @@
+<div class="sv-search mo-vl-search-clearable">
+    <MoIcon Icon="@MoIcons.Search" Size="15px" />
+    <input @ref="_input" type="search" value="@Value" placeholder="@Label" aria-label="@Label"
+           @oninput="e => ValueChanged.InvokeAsync(e.Value?.ToString() ?? string.Empty)" />
+    @if (!string.IsNullOrEmpty(Value))
+    {
+        <button type="button" class="mo-vl-search-clear" aria-label="@ClearLabel" @onclick="ClearAsync">
+            <MoIcon Icon="@MoIcons.Close" Size="14px" />
+        </button>
+    }
+</div>
+
+@code {
+    [Parameter] public string? Value { get; set; }
+    [Parameter] public EventCallback<string> ValueChanged { get; set; }
+    [Parameter, EditorRequired] public string Label { get; set; } = "";
+    [Parameter, EditorRequired] public string ClearLabel { get; set; } = "";
+    private ElementReference _input;
+
+    private async Task ClearAsync()
+    {
+        await ValueChanged.InvokeAsync(string.Empty);
+        await _input.FocusAsync();
+    }
+}

@@ -1,8 +1,9 @@
 @namespace Monica.ServiceDiscovery.Pages
 @attribute [Route(PAGE_URL)]
-@using Monica.ServiceDiscovery.UIServiceDiscovery.Components
-@using Monica.ServiceDiscovery.Localization
-@inject IStringLocalizer<ServiceDiscoveryResource> L
-<PageTitle>@L["Workbench:Views:Host:Title"]</PageTitle>
-<DiscoveryWorkbench View="Host"><CurrentInstanceInfo /></DiscoveryWorkbench>
-@code { public const string PAGE_URL = "/service-discovery-manage/current-host"; }
+@using Monica.ServiceDiscovery.UIServiceDiscovery.Workbench
+
+<DiscoveryWorkbench View="Host" />
+
+@code {
+    public const string PAGE_URL = "/service-discovery-manage/current-host";
+}

@@ -1,0 +1,40 @@
+@inherits DiscoveryComponent
+
+@{
+    var incoming = FocusRole is { } role ? Call.TargetRole == role && Call.SourceRole != role :
+        FocusApp is { } app && Call.TargetApp == app && Call.SourceApp != app;
+    var peerRole = incoming ? Call.SourceRole : Call.TargetRole;
+    var peerDomain = incoming ? Call.SourceDomain : Call.TargetDomain;
+    var peerApp = incoming ? Call.SourceApp : Call.TargetApp;
+    var peerUrl = peerRole is null ? Workbench.Link(DiscoveryWorkbench.DOMAINS, ("domain", peerDomain)) :
+        Workbench.Link(DiscoveryWorkbench.REGISTRY, ("view", "atlas"), ("role", peerRole));
+}
+
+<div class="sv-rcall-item role-@(Call.Risk is { } risk ? RiskRole(risk) : RoutingRole(Call.Route))">
+    <div class="sv-rcall-top">
+        <span class="sv-rcall-dir" aria-hidden="true">@(incoming ? "←" : "→")</span>
+        <a class="sv-rcall-peer mono" href="@peerUrl">@(peerRole ?? peerDomain)</a>
+        @if (peerApp is not null) { <code class="sv-rcall-app">@peerApp</code> }
+        <DiscoveryBadge Role="@(Call.Risk is { } danger ? RiskRole(danger) : RoutingRole(Call.Route))"
+                        Title="@T(Call.Risk is { } reason ? "routingRisk:" + reason : "depRoutingLabels:" + Call.Route)">
+            @T("depRoutingShort:" + (Call.Risk ?? Call.Route))
+        </DiscoveryBadge>
+    </div>
+    <div class="sv-rcall-op">
+        <code title="@Call.Definition.Operation">@ShortName(Call.Definition.Operation)</code>
+        @if (Call.Definition.RequiredRole is { } required) { <span class="sv-runon-tag mono">[RunOnRole(@required)]</span> }
+        else { <span class="sv-ord-tag">@T("ordinaryContract")</span> }
+    </div>
+    <div class="sv-rcall-meta">
+        <code>@(Call.SourceApp ?? "—") → @(Call.TargetApp ?? "—")</code>
+        <code title="@Call.Definition.SourceType">@ShortName(Call.Definition.SourceType)</code>
+        @if (Call.Remote) { <span>@T("targetInstanceEvidence", Call.TargetInstances)</span> }
+        @if (Call.Route == "local-runonrole") { <span>@T("splitImpact")</span> }
+    </div>
+</div>
+
+@code {
+    [Parameter, EditorRequired] public CallRow Call { get; set; } = default!;
+    [Parameter] public string? FocusRole { get; set; }
+    [Parameter] public string? FocusApp { get; set; }
+}

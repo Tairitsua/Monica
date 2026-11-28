@@ -9,4 +9,8 @@ export function bindEscape(invoker) {
         event.stopPropagation();
         invoker.click();
     }, true);
+
+    if (!dialog.contains(dialog.ownerDocument.activeElement)) {
+        dialog.querySelector(".mo-side-sheet-close:not([disabled])")?.focus({ preventScroll: true });
+    }
 }

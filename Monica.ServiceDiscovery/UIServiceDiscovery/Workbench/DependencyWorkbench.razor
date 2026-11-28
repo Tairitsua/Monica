@@ -1,0 +1,571 @@
+@inherits DiscoveryComponent
+
+<DiscoverySignature Label="@T(Roles ? "depDecisionLabelRole" : "depDecisionLabel")" Value="@(Available ? _pairs.Count(pair => pair.Remote).ToString() : "—")"
+                    Unit="@(Available ? T("depDecisionUnit", _pairs.Count, RemoteCalls, AllCalls) : T("notAvailable"))"
+                    Role="@(_pairs.Any(pair => pair.Severity == 2) ? "error" : _pairs.Any(pair => pair.Severity == 1) ? "warning" : "primary")" Facts="@Facts">
+    <Reasons>
+        @if (Available)
+        {
+            @foreach (var reason in Reasons)
+            {
+                var count = _pairs.Count(pair => Matches(pair, reason.Route));
+                <DiscoveryReason Role="@reason.Role" Count="@count">@T(reason.Label, count)</DiscoveryReason>
+            }
+        }
+    </Reasons>
+    <Finding>
+        @if (!Available)
+        {
+            @T("depNoTopology")
+        }
+        else
+        {
+            <MoRichFinding Template="@T("depFinding")" Values="@FindingSlots" />
+            @foreach (var risk in _pairs.Where(pair => pair.Severity > 0).GroupBy(pair => pair.Calls.First(call => call.Severity == pair.Severity).Risk))
+            {
+                var example = risk.First();
+                <text> </text><MoValueMark Role="@(example.Severity == 2 ? MoVisualRole.Error : MoVisualRole.Warning)" Href="@Workbench.Here(("pair", example.Key), ("focus", null))">
+                    @risk.Count() @T("routingRisk:" + risk.Key) · @example.Source → @example.Target
+                </MoValueMark>
+            }
+        }
+    </Finding>
+</DiscoverySignature>
+
+<section class="sv-dep-workbench @(Expanded ? "is-expanded" : null) @(!Available ? "is-no-topo" : null)" aria-label="@T("depWorkbenchLabel")">
+    @if (Available)
+    {
+        <div class="mo-vl-surface sv-dep-canvas-card">
+            <header class="sv-dep-canvas-head">
+                <div class="sv-dep-canvas-controls">
+                    <div class="seg" role="group" aria-label="@T("depGranularityLabel")">
+                        <button type="button" aria-pressed="@DiscoveryWorkbench.Bool(!Roles)" @onclick="UseDomains"><MoIcon Icon="@MoIcons.Building" Size="15px" />@T("depGranDomain")</button>
+                        <button type="button" aria-pressed="@DiscoveryWorkbench.Bool(Roles)" @onclick="UseRoles"><MoIcon Icon="@MoIcons.Layers" Size="15px" />@T("depGranRole")</button>
+                    </div>
+                    <div class="seg" role="group" aria-label="@T("depFlowTab")">
+                        <button type="button" aria-pressed="@DiscoveryWorkbench.Bool(!Matrix)" @onclick='() => Workbench.Pick("mode", null)'><MoIcon Icon="@MoIcons.Workflow" Size="15px" />@T("depFlowTab")</button>
+                        <button type="button" aria-pressed="@DiscoveryWorkbench.Bool(Matrix)" @onclick='() => Workbench.Pick("mode", "matrix")'><MoIcon Icon="@MoIcons.Grid" Size="15px" />@T("depMatrixTab")</button>
+                    </div>
+                    @if (!Matrix)
+                    {
+                        <div class="seg sv-dep-layout-seg" role="group" aria-label="@T("depLayoutLabel")">
+                            @foreach (var layout in Layouts)
+                            {
+                                <button type="button" aria-pressed="@DiscoveryWorkbench.Bool(Layout == layout)" @onclick='() => Workbench.Pick("layout", layout == "layered" ? null : layout)'>@T("depLayouts:" + layout)</button>
+                            }
+                        </div>
+                    }
+                </div>
+                <div class="sv-dep-canvas-aside">
+                    <a class="btn btn-ghost btn-sm" href="@Workbench.Link(DiscoveryWorkbench.REGISTRY, ("view", "atlas"))"><MoIcon Icon="@MoIcons.ChartScatter" Size="14px" />@T("depOpenDeployAtlas")</a>
+                    <button type="button" class="btn btn-outline btn-sm sv-dep-expand-btn" aria-pressed="@DiscoveryWorkbench.Bool(Expanded)" @onclick='() => Workbench.Pick("expanded", Expanded ? null : "1")'>
+                        <MoIcon Icon="@(Expanded ? MoIcons.Columns : MoIcons.Maximize)" Size="14px" />@T(Expanded ? "depSplitView" : "depExpandCanvas")
+                    </button>
+                </div>
+            </header>
+            @if (_pairs.Count == 0)
+            {
+                <MoContentState><span class="mo-vl-tile role-info"><MoIcon Icon="@MoIcons.Workflow" Size="18px" /></span><h3>@T("depNoPairsTitle")</h3><p>@T("depNoPairsBody")</p></MoContentState>
+            }
+            else if (Matrix)
+            {
+                @MatrixMarkup()
+            }
+            else
+            {
+                <DiscoveryDependencyGraph Model="@_graph" Hover="@_hoverPair" ActiveReadout="@Readout" CanClear="@(Focus is not null || Pair is not null)" Interact="Interact" />
+            }
+        </div>
+    }
+    <aside class="mo-vl-surface sv-dep-dock" aria-label="@T("depLedgerTitle")">
+        <header class="sv-dep-dock-head">
+            <div class="sv-dep-dock-title-row">
+                <div class="sv-dep-dock-title">
+                    <span class="mo-vl-tile role-primary"><MoIcon Icon="@MoIcons.Code" Size="15px" /></span>
+                    <div><h2>@T("depLedgerTitle")</h2><span class="sv-dep-dock-sub mono">@(_visible.Count == _pairs.Count ? T("depDockCountAll", _pairs.Count) : T("depDockCount", _visible.Count, _pairs.Count))</span></div>
+                </div>
+                @if (Unassigned.Count > 0)
+                {
+                    <div class="seg sv-dock-tabs" role="group" aria-label="@T("depLedgerTitle")">
+                        <button type="button" aria-pressed="@DiscoveryWorkbench.Bool(!UnassignedTab)" @onclick='() => Workbench.Pick("dock", null)'>@T("depTabEvidence")</button>
+                        <button type="button" aria-pressed="@DiscoveryWorkbench.Bool(UnassignedTab)" @onclick='() => Workbench.Pick("dock", "unassigned")'>@T("depTabUnassigned", Unassigned.Count)</button>
+                    </div>
+                }
+            </div>
+            @if (Available && !UnassignedTab)
+            {
+                <div class="sv-dep-dock-filters">
+                    <DiscoverySearch Value="@Workbench.Param("q")" Label="@T("depLedgerSearch")" ClearLabel="@T("clearSearch")" ValueChanged='value => Workbench.Pick("q", value.Length == 0 ? null : value, true)' />
+                    <div class="fchips sv-dock-chips" role="group" aria-label="@T("depRoutingAll")">
+                        <MoFilterChip Role="MoVisualRole.Primary" Pill Class="mo-vl-chip--instrument" Label="@T("depRoutingAll")" Count="@_pool.Count" Selected="@(Routing == "all")" SelectedChanged='() => SelectRouting(null)' />
+                        @foreach (var filter in Filters)
+                        {
+                            <MoFilterChip Role="@filter.Role" Pill ShowDot Class="mo-vl-chip--instrument" Label="@T("depFilterShort:" + filter.Key)" Count="@_pool.Count(pair => Matches(pair, filter.Key))"
+                                          Selected="@(Routing == filter.Key)" SelectedChanged="value => SelectRouting(value ? filter.Key : null)" />
+                        }
+                    </div>
+                    @if (Focus is not null || Pair is not null)
+                    {
+                        <div class="sv-dock-context-bar">
+                            @if (Focus is { } focus)
+                            {
+                                <button type="button" class="chip role-primary" @onclick='() => Workbench.Pick("focus", null)'><MoIcon Icon="@MoIcons.Focus" Size="13px" />@T("depFocusNode", focus) ×</button>
+                            }
+                            @if (Pair is { } pair)
+                            {
+                                <button type="button" class="chip role-primary" @onclick='() => Workbench.Pick("pair", null)'><MoIcon Icon="@MoIcons.Link" Size="13px" />@pair ×</button>
+                            }
+                            <button type="button" class="btn btn-ghost btn-sm" @onclick="Reset">@T("depClearFocus")</button>
+                        </div>
+                    }
+                </div>
+            }
+        </header>
+        <div class="sv-dep-dock-body">
+            @if (UnassignedTab && Unassigned.Count > 0)
+            {
+                <div class="sv-dock-unassigned">
+                    <MoSemanticCallout Severity="MoVisualRole.Neutral" Title="@T("depTabUnassigned", Unassigned.Count)">@T("depUnassignedNote", Unassigned.Count)</MoSemanticCallout>
+                    @foreach (var app in Unassigned)
+                    {
+                        <div class="sv-unassigned-item">
+                            <div><a class="sv-row-link" href="@Workbench.Here(("inspect", app.Id), ("tab", null))">@app.Name</a><code class="mono">@app.Id</code></div>
+                            <DiscoveryBadge Role="@StatusRole(app.State.OverallStatus)">@T("statuses:" + app.State.OverallStatus)</DiscoveryBadge>
+                            <span class="mono sv-dim">@app.State.RunningInstanceCount/@app.Instances.Count</span>
+                        </div>
+                    }
+                </div>
+            }
+            else if (_visible.Count == 0)
+            {
+                <MoContentState Compact>
+                    <span class="mo-vl-tile role-neutral"><MoIcon Icon="@MoIcons.Workflow" Size="18px" /></span>
+                    <p>@T(Available ? "depNoLedgerMatch" : "depNoTopology")</p>
+                    @if (HasFilters) { <button type="button" class="btn btn-outline btn-sm" @onclick="Reset">@T("resetFilters")</button> }
+                </MoContentState>
+            }
+            else
+            {
+                <div class="sv-dock-list">
+                    @if (Pair is null && Focus is { } node)
+                    {
+                        @FocusCard(node)
+                        var outgoing = _visible.Where(pair => pair.Source == node).ToArray();
+                        var incoming = _visible.Where(pair => pair.Target == node).ToArray();
+                        @if (outgoing.Length > 0)
+                        {
+                            <div class="sv-dock-group"><h3 class="sv-dock-group-title">@T("depDockOutbound", outgoing.Length)</h3>
+                                @foreach (var pair in outgoing) { @PairCard(pair) }
+                            </div>
+                        }
+                        @if (incoming.Length > 0)
+                        {
+                            <div class="sv-dock-group"><h3 class="sv-dock-group-title">@T("depDockInbound", incoming.Length)</h3>
+                                @foreach (var pair in incoming) { @PairCard(pair) }
+                            </div>
+                        }
+                    }
+                    else
+                    {
+                        @foreach (var pair in _visible) { @PairCard(pair) }
+                    }
+                </div>
+            }
+        </div>
+        <footer class="sv-scope-foot sv-dock-foot"><MoIcon Icon="@MoIcons.Info" Size="14px" /><span>@T("depStaticScopeNote") @T("routingBoundaryNote")</span></footer>
+    </aside>
+</section>
+
+@code {
+    private static readonly string[] Layouts = ["layered", "radial", "force"];
+    private static readonly (string Key, MoVisualRole Role)[] Filters =
+    [
+        ("remote", MoVisualRole.Primary), ("runonrole", MoVisualRole.Info),
+        ("risk", MoVisualRole.Error), ("local", MoVisualRole.Neutral)
+    ];
+    private static readonly (string Route, string Role, string Label)[] Reasons =
+    [
+        ("remote-runonrole", "primary", "depReasonRemoteRunOn"), ("remote-artifact", "third", "depReasonRemoteArtifact"),
+        ("local-runonrole", "info", "depReasonLocalRunOn"), ("local-ordinary", "neutral", "depReasonOrdinary"), ("risk", "error", "depReasonRisk")
+    ];
+    private DiscoveryEvidence Evidence => Workbench.Evidence!;
+    private bool Available => Evidence.Topology.IsAvailable;
+    private bool Roles => Workbench.Param("granularity") == "role";
+    private bool Matrix => Workbench.Param("mode") == "matrix";
+    private bool Expanded => Workbench.Param("expanded") == "1";
+    private bool UnassignedTab => Workbench.Param("dock") == "unassigned";
+    private string Layout => Workbench.Param("layout") is "radial" or "force" ? Workbench.Param("layout")! : "layered";
+    private string Routing => Workbench.Param("routing") ?? Workbench.Param("boundary") ?? "all";
+    private string? Focus => Workbench.Param("focus");
+    private string? Pair => Workbench.Param("pair");
+    private bool HasFilters => Routing != "all" || Focus is not null || Pair is not null || Workbench.Param("q") is not null;
+    private string? _hoverPair;
+    private string? _hoverNode;
+    private (string Source, string Target)? _matrixHover;
+    private (string Source, string Target)? _matrixCursor;
+    private int _matrixMaxCalls = 1;
+    private IReadOnlyList<CallPair> _pairs = [];
+    private IReadOnlyList<CallPair> _pool = [];
+    private IReadOnlyList<CallPair> _visible = [];
+    private IReadOnlyList<CallPair> _canvasPairs = [];
+    private IReadOnlyList<ServiceRow> Unassigned { get; set; } = [];
+    private IReadOnlyList<Node> _nodes = [];
+    private IReadOnlyDictionary<string, CallPair> _pairById = new Dictionary<string,CallPair>();
+    private object _graph = new();
+    private int AllCalls => _pairs.Sum(pair => pair.Calls.Count);
+    private int RemoteCalls => _pairs.Sum(pair => pair.Calls.Count(call => call.Remote));
+
+    private IReadOnlyList<DiscoverySignature.Fact> Facts =>
+    [
+        new("primary", T("depFactRemote"), Count(RemoteCalls), T("depFactRemoteSub", _pairs.Count(pair => pair.Remote))),
+        new("info", T("depFactRunOnRole"), Count(_pairs.Sum(pair => pair.Calls.Count(call => call.Definition.RequiredRole is not null))), T("depFactRunOnRoleSub", _pairs.Count(pair => Matches(pair, "runonrole")))),
+        new("neutral", T("depFactLocalOrdinary"), Count(_pairs.Count(pair => Matches(pair, "local"))), T("depFactLocalOrdinarySub")),
+        new(_pairs.Any(pair => pair.Severity > 0) ? "error" : "success", T("depFactRisk"), Count(_pairs.Count(pair => pair.Severity > 0)), T("depFactRiskSub",
+            _pairs.Count(pair => pair.Calls.Any(call => call.Risk == "target-faulted")),
+            _pairs.Count(pair => pair.Calls.Any(call => call.Risk == "target-offline")),
+            _pairs.Count(pair => pair.Calls.Any(call => call.Risk == "unlisted"))))
+    ];
+
+    private RenderFragment[] FindingSlots =>
+    [
+        @<span>@_pairs.Count</span>,
+        @<MoValueMark Href="@Workbench.Here(("routing", "remote"), ("boundary", null), ("focus", null), ("pair", null))">@T("depRealPairs", _pairs.Count(pair => pair.Remote))</MoValueMark>,
+        @<span>@T("depUnknownPaths", _pairs.Sum(pair => pair.Calls.Count(call => call.Route == "unknown")))</span>
+    ];
+
+    private (string Label, string Role)? Readout
+    {
+        get
+        {
+            if ((_hoverPair ?? Pair) is { } key && _pairById.TryGetValue(key, out var pair))
+                return (T("depReadoutCell", pair.Source, pair.Target, pair.Calls.Count, T("depRoutingLabels:" + Dominant(pair).Route),
+                    string.Join(", ", pair.Calls.Select(call => call.TargetApp).OfType<string>().Distinct())), PairRole(pair));
+            if ((_hoverNode ?? Focus) is { } id && _nodes.FirstOrDefault(node => node.Id == id) is { } node)
+                return (T("depReadoutNode", id, node.DisplayName, node.SvcBadge, node.InboundCalls, node.OutboundCalls), node.NodeRole);
+            return null;
+        }
+    }
+
+    protected override void OnParametersSet()
+    {
+        _pairs = Evidence.Pairs(Roles).ToArray();
+        _pairById = _pairs.ToDictionary(pair => pair.Key, StringComparer.Ordinal);
+        Unassigned = Evidence.Services.Where(service => !service.Offline && service.Domains.Count == 0).ToArray();
+        var text = Workbench.Param("q")?.Trim();
+        _canvasPairs = _pairs.Where(pair => string.IsNullOrEmpty(text) || MatchesSearch(pair, text)).ToArray();
+        _pool = _canvasPairs.Where(pair => (Pair is null || pair.Key == Pair) &&
+            (Focus is not { } focus || pair.Source == focus || pair.Target == focus)).ToArray();
+        _visible = _pool.Where(pair => Matches(pair, Routing)).ToArray();
+        var shown = _canvasPairs.SelectMany(pair => new[] { pair.Source, pair.Target }).ToHashSet(StringComparer.Ordinal);
+        _nodes = shown.Select(id => BuildNode(id, _canvasPairs)).OrderBy(node => !node.IsCatalog)
+            .ThenByDescending(node => node.TotalCalls).ThenBy(node => node.Id, StringComparer.Ordinal).ToArray();
+        _matrixMaxCalls = _canvasPairs.Select(pair => pair.Calls.Count).DefaultIfEmpty(1).Max();
+        if (_matrixCursor is not { } cursor || !shown.Contains(cursor.Source) || !shown.Contains(cursor.Target))
+            _matrixCursor = _nodes.Count == 0 ? null : (_nodes[0].Id, _nodes[Math.Min(1, _nodes.Count - 1)].Id);
+        _graph = new
+        {
+            Nodes = _nodes,
+            Links = _canvasPairs.Select((pair, index) => new
+            {
+                pair.Key, SourceId = pair.Source, TargetId = pair.Target, Count = pair.Calls.Count, EdgeIndex = index,
+                Routing = Dominant(pair).Route, RoutingLabel = T("depRoutingLabels:" + Dominant(pair).Route),
+                Role = PairRole(pair), IsRealRemote = pair.Remote, RunOnRoleCalls = pair.Calls.Count(call => call.Definition.RequiredRole is not null),
+                HasRisk = pair.Severity > 0, HasReverse = _pairById.ContainsKey($"{pair.Target}→{pair.Source}")
+            }).ToArray(),
+            Layout, Granularity = Roles ? "role" : "domain", FocusDomain = Focus, SelectedPairKey = Pair,
+            RoutingFilter = Routing == "local" ? "local" : Routing,
+            Texts = new { AriaLabel = T("depFlowTitle"), TierLabels = new[] { T("depTierUpstream"), T("depTierHubs"), T("depTierTargets") } }
+        };
+    }
+
+    private Node BuildNode(string id, IReadOnlyList<CallPair> pairs)
+    {
+        var role = Roles ? Evidence.RoleById.GetValueOrDefault(id) : null;
+        var domain = Evidence.Domains.FirstOrDefault(item => item.Id == (role?.Domain ?? id));
+        var inbound = pairs.Where(pair => pair.Target == id).Sum(pair => pair.Calls.Count);
+        var outbound = pairs.Where(pair => pair.Source == id).Sum(pair => pair.Calls.Count);
+        var named = domain?.Catalog?.DisplayName ?? domain?.Id ?? id;
+        var catalogued = domain?.Catalog is not null;
+        var unhosted = role is not null ? role.Service?.Offline != false : domain?.Hosts.Count == 0;
+        var faulted = role?.Status == RoleHealthStatus.Faulted || !Roles && domain?.Roles.Any(item => item.Status == RoleHealthStatus.Faulted) == true;
+        var nodeRole = !catalogued ? "warning" : faulted || unhosted ? "error" :
+            role is not null ? HealthRole(role.Status) : domain?.Hosts.Count > 1 ? "third" : "success";
+        return new(id, role is null ? named : $"{named} · {role.App ?? "—"}",
+            role?.App ?? (!catalogued ? T("domUnlistedBadge") : Roles ? T("depDomainCoreCaller") : named != id ? named : T("depCatalogNodeTag")),
+            catalogued, unhosted, faulted, !catalogued ? "?" : faulted ? "503" :
+            role is not null ? T("criticalityShort:" + role.Criticality) : T("depNodeSvcBadge", domain?.Hosts.Count ?? 0),
+            inbound, outbound, inbound + outbound, nodeRole);
+    }
+
+    private static CallRow Dominant(CallPair pair) => pair.Calls.OrderByDescending(call => call.Severity)
+        .ThenByDescending(call => call.Remote).ThenByDescending(call => call.Definition.RequiredRole is not null).First();
+
+    private static string PairRole(CallPair pair) => pair.Severity == 2 ? "error" : pair.Severity == 1 ? "warning" : RoutingRole(Dominant(pair).Route);
+
+    private static bool Matches(CallPair pair, string filter) => filter switch
+    {
+        "all" => true, "remote" => pair.Remote, "risk" => pair.Severity > 0,
+        "runonrole" => pair.Calls.Any(call => call.Definition.RequiredRole is not null),
+        "local" => pair.Calls.Any(call => call.Route == "local-ordinary"),
+        _ => pair.Calls.Any(call => call.Route == filter)
+    };
+
+    private static bool Has(string? value, string q) => value?.Contains(q, StringComparison.OrdinalIgnoreCase) == true;
+
+    private static bool MatchesSearch(CallPair pair, string q) => Has(pair.Source, q) || Has(pair.Target, q) ||
+        pair.Calls.Any(call => Has(call.SourceApp, q) || Has(call.TargetApp, q) || Has(call.Definition.Operation, q) ||
+            Has(call.Definition.SourceType, q) || Has(call.SourceRole, q) || Has(call.TargetRole, q));
+
+    private string Count(int count) => Available ? count.ToString() : "—";
+    private void UseRoles() => Workbench.SetQuery(false, ("granularity", "role"), ("focus", null), ("pair", null));
+    private void UseDomains() => Workbench.SetQuery(false, ("granularity", null), ("focus", null), ("pair", null));
+    private void SelectRouting(string? routing) => Workbench.SetQuery(false, ("routing", routing), ("boundary", null));
+    private void Reset() => Workbench.SetQuery(false, ("routing", null), ("boundary", null), ("focus", null), ("pair", null), ("q", null));
+
+    private void Interact((string Kind, string? Key) interaction)
+    {
+        switch (interaction.Kind)
+        {
+            case "pair": Workbench.SetQuery(false, ("dock", null), ("pair", Pair == interaction.Key ? null : interaction.Key), ("focus", null)); break;
+            case "node": Workbench.SetQuery(false, ("dock", null), ("focus", Focus == interaction.Key ? null : interaction.Key), ("pair", null)); break;
+            case "clear": _hoverPair = null; _hoverNode = null; Workbench.SetQuery(false, ("focus", null), ("pair", null)); break;
+            case "hoverPair": _hoverPair = interaction.Key; break;
+            case "hoverNode": _hoverNode = interaction.Key; break;
+        }
+    }
+
+    private RenderFragment PairCard(CallPair pair) => @<article @key="pair.Key" class="sv-dock-card role-@PairRole(pair) @(pair.Key == Pair ? "is-pinned" : null) @(_hoverPair == pair.Key ? "is-hovered" : null)"
+          @onmouseenter='() => Interact(("hoverPair", pair.Key))' @onmouseleave='() => Interact(("hoverPair", null))'>
+        @{
+            var expanded = pair.Key == Pair;
+            var dominant = Dominant(pair);
+            var unlisted = dominant.Risk == "unlisted";
+            var constrained = pair.Calls.Count(call => call.Definition.RequiredRole is not null);
+            var targetLabel = T(Roles ? "depOpenRoleInAtlas" : "depOpenDomain");
+            var targetHref = Roles
+                ? Workbench.Link(DiscoveryWorkbench.REGISTRY, ("view", "atlas"), ("role", pair.Target))
+                : Workbench.Link(DiscoveryWorkbench.DOMAINS, ("domain", pair.Target));
+        }
+        <div class="sv-dock-card-head">
+            <button type="button" class="sv-dock-card-btn" aria-expanded="@DiscoveryWorkbench.Bool(expanded)" @onclick='() => Workbench.Pick("pair", expanded ? null : pair.Key)'>
+                <MoIcon Icon="@(expanded ? MoIcons.ChevronDown : MoIcons.ChevronRight)" Size="14px" />
+                <span class="sv-dock-pair"><b>@pair.Source</b><span class="sv-dep-arrow" aria-hidden="true">→</span><b class="@(unlisted ? "is-unlisted" : null)">@pair.Target</b></span>
+                <span class="sv-dock-count mono">@pair.Calls.Count</span>
+            </button>
+            <a class="icon-btn sv-dock-go" href="@targetHref" title="@targetLabel" aria-label="@targetLabel"><MoIcon Icon="@MoIcons.ArrowUpRight" Size="14px" /></a>
+        </div>
+        <div class="sv-dock-card-meta">
+            @CompactRoute(dominant)
+            @if (constrained > 0) { <span class="sv-runon-tag mono">[RunOnRole] ×@constrained</span> }
+            <div class="sv-dep-hosts mono">
+                @Hosts(pair.Calls.Select(call => call.SourceApp))
+                <span class="sv-dep-arrow" aria-hidden="true">→</span>
+                @Hosts(pair.Calls.Select(call => call.TargetApp), unlisted)
+            </div>
+        </div>
+        @if (expanded)
+        {
+            <div class="sv-dock-evidence">
+                <ul class="sv-dock-ev-list">
+                    @foreach (var call in pair.Calls)
+                    {
+                        <li class="sv-dock-ev">
+                            <div class="sv-dock-ev-top mono"><span class="sv-dock-ev-op" title="@call.Definition.Operation">@ShortName(call.Definition.Operation)</span>@CompactRoute(call)</div>
+                            <div class="sv-dock-ev-contract mono">
+                                <span class="sv-dock-ev-roles"><span>@(call.SourceRole ?? call.SourceDomain)</span><span aria-hidden="true">→</span><b>@call.TargetRole</b></span>
+                                @if (call.Definition.RequiredRole is { } required) { <span class="sv-runon-tag">[RunOnRole(@required)]</span> }
+                                else { <span class="sv-ord-tag">@T(call.Route == "remote-artifact" ? "depOmittedArtifactTag" : "ordinaryContract")</span> }
+                            </div>
+                            <div class="sv-dock-ev-verdict">
+                                <span>@T("routesVerdict:" + call.Route)
+                                    @if (call.TargetApp is { } target) { <code>@target</code> }
+                                </span>
+                                @if (call.Remote) { <span>@T("targetInstanceEvidence", call.TargetInstances)</span> }
+                                @if (call.Route == "local-runonrole") { <span>@T("splitImpact")</span> }
+                                @if (call.Risk == "target-faulted" && Evidence.RoleById.GetValueOrDefault(call.TargetRole)?.Local is not null)
+                                {
+                                    <a class="sv-rcall-health-link" href="@Workbench.Link("/health-checks/roles", ("role", call.TargetRole))">@T("openLocalRoleHealth")<MoIcon Icon="@MoIcons.ArrowUpRight" Size="12px" /></a>
+                                }
+                            </div>
+                            <div class="sv-dock-ev-caller mono" title="@call.Definition.SourceType">@call.Definition.SourceType</div>
+                        </li>
+                    }
+                </ul>
+            </div>
+        }
+    </article>;
+
+    private RenderFragment CompactRoute(CallRow call) => @<DiscoveryBadge Role="@(call.Risk is { } risk ? RiskRole(risk) : RoutingRole(call.Route))"
+        Title="@T(call.Risk is { } reason ? "routingRisk:" + reason : "depRoutingLabels:" + call.Route)">@T("depRoutingShort:" + (call.Risk ?? call.Route))</DiscoveryBadge>;
+
+    private RenderFragment Hosts(IEnumerable<string?> values, bool unlisted = false) => @<text>
+        @{
+            var apps = values.OfType<string>().Distinct(StringComparer.Ordinal).ToArray();
+        }
+        @foreach (var app in apps)
+        {
+            @if (Evidence.ServiceById.ContainsKey(app))
+            {
+                <a class="sv-host-chip" href="@Workbench.Here(("inspect", app), ("tab", null))">@app</a>
+            }
+            else { <span class="sv-host-chip">@app</span> }
+        }
+        @if (apps.Length == 0) { <span class="sv-host-none">@T(unlisted ? "domUnlistedBadge" : "notSpecified")</span> }
+    </text>;
+
+    private RenderFragment FocusCard(string focus) => @<div class="sv-dock-focus-card">
+        @{
+            var role = Roles ? Evidence.RoleById.GetValueOrDefault(focus) : null;
+            var domainId = role?.Domain ?? focus;
+            var domain = Evidence.Domains.FirstOrDefault(item => item.Id == domainId);
+            var display = domain?.Catalog?.DisplayName ?? domainId;
+        }
+        <div class="sv-dock-focus-top">
+            @if (role is not null)
+            {
+                <div><strong class="mono">@role.Id</strong><code>@display · @T("criticality:" + role.Criticality)</code></div>
+                <DiscoveryBadge Role="@HealthRole(role.Status)">@T("roleHealthShort:" + (role.Status?.ToString() ?? "Unavailable"))</DiscoveryBadge>
+            }
+            else
+            {
+                <div><strong>@display</strong><code class="mono">@domainId</code></div>
+                <a class="btn btn-outline btn-sm" href="@Workbench.Link(DiscoveryWorkbench.DOMAINS, ("domain", domainId))">@T("depOpenDomain")</a>
+            }
+        </div>
+        <div class="sv-dock-focus-owners mono">
+            @if (role is not null)
+            {
+                @Hosts([role.App])
+                <a class="btn btn-outline btn-sm" href="@Workbench.Link(DiscoveryWorkbench.REGISTRY, ("view", "atlas"), ("role", focus))">@T("depOpenRoleInAtlas")</a>
+                @if (role.Local is not null)
+                {
+                    <a class="btn btn-ghost btn-sm" href="@Workbench.Link("/health-checks/roles", ("role", focus))"><MoIcon Icon="@MoIcons.ShieldCheck" Size="13px" />@T("openLocalRoleHealth")</a>
+                }
+            }
+            else if (domain?.Hosts.Count > 0)
+            {
+                @Hosts(domain.Hosts.Select(host => host.Id))
+            }
+            else { <span class="sv-host-none">@T(domain?.Catalog is null ? "domUnlistedBadge" : "expectedOnly")</span> }
+        </div>
+    </div>;
+
+    private RenderFragment MatrixMarkup() => @<div class="sv-mx-in-split" @onmouseleave="ClearMatrixHover">
+        @if (_nodes.Count == 0)
+        {
+            <p class="sv-dim sv-mx-empty">@T("depNoLedgerMatch")</p>
+        }
+        else
+        {
+            <div class="sv-mx-scroll">
+                <table class="sv-mx-table" style="--sv-mx-columns:@_nodes.Count" data-sv-keygrid data-sv-keymatrix
+                       aria-label="@T("depMatrixTitle")" @onkeydown="MatrixEscape">
+                    <colgroup><col class="sv-mx-label-col" /><col span="@_nodes.Count" /></colgroup>
+                    <thead><tr><th class="sv-mx-corner mono" scope="col">@T("depMatrixAxis")</th>
+                        @foreach (var node in _nodes)
+                        {
+                            <th scope="col">
+                                <button type="button" class="sv-mx-colhead @(Focus == node.Id || _matrixHover?.Target == node.Id ? "is-hot" : null) @(node.IsCatalog ? node.IsUnhosted || node.IsFaulted ? "is-unbacked" : null : "is-unlisted")"
+                                        aria-pressed="@DiscoveryWorkbench.Bool(Focus == node.Id)" title="@($"{node.DisplayName} ({node.Id}) · ↓{node.InboundCalls}")"
+                                        @onclick='() => Interact(("node", node.Id))'><span>@node.Id</span></button>
+                            </th>
+                        }
+                    </tr></thead>
+                    <tbody>
+                        @foreach (var source in _nodes)
+                        {
+                            <tr data-sv-keyrow @key="source.Id">
+                                <th scope="row">
+                                    <button type="button" class="sv-mx-rowhead @(Focus == source.Id || _matrixHover?.Source == source.Id ? "is-hot" : null) @(source.IsCatalog ? null : "is-unlisted")"
+                                            aria-pressed="@DiscoveryWorkbench.Bool(Focus == source.Id)" title="@source.DisplayName"
+                                            @onclick='() => Interact(("node", source.Id))'>
+                                        <span class="sv-mx-rowname">@source.Id</span><small class="mono">@source.OutboundCalls</small>
+                                    </button>
+                                </th>
+                                @foreach (var target in _nodes)
+                                {
+                                    var same = source.Id == target.Id;
+                                    var pair = same ? null : _pairById.GetValueOrDefault($"{source.Id}→{target.Id}");
+                                    var dim = Focus is { } focus && focus != source.Id && focus != target.Id || pair is not null && !Matches(pair, Routing);
+                                    var cross = _matrixHover is { } hover && (hover.Source == source.Id || hover.Target == target.Id);
+                                    var selected = pair is not null && Pair == pair.Key;
+                                    var alpha = pair is null ? null : (0.25 + (double)pair.Calls.Count / _matrixMaxCalls * 0.75).ToString("0.##", System.Globalization.CultureInfo.InvariantCulture);
+                                    <td @key="target.Id">
+                                        <button type="button" data-sv-keymark aria-disabled="@(pair is null ? "true" : null)"
+                                                tabindex="@(_matrixCursor == (source.Id, target.Id) ? 0 : -1)"
+                                                aria-pressed="@(pair is null ? null : DiscoveryWorkbench.Bool(selected))"
+                                                aria-label="@($"{source.Id} → {target.Id}: {pair?.Calls.Count ?? 0}")"
+                                                class="sv-mx-cell @(same ? "is-same hatch" : pair is null ? "is-empty" : $"is-filled role-{PairRole(pair)}") @(dim && !same ? "is-dim" : null) @(cross && !same ? "is-cross" : null) @(selected ? "is-selected" : null)"
+                                                style="@(alpha is null ? null : $"--alpha:{alpha}")"
+                                                @onfocus="() => FocusMatrixCell(source.Id, target.Id, pair)" @onmouseenter="() => HoverMatrixCell(source.Id, target.Id, pair)"
+                                                @onclick='() => { if (pair is not null) Interact(("pair", pair.Key)); }'>
+                                            @if (!same) { <span class="mono">@(pair?.Calls.Count.ToString() ?? "·")</span> }
+                                        </button>
+                                    </td>
+                                }
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+            <div class="sv-mx-mobile-list" aria-label="@T("depMatrixTitle")">
+                @foreach (var row in _nodes)
+                {
+                    var calls = _canvasPairs.Where(pair => pair.Source == row.Id).ToArray();
+                    if (calls.Length == 0) continue;
+                    <div class="sv-mx-mrow">
+                        <div class="sv-mx-mrow-src"><b>@row.Id</b><small>@row.Subtitle</small></div>
+                        <div class="sv-mx-mrow-targets">
+                            @foreach (var pair in calls)
+                            {
+                                <button type="button" class="sv-mx-mpill role-@PairRole(pair) @(Pair == pair.Key ? "is-selected" : null) @(!Matches(pair, Routing) ? "is-dim" : null)"
+                                        aria-pressed="@DiscoveryWorkbench.Bool(Pair == pair.Key)" @onclick='() => Interact(("pair", pair.Key))'>
+                                    <span>→ @pair.Target</span><b class="mono">@pair.Calls.Count</b>
+                                </button>
+                            }
+                        </div>
+                    </div>
+                }
+            </div>
+        }
+        <div class="sv-d3-foot">
+            <DiscoveryRoutingLegend />
+            <div class="sv-hz-readout @(Readout is null ? null : "is-active")" role="status" aria-live="polite">
+                <span class="sv-hz-readout-dot role-@(Readout?.Role ?? "neutral")" aria-hidden="true"></span>
+                <span class="mono">@(Readout?.Label ?? T("depGraphReadoutIdle"))</span>
+                @if (Focus is not null || Pair is not null)
+                {
+                    <button type="button" class="btn btn-ghost btn-sm sv-readout-clear" @onclick='() => Interact(("clear", null))'>@T("depClearFocus")</button>
+                }
+            </div>
+        </div>
+    </div>;
+
+    private void FocusMatrixCell(string source, string target, CallPair? pair)
+    {
+        _matrixCursor = (source, target);
+        HoverMatrixCell(source, target, pair);
+    }
+
+    private void HoverMatrixCell(string source, string target, CallPair? pair)
+    {
+        _matrixHover = (source, target);
+        _hoverPair = pair?.Key;
+    }
+
+    private void ClearMatrixHover()
+    {
+        _matrixHover = null;
+        _hoverPair = null;
+    }
+
+    private void MatrixEscape(KeyboardEventArgs args)
+    {
+        if (args.Key != "Escape") return;
+        ClearMatrixHover();
+        Workbench.Pick("pair", null);
+    }
+
+    private sealed record Node(string Id, string DisplayName, string Subtitle, bool IsCatalog, bool IsUnhosted,
+        bool IsFaulted, string SvcBadge, int InboundCalls, int OutboundCalls, int TotalCalls, string NodeRole);
+}

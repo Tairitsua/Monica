@@ -1,0 +1,124 @@
+.sv-inspector-scope {
+    --sv-panel-radius: 12px;
+    --sv-control-radius: 6px;
+    --sv-tile-radius: 8px;
+    --sv-badge-radius: 5px;
+    --sv-rest-shadow: 0 1px 2px color-mix(in srgb, var(--mud-palette-text-primary) 5%, transparent);
+    --sv-ease: cubic-bezier(.2, .7, .2, 1);
+    --sv-fast: 120ms;
+    --mo-vl-role: var(--mud-palette-text-secondary);
+}
+.sv-inspector-scope.sv-sheet-tab-content { display: flex; flex-direction: column; gap: 18px; }
+.sv-inspector-scope ::deep .role-neutral { --mo-vl-role: var(--mud-palette-text-secondary); }
+.sv-inspector-scope ::deep .role-primary { --mo-vl-role: var(--mud-palette-primary); }
+.sv-inspector-scope ::deep .role-info { --mo-vl-role: var(--mud-palette-info); }
+.sv-inspector-scope ::deep .role-success { --mo-vl-role: var(--mud-palette-success); }
+.sv-inspector-scope ::deep .role-warning { --mo-vl-role: var(--mud-palette-warning); }
+.sv-inspector-scope ::deep .role-error { --mo-vl-role: var(--mud-palette-error); }
+.sv-inspector-scope ::deep .role-third { --mo-vl-role: var(--mo-color-role-third); }
+.sv-inspector-scope ::deep .mono, .sv-inspector-scope ::deep code { font-family: var(--mo-font-family-mono); font-variant-numeric: tabular-nums; }
+.sv-inspector-scope ::deep .chip { display: inline-flex; align-items: center; gap: 5px; min-height: 22px; max-width: 100%; padding: 1px 7px; border-radius: var(--sv-badge-radius); background: color-mix(in srgb, var(--mo-vl-role) 11%, var(--mud-palette-surface)); color: color-mix(in srgb, var(--mo-vl-role) 72%, var(--mud-palette-text-primary)); font-size: 12px; line-height: 1.5; overflow-wrap: anywhere; }
+.sv-inspector-scope ::deep .chip.is-outline { background: var(--mud-palette-surface); box-shadow: inset 0 0 0 1px var(--mud-palette-lines-default); color: var(--mud-palette-text-secondary); }
+.sv-inspector-scope ::deep .chip.is-mono { font-family: var(--mo-font-family-mono); font-size: 11.5px; }
+.sv-inspector-scope ::deep .status { display: inline-flex; align-items: center; gap: 7px; color: color-mix(in srgb, var(--mo-vl-role) 72%, var(--mud-palette-text-primary)); font-weight: 500; }
+.sv-inspector-scope ::deep .status.is-pill { min-height: 24px; padding: 1px 8px; border-radius: 999px; background: color-mix(in srgb, var(--mo-vl-role) 10%, var(--mud-palette-surface)); font-size: 12px; }
+.sv-inspector-scope ::deep .status-dot { flex: none; width: 7px; height: 7px; border-radius: 2px; background: var(--mo-vl-role); }
+.sv-inspector-scope ::deep .status-dot.is-live { box-shadow: 0 0 0 2px color-mix(in srgb, var(--mo-vl-role) 14%, transparent); }
+.sv-inspector-scope ::deep .sw { display: inline-block; flex: none; width: 10px; height: 10px; border-radius: 3px; background: var(--mo-vl-role); }
+.sv-inspector-scope ::deep .sw.is-diamond, .sv-inspector-scope ::deep .status-dot.is-diamond { transform: rotate(45deg) scale(.9); }
+.sv-inspector-scope ::deep .sw.is-hatch, .sv-inspector-scope ::deep .hatch { background: repeating-linear-gradient(135deg, color-mix(in srgb, var(--mud-palette-text-secondary) 40%, transparent) 0 1.5px, transparent 1.5px 5px), color-mix(in srgb, var(--mud-palette-text-secondary) 8%, transparent); }
+.sv-inspector-scope ::deep .btn { display: inline-flex; align-items: center; justify-content: center; gap: 7px; min-height: 34px; padding: 0 12px; border: 0; border-radius: var(--sv-control-radius); color: var(--mud-palette-text-primary); font-size: 13px; font-weight: 550; text-align: center; text-decoration: none; }
+.sv-inspector-scope ::deep .btn:disabled { opacity: .5; cursor: default; }
+.sv-inspector-scope ::deep .btn-sm { min-height: 28px; padding: 0 10px; font-size: 12.5px; }
+.sv-inspector-scope ::deep .btn-primary { background: var(--mud-palette-primary); color: var(--mud-palette-primary-text); }
+.sv-inspector-scope ::deep .btn-primary:hover:not(:disabled) { background: var(--mud-palette-primary-darken); color: var(--mud-palette-primary-text); }
+.sv-inspector-scope ::deep .btn-outline { background: var(--mud-palette-surface); box-shadow: inset 0 0 0 1px var(--mud-palette-lines-inputs), var(--sv-rest-shadow); }
+.sv-inspector-scope ::deep .btn-outline:hover:not(:disabled) { background: color-mix(in srgb, var(--mud-palette-text-primary) 4%, var(--mud-palette-surface)); }
+.sv-inspector-scope ::deep .btn-soft { background: color-mix(in srgb, var(--mo-vl-role) 12%, var(--mud-palette-surface)); color: color-mix(in srgb, var(--mo-vl-role) 72%, var(--mud-palette-text-primary)); }
+.sv-inspector-scope ::deep .btn-soft:hover:not(:disabled) { background: color-mix(in srgb, var(--mo-vl-role) 19%, var(--mud-palette-surface)); }
+.sv-inspector-scope ::deep .btn-ghost { color: var(--mud-palette-text-secondary); }
+.sv-inspector-scope ::deep .btn-ghost:hover:not(:disabled) { background: var(--mud-palette-action-default-hover); color: var(--mud-palette-text-primary); }
+.sv-inspector-scope ::deep .kv { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); column-gap: 22px; margin: 0; }
+.sv-inspector-scope ::deep .kv > div { display: grid; grid-template-columns: minmax(92px, 36%) minmax(0, 1fr); align-items: baseline; gap: 10px; min-width: 0; padding: 9px 0; border-bottom: 1px dashed var(--mud-palette-divider); }
+.sv-inspector-scope ::deep .kv.is-single { grid-template-columns: minmax(0, 1fr); }
+.sv-inspector-scope ::deep .kv.is-single > div { grid-template-columns: 112px minmax(0, 1fr); }
+.sv-inspector-scope ::deep .kv dt { color: var(--mud-palette-text-secondary); font-size: 12.5px; }
+.sv-inspector-scope ::deep .kv dd { display: flex; align-items: center; flex-wrap: wrap; gap: 4px 8px; min-width: 0; margin: 0; font-size: 13px; overflow-wrap: anywhere; }
+.sv-inspector-scope ::deep .kv code, .sv-inspector-scope ::deep .mono { overflow-wrap: anywhere; }
+
+
+.sv-inspector-scope ::deep .sv-sheet-head-top { display: flex; align-items: flex-start; gap: 12px; }
+.sv-inspector-scope ::deep .sv-sheet-id { flex: 1; min-width: 0; }
+.sv-inspector-scope ::deep .sv-sheet-eyebrow-row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.sv-inspector-scope ::deep .sv-sheet-id h2 { margin-top: 3px; border-radius: 4px; font-size: 18px; font-weight: 600; line-height: 1.25; letter-spacing: -.015em; overflow-wrap: anywhere; }
+.sv-inspector-scope ::deep .sv-sheet-id h2:focus-visible { outline-offset: 3px; }
+.sv-inspector-scope ::deep .sv-sheet-sub { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-top: 4px; color: var(--mud-palette-text-secondary); font-size: 12px; }
+.sv-sheet-eyebrow { color: var(--mud-palette-text-secondary); font-size: 11.5px; line-height: 1.35; }
+.sv-sheet-capture { padding: 0 22px 10px; }
+.sv-sheet-frozen-line { color: var(--mud-palette-text-secondary); font-size: 12px; line-height: 1.5; }
+@media (max-width: 560px) {
+    .sv-sheet-capture { padding-inline: 16px; }
+}
+
+
+.sv-inspector-scope ::deep .sv-sheet-tab-content { display: flex; flex-direction: column; gap: 18px; }
+.sv-inspector-scope ::deep .sv-sheet-note { color: var(--mud-palette-text-secondary); font-size: 12.5px; line-height: 1.6; }
+.sv-inspector-scope ::deep .sv-sheet-sec h3 { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; font-size: 13.5px; font-weight: 600; }
+.sv-inspector-scope ::deep .sv-pill-cloud { display: flex; flex-wrap: wrap; gap: 6px; }
+.sv-inspector-scope ::deep .sv-sheet-links { display: flex; flex-wrap: wrap; gap: 8px; }
+.sv-inspector-scope ::deep .sv-host-ref { padding: 14px 16px; border-radius: 10px; background: var(--mud-palette-background); box-shadow: inset 0 0 0 1px var(--mud-palette-divider); }
+.sv-inspector-scope ::deep .sv-host-ref-head { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; color: var(--mud-palette-text-secondary); }
+.sv-inspector-scope ::deep .sv-host-ref-head h3 { margin: 0; font-size: 12.5px; color: var(--mud-palette-text-primary); }
+
+.sv-inspector-scope ::deep .sv-inst-cards { display: flex; flex-direction: column; gap: 12px; }
+.sv-inspector-scope ::deep .sv-inst-card { display: flex; flex-direction: column; gap: 12px; padding: 14px 16px; border-radius: 10px; background: var(--mud-palette-background); box-shadow: inset 0 0 0 1px var(--mud-palette-divider); }
+.sv-inspector-scope ::deep .sv-inst-card.is-self { background: color-mix(in srgb, var(--mud-palette-info) 6%, var(--mud-palette-surface)); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--mud-palette-info) 44%, transparent); }
+.sv-inspector-scope ::deep .sv-inst-card.is-evicted { box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--mud-palette-warning) 45%, transparent); }
+.sv-inspector-scope ::deep .sv-inst-card-head { display: flex; flex-wrap: wrap; align-items: flex-start; justify-content: space-between; gap: 8px 12px; }
+.sv-inspector-scope ::deep .sv-inst-id-block { display: flex; flex-direction: column; gap: 6px; min-width: 0; flex: 1; }
+.sv-inspector-scope ::deep .sv-inst-id-row { display: flex; align-items: center; gap: 6px; min-width: 0; }
+.sv-inspector-scope ::deep .sv-inst-id { font-size: 12.5px; font-weight: 600; overflow-wrap: anywhere; }
+.sv-inspector-scope ::deep .sv-inst-badges { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.sv-inspector-scope ::deep .sv-ev-time { color: color-mix(in srgb, var(--mud-palette-warning) 78%, var(--mud-palette-text-primary)); font-size: 11.5px; }
+
+.sv-inspector-scope ::deep .sv-mini-runway { display: flex; flex-direction: column; gap: 4px; }
+.sv-inspector-scope ::deep .sv-mini-track { position: relative; height: 8px; border-radius: 4px; background: var(--mud-palette-surface); box-shadow: inset 0 0 0 1px var(--mud-palette-divider); overflow: hidden; }
+.sv-inspector-scope ::deep .sv-mini-warn-zone { position: absolute; top: 0; bottom: 0; background: color-mix(in srgb, var(--mud-palette-warning) 14%, transparent); }
+.sv-inspector-scope ::deep .sv-mini-fill { position: absolute; top: 0; bottom: 0; left: 0; border-radius: 4px; background: var(--mo-vl-role); }
+.sv-inspector-scope ::deep .sv-mini-mark { position: absolute; top: 0; bottom: 0; width: 1.5px; background: var(--mud-palette-warning); }
+.sv-inspector-scope ::deep .sv-mini-axis { display: flex; justify-content: space-between; color: var(--mud-palette-text-secondary); font-size: 10.5px; }
+
+.sv-inspector-scope ::deep .sv-inst-facts { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px 16px; margin: 0; padding-top: 8px; border-top: 1px dashed var(--mud-palette-divider); }
+.sv-inspector-scope ::deep .sv-inst-facts > div { min-width: 0; }
+.sv-inspector-scope ::deep .sv-inst-facts dt { color: var(--mud-palette-text-secondary); font-size: 11.5px; }
+.sv-inspector-scope ::deep .sv-inst-facts dd { margin: 2px 0 0; font-size: 12px; color: var(--mud-palette-text-primary); overflow-wrap: anywhere; }
+
+.sv-inspector-scope ::deep .sv-sheet-danger { display: flex; flex-direction: column; gap: 10px; padding: 14px 16px; border-radius: 10px; background: color-mix(in srgb, var(--mud-palette-error) 5%, var(--mud-palette-surface)); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--mud-palette-error) 22%, transparent); }
+.sv-inspector-scope ::deep .sv-sheet-danger-copy h4 { font-size: 13.5px; font-weight: 600; color: var(--mud-palette-text-primary); }
+.sv-inspector-scope ::deep .sv-sheet-danger-copy p { margin-top: 4px; color: var(--mud-palette-text-secondary); font-size: 12px; line-height: 1.55; }
+.sv-inspector-scope ::deep .sv-sheet-danger-act { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
+.sv-inspector-scope ::deep .sv-sheet-hint { color: var(--mud-palette-text-secondary); font-size: 12px; }
+
+.sv-inspector-scope ::deep .sv-meta-group { padding: 14px 16px; border-radius: 10px; background: var(--mud-palette-background); box-shadow: inset 0 0 0 1px var(--mud-palette-divider); }
+.sv-inspector-scope ::deep .sv-meta-group-head { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-bottom: 10px; }
+.sv-inspector-scope ::deep .sv-meta-group-head code { font-size: 12.5px; font-weight: 600; overflow-wrap: anywhere; }
+.sv-inspector-scope ::deep .sv-meta-dl { display: flex; flex-direction: column; gap: 8px; margin: 0; }
+.sv-inspector-scope ::deep .sv-meta-row { display: grid; grid-template-columns: minmax(140px, 34%) minmax(0, 1fr); align-items: baseline; gap: 8px 14px; padding-top: 8px; border-top: 1px dashed var(--mud-palette-divider); }
+.sv-inspector-scope ::deep .sv-meta-row dt { color: var(--mud-palette-text-secondary); font-size: 12px; overflow-wrap: anywhere; }
+.sv-inspector-scope ::deep .sv-meta-row dd { margin: 0; min-width: 0; }
+.sv-inspector-scope ::deep .sv-meta-scalar { display: flex; align-items: center; gap: 6px; font-size: 12.5px; overflow-wrap: anywhere; }
+.sv-inspector-scope ::deep .sv-addr-list { display: flex; flex-wrap: wrap; gap: 6px; }
+.sv-inspector-scope ::deep .sv-addr-chip { display: inline-flex; align-items: center; gap: 4px; padding: 2px 4px 2px 8px; border-radius: var(--sv-badge-radius); background: var(--mud-palette-surface); box-shadow: inset 0 0 0 1px var(--mud-palette-lines-default); font-size: 11.5px; }
+
+.sv-inspector-scope ::deep .sv-empty-inline { display: flex; flex-direction: column; align-items: flex-start; gap: 8px; padding: 16px; border-radius: 10px; background: var(--mud-palette-background); }
+.sv-inspector-scope ::deep .sv-empty-inline.is-lg { padding: 22px; }
+
+.sv-inspector-scope ::deep .sv-dim { color: var(--mud-palette-text-secondary); font-size: 12px; }
+.sv-inspector-scope ::deep .sv-pill-cloud { display: flex; flex-wrap: wrap; gap: 6px; }
+@media (max-width: 600px) {
+    .sv-inspector-scope ::deep .sv-inst-facts { grid-template-columns: minmax(0, 1fr); }
+    .sv-inspector-scope ::deep .sv-meta-row { grid-template-columns: minmax(0, 1fr); gap: 3px; }
+}
+@media (max-width: 420px) {
+    .sv-inspector-scope ::deep .kv.is-single > div { grid-template-columns: minmax(0, 1fr); gap: 3px; }
+}

@@ -15,6 +15,9 @@ public class LeaderState
     /// </summary>
     public DateTime BecomeLeaderTime { get; set; }
 
+    /// <summary>The independently observed provider lease expiry in UTC, when supplied by the authority.</summary>
+    public DateTimeOffset? ExpiresAt { get; set; }
+
     /// <summary>
     /// Application identifier that owns the leader key.
     /// </summary>
