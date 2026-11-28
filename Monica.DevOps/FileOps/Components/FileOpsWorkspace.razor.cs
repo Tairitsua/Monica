@@ -57,7 +57,7 @@ public partial class FileOpsWorkspace
     {
         _controller = Session.Borrow(Facade);
         _dialogs = new(Dialogs, action => InvokeAsync(action));
-        _transfer = new(JS);
+        _transfer = new(JS, $"./{Assets[FileOpsTransferInteropSession.MODULE_ASSET]}");
         Session.Changed += OnControllerChangedAsync;
         Navigation.LocationChanged += OnLocationChanged;
         UpdateEvidence();

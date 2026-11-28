@@ -106,6 +106,8 @@ When page work awaits a native dialog result or JavaScript callback completion, 
 
 ### 2.3 Keep Single Ownership of JS Interop References
 
+Fingerprint collocated JavaScript modules whose exports are called by .NET components. In the owning Razor class library, add a `StaticWebAssetFingerprintPattern` for the scripts with `Expression="#[.{fingerprint}]"`, and resolve their base-relative URL through `Assets` in the importing component. This keeps the module exports paired with the running server code after a deployment. Verify that the host's published static asset manifest includes the fingerprinted endpoint and that the browser imports it with an older module still available at the original URL.
+
 ```csharp
 @implements IAsyncDisposable
 @inject IJSRuntime JSRuntime
@@ -124,7 +126,7 @@ When page work awaits a native dialog result or JavaScript callback completion, 
         // Always observe resource-producing imports so a late result can be disposed.
         var module = await JSRuntime.InvokeAsync<IJSObjectReference>(
             "import",
-            "./component.js");
+            $"./{Assets["_content/YourLibrary/Components/Example.razor.js"]}");
 
         if (_disposed)
         {

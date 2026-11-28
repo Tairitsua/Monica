@@ -9,13 +9,19 @@ namespace Monica.DevOps.FileOps.Support;
 /// and late imports before releasing its module; it never performs DOM cleanup during disposal.</remarks>
 public sealed class FileOpsTransferInteropSession(IJSRuntime runtime) : IAsyncDisposable
 {
-    private const string MODULE_PATH = "./_content/Monica.DevOps/FileOps/Components/FileOpsWorkspace.razor.js";
+    internal const string MODULE_ASSET = "_content/Monica.DevOps/FileOps/Components/FileOpsWorkspace.razor.js";
+    private readonly string _modulePath = $"./{MODULE_ASSET}";
     private readonly object _sync = new();
     private readonly SemaphoreSlim _gate = new(1, 1);
     private readonly HashSet<Task> _users = [];
     private IJSObjectReference? _module;
     private Task? _retirement;
     private bool _retired;
+
+    internal FileOpsTransferInteropSession(IJSRuntime runtime, string modulePath) : this(runtime)
+    {
+        _modulePath = modulePath;
+    }
 
     /// <summary>Buffers the borrowed stream in the browser and initiates a native download.</summary>
     /// <remarks>A true result means initiation, not persisted browser output. Returns false when this visit has
@@ -44,7 +50,7 @@ public sealed class FileOpsTransferInteropSession(IJSRuntime runtime) : IAsyncDi
                 acquired = true;
                 if (!IsRetired())
                 {
-                    _module ??= await runtime.InvokeAsync<IJSObjectReference>("import", MODULE_PATH);
+                    _module ??= await runtime.InvokeAsync<IJSObjectReference>("import", _modulePath);
                     if (!IsRetired())
                     {
                         using var reference = new DotNetStreamReference(descriptor.ContentStream, leaveOpen: true);

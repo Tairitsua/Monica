@@ -18,6 +18,7 @@
 
   <ItemGroup>
     <EmbeddedResource Include="Localization\**\*.json" />
+    <StaticWebAssetFingerprintPattern Include="FileOpsModule" Pattern="FileOps/**/*.razor.js" Expression="#[.{fingerprint}]" />
   </ItemGroup>
 
 </Project>
