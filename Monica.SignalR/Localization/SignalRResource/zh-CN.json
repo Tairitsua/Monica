@@ -71,6 +71,7 @@
     "RefreshConns": "刷新连接快照",
     "Close": "关闭",
     "Copy": "复制",
+    "CopyHost": "复制主机名 {0}",
     "ResetFilters": "重置筛选",
     "None": "无",
     "NotObserved": "尚未观察到",
@@ -204,9 +205,6 @@
     },
     "TrEmpty": "尚无会话事件。连接 Hub、调用方法或发送测试消息后，报文与回调会实时显示在此处。",
     "TrNoMatch": "没有事件符合当前筛选条件。",
-    "TrShowing": "第 {0}–{1} 条，共 {2} 条匹配",
-    "TrPrev": "上一页",
-    "TrNext": "下一页",
     "SdDisplayLabel": "需关注的服务端发送方法",
     "SdDisplayUnit": "/ {0} 个已观察方法",
     "SdReasons": {
@@ -325,7 +323,6 @@
     "CnNoMatch": "没有连接符合当前搜索条件。",
     "CnNoMatchHelp": "搜索涵盖完整连接 ID、用户 ID、用户名以及快照中所有 Claim 类型和值。",
     "CnRowsPerPage": "每页",
-    "CnPageInfo": "第 {0}–{1} 项，共 {2} 项",
     "Sheet": {
       "ConnEyebrow": "冻结连接快照",
       "ConnFrozenTitle": "独立冻结快照",

@@ -4,17 +4,26 @@
 {
     <nav class="mo-compact-pager" aria-label="@L["Pager:Navigation"]">
         <span class="mo-pager-range" role="status">@L["Pager:Range", (Page - 1L) * PageSize + 1, Math.Min((long)Page * PageSize, Total), Total]</span>
-        <div class="mo-pager-controls">
-            <button type="button" aria-label="@L["Pager:Previous"]" title="@L["Pager:Previous"]"
-                    disabled="@(Page <= 1)" @onclick="() => PageChanged.InvokeAsync(Page - 1)">
-                <MoIcon Icon="@MoIcons.ChevronLeft" Size="15px" />
-            </button>
-            <span>@L["Pager:Position", Page, Pages]</span>
-            <button type="button" aria-label="@L["Pager:Next"]" title="@L["Pager:Next"]"
-                    disabled="@(Page >= Pages)" @onclick="() => PageChanged.InvokeAsync(Page + 1)">
-                <MoIcon Icon="@MoIcons.ChevronRight" Size="15px" />
-            </button>
-        </div>
+        @if (PageSizeContent is not null || ShowPageNavigation)
+        {
+            <div class="mo-pager-controls">
+                @PageSizeContent
+                @if (ShowPageNavigation)
+                {
+                    <button type="button" aria-label="@L["Pager:Previous"]" title="@L["Pager:Previous"]"
+                            aria-disabled="@(Page <= 1 ? "true" : null)" tabindex="@(Page <= 1 ? "-1" : null)"
+                            @onclick="() => RequestPageAsync(Page - 1)">
+                        <MoIcon Icon="@MoIcons.ChevronLeft" Size="15px" />
+                    </button>
+                    <span>@L["Pager:Position", Page, Pages]</span>
+                    <button type="button" aria-label="@L["Pager:Next"]" title="@L["Pager:Next"]"
+                            aria-disabled="@(Page >= Pages ? "true" : null)" tabindex="@(Page >= Pages ? "-1" : null)"
+                            @onclick="() => RequestPageAsync(Page + 1)">
+                        <MoIcon Icon="@MoIcons.ChevronRight" Size="15px" />
+                    </button>
+                }
+            </div>
+        }
     </nav>
 }
 
@@ -27,8 +36,18 @@
     [Parameter, EditorRequired] public int Total { get; set; }
     /// <summary>Show the range and disabled controls for a single page. Defaults to false.</summary>
     [Parameter] public bool ShowSinglePage { get; set; }
+    /// <summary>When showing a single page, include its disabled navigation controls. Defaults to true.</summary>
+    [Parameter] public bool ShowSinglePageControls { get; set; } = true;
+    /// <summary>Optional page-size selector. The caller updates the size and bounds the page.</summary>
+    [Parameter] public RenderFragment? PageSizeContent { get; set; }
+
     /// <summary>Requests a one-based page. Callers own navigation and selection.</summary>
     [Parameter] public EventCallback<int> PageChanged { get; set; }
 
+    private Task RequestPageAsync(int requested) => requested >= 1 && requested <= Pages
+        ? PageChanged.InvokeAsync(requested)
+        : Task.CompletedTask;
+
+    private bool ShowPageNavigation => Pages > 1 || ShowSinglePageControls;
     private int Pages => 1 + (Total - 1) / PageSize;
 }

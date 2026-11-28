@@ -44,7 +44,7 @@ Build a small state check for each changed control. Compare the actual paint at 
 
 When a row sits flush inside a rounded list, match the selection and focus paint to the list's inner radius, which accounts for its border width. Inspect the painted corners on the first, last and only rows. Scroll a selected row to the visible edge and check the result in both themes.
 
-Compare the visible shape and optical center of each colored marker against its adjacent text, including rows with mixed font sizes and wrapped labels. Reuse one nominal size for markers with the same role within a group. Preserve meaningful shapes such as severity diamonds. If the prototype marker sits low against the text or the group no longer aligns with a wide heading, correct the alignment in the shared marker or its owning layout. Check the group again after reflow.
+Compare the visible shape and optical center of each colored marker against its adjacent text, including rows with mixed font sizes and wrapped labels. Reuse one nominal size for markers with the same role within a group. Preserve meaningful shapes such as severity diamonds. If the prototype marker sits low against the text or the group no longer aligns with a wide heading, correct the alignment in the shared marker or its owning layout. Check the group again after reflow, including patterned status dots in both themes and languages at phone width.
 
 Record paired captures of the populated inventory including its last row, the compact record arrangement, the opened inspector at the top and bottom, and the decision actions. Compare field placement, row height, label/value order and available commands before tuning paint. Inspect combinations of independent state signals in the same cell. For example, an active database session keeps its info-colored state pill while its lock wait uses a separate error-colored line. Include the ordinary, waiting and unknown cases in the comparison. Choose the reflow from the component's usable width, then verify actual columns and cell formatting at that boundary.
 
@@ -52,11 +52,16 @@ For a portaled inspector, inspect the generated portal root and measure the titl
 
 Open every changed picker, select and menu during browser review. Check its theme, localized calendar and control text, viewport containment, keyboard selection/dismissal and restored focus. Exercise clearing, invalid input and accepted changes; verify that a date/time selection retains required seconds and uses the declared timezone rather than the browser's timezone. Correct an obvious prototype alignment defect instead of turning it into an acceptance target.
 
+Before accepting a workbench replica, exercise these paths when the corresponding controls are present:
+
+- Copy a complete identifier from the masthead or an open sheet with `MoCopyButton`. Test both a successful write and a browser without the Clipboard API or permission. Check the localized result and operate another control immediately afterward to verify the circuit stays interactive.
+- Focus a specific record link and press Enter. Check the intended initial focus inside the sheet, dismiss with Escape, then verify the exact opener has focus and Tab advances from that record. Repeat from a direct detail URL, which has no launching control. A visible sheet and a working Close button alone do not establish keyboard continuity.
+- Compare the navigation at the same usable phone width in both locales. Count links per row and measure the rail height. Start with the shared navigation's natural wrapping. A page can avoid horizontal overflow and still waste a row by forcing every link into a column.
+- Exercise the pager with zero, one and multiple pages. Check the range, page-size selector when present, and previous/next boundaries. Inside a sheet, reach the last page from the keyboard and press Escape without refocusing the sheet. Follow the URL through a page change and a narrower filter. Preserve the caller's query keys, single-page policy and other selections when adopting `MoCompactPager`.
+
 ## Feed verified results back into the skill route
 
 Keep the executable asset in its production owner and its usage guidance in the corresponding `monica-infra-*` reference. Add or update a read-when route when an agent would otherwise miss it. Authoring procedure belongs here; recurring visual failure checks belong in `monica-ui-audit`; palette grammar belongs in the shared visual language. Update the existing explanation rather than creating a second component manual or a new skill for each primitive.
-
-For compact registry controls, exercise a real copy from a focused evidence sheet and dismiss the sheet with Escape directly afterward. Verify that an empty filter hides its pager, a single page follows the page's range policy, and moving past the first page preserves the owning URL or local index. Check patterned status dots in both themes and languages at phone width.
 
 After a verified extraction or repeated defect, complete the same change with the relevant usage example, selection boundary and regression check. Run the canonical skill validators and projection workflow described in `CONTRIBUTING.md`, and run `scripts/check_knowledge_impact.py --base <base-ref>`. Review representative tasks from entrypoint to component use; mechanical checks do not establish that the prose describes the right behavior.
 

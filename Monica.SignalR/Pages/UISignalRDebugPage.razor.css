@@ -515,16 +515,6 @@
     -webkit-box-orient: vertical;
     overflow: hidden;
  }
-.signalr-family ::deep .sr-trace-foot {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    justify-content: space-between;
-    gap: 8px;
-    padding: 10px 20px;
-    border-top: 1px solid var(--mud-palette-divider);
-    background: var(--mud-palette-background-gray);
- }
 .signalr-family ::deep .sr-trace-empty {  align-items: flex-start;  }
 .signalr-family ::deep .sr-spread {
     display: flex;
@@ -785,19 +775,6 @@
     font-weight: 500;
  }
 .signalr-family ::deep .sr-sort:hover {  color: var(--mud-palette-text-primary);  }
-.signalr-family ::deep .sr-table-foot {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    justify-content: space-between;
-    gap: 10px 16px;
-    padding: 12px 20px;
-    border-top: 1px solid var(--mud-palette-divider);
-    background: var(--mud-palette-background-gray);
- }
-.signalr-family ::deep .sr-pager-right {  display: flex; flex-wrap: wrap; align-items: center; gap: 12px;  }
-.signalr-family ::deep .sr-size-pick {  display: inline-flex; align-items: center; gap: 6px;  }
-.signalr-family ::deep .sr-pager-btns {  display: inline-flex; align-items: center; gap: 6px;  }
 @container page (max-width: 1040px) { .signalr-family ::deep .sr-decision {  grid-template-columns: minmax(0, 1fr); gap: 14px; padding: 20px;  }
 .signalr-family ::deep .sr-conduit {  padding: 16px 20px;  }
 .signalr-family ::deep .sr-conduit-top {  grid-template-columns: minmax(0, 1fr); gap: 14px;  }

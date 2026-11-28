@@ -64,7 +64,8 @@
                             </li>
                         }
                     </ul>
-                    @if (method.TargetMetrics.Count > 5) { <div class="sr-pager"><span class="sr-muted">@T("Workspace:CnPageInfo", (TargetPage - 1) * 5 + 1, Math.Min(TargetPage * 5, method.TargetMetrics.Count), method.TargetMetrics.Count)</span><div class="sr-pager-btns"><button class="sr-evidence-action" disabled="@(TargetPage <= 1)" @onclick='() => Context.Set("targetPage", (TargetPage - 1).ToString())'>@T("Workspace:TrPrev")</button><button class="sr-evidence-action" disabled="@(TargetPage * 5 >= method.TargetMetrics.Count)" @onclick='() => Context.Set("targetPage", (TargetPage + 1).ToString())'>@T("Workspace:TrNext")</button></div></div> }
+                    <MoCompactPager Page="@TargetPage" PageSize="5" Total="@method.TargetMetrics.Count"
+                                    PageChanged='page => Context.Set("targetPage", page.ToString(CultureInfo.InvariantCulture))' />
                     </section>
                 }
             }

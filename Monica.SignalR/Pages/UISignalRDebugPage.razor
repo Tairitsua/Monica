@@ -27,7 +27,9 @@
                 <Meta>
                     <SignalRBadge Status="true" Text="@(InitialFailed ? T("Workspace:LoadFailedTitle") : InitialLoading ? T("Workspace:LoadingTitle") : T($"Workspace:Status:{PageState.ConnectionState.Status}"))"
                                   Role="@(InitialFailed ? MoVisualRole.Error : Stale ? MoVisualRole.Warning : SignalRDiagnosticRules.StatusRole(PageState.ConnectionState.Status))" Live="@(PageState.ConnectionState.IsConnected && !Stale && !InitialFailed)" />
-                    <button type="button" class="mo-vl-capsule mo-vl-capsule--outline mono" title="@T("Workspace:Copy")" @onclick="CopyHostAsync"><MoIcon Icon="@MoIcons.Server" Size="13px" />@Environment.MachineName</button>
+                    <MoCopyButton Value="@Environment.MachineName" Label="@T("Workspace:CopyHost", Environment.MachineName)">
+                        <MoIcon Icon="@MoIcons.Server" Size="13px" /><span class="mono">@Environment.MachineName</span>
+                    </MoCopyButton>
                     <span class="mo-vl-capsule mo-vl-capsule--outline" title="@UiTime.TimeZone.Id">@T("Workspace:Tz") @UiTime.FormatZoneLabel(CapturedAt)</span>
                 </Meta>
                 <Actions>
@@ -87,8 +89,6 @@
     private DateTimeOffset? CapturedAt => (PageIndex == 1 ? PageState.SendDiagnostics?.SnapshotTimeUtc : PageIndex == 2 ? PageState.ConnectedUsersCapturedAtUtc : PageState.HubsCapturedAtUtc) is { } value ? new DateTimeOffset(value) : null;
     private DateTimeOffset? RetainedAt => new[] { PageState.HubsLoadFailed ? PageState.HubsCapturedAtUtc : null, PageState.ConnectedUsersLoadFailed ? PageState.ConnectedUsersCapturedAtUtc : null, PageState.SendDiagnosticsLoadFailed ? PageState.SendDiagnostics?.SnapshotTimeUtc : null }.Min() is { } value ? new DateTimeOffset(value) : null;
     private MoVisualRole SendBadgeRole => PageState.SendDiagnostics is not { IsEnabled: true } snapshot ? MoVisualRole.Neutral : snapshot.TotalFailedCount > 0 ? MoVisualRole.Error : snapshot.PendingSendCount > 0 ? MoVisualRole.Info : Attention > 0 ? MoVisualRole.Warning : MoVisualRole.Success;
-    [Inject] private IJSRuntime Js { get; set; } = null!;
-    private Task CopyHostAsync() => Js.InvokeVoidAsync("navigator.clipboard.writeText", Environment.MachineName).AsTask();
     private Task RefreshAsync() => RunOperationAsync(async () =>
     {
         if (_refreshing) return;

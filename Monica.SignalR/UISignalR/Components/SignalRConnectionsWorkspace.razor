@@ -39,7 +39,22 @@ else
                     <tr class="@(connection.ConnectionId == S.ConnectionState.ConnectionId ? "is-browser-row" : null)" @key="connection.ConnectionId"><td data-label="@T("Workspace:CnCols:ConnId")"><div class="sr-conn-id-cell"><code class="mono sr-break">@connection.ConnectionId</code><MoCopyButton Value="@connection.ConnectionId" Label="@T("Workspace:Copy")" />@if (connection.ConnectionId == S.ConnectionState.ConnectionId) { <SignalRBadge Text="@T("Workspace:CnThisBrowser")" Role="MoVisualRole.Primary" /> }</div></td><td data-label="@T("Workspace:CnCols:User")" class="is-name"><div class="sr-user-cell"><b>@(connection.UserName ?? T("Workspace:None"))</b>@if (sessions > 1) { <SignalRBadge Text="@T("Workspace:CnMultiTag", sessions)" Role="MoVisualRole.Info" /> }</div><small class="mono sr-break">@(connection.UserId ?? T("Workspace:None"))</small></td><td data-label="@T("Workspace:CnCols:ConnectedAt")" class="sr-time-cell"><time class="mono" datetime="@connection.ConnectionTime.ToString("O")">@UiTime.Format(connection.ConnectionTime)</time><small class="sr-muted">@Age(connection.ConnectionTime, S.ConnectedUsersCapturedAtUtc)</small></td><td data-label="@T("Workspace:CnCols:AuthClaims")"><div class="sr-auth-cell"><SignalRBadge Status="true" Text="@T(connection.IsAuthenticated ? "Workspace:Auth:Authenticated" : "Workspace:Auth:Unauthenticated")" Role="@(connection.IsAuthenticated ? MoVisualRole.Success : MoVisualRole.Neutral)" /><span class="sr-muted mono">@T("Workspace:CnClaimsCount", connection.Claims.Count)</span></div></td><td data-label="@T("Workspace:CnCols:Actions")" class="is-num"><button class="sr-btn sr-btn-sm mo-vl-soft-action mo-vl-role--primary" @onclick='() => Context.Set("conn", connection.ConnectionId, true)'>@T("Workspace:CnInspect")<MoIcon Icon="@MoIcons.ChevronRight" Size="13px" /></button></td></tr>
                 }
             </tbody></table></div>
-            <footer class="sr-table-foot"><span class="sr-muted">@T("Workspace:CnPageInfo", (Page - 1) * Size + 1, Math.Min(Page * Size, Filtered.Count), Filtered.Count)</span><div class="sr-pager-right"><div class="sr-size-pick"><span class="sr-muted">@T("Workspace:CnRowsPerPage")</span><MudSelect T="int" Value="@Size" ValueChanged='value => Change("size", value.ToString())' Variant="Variant.Outlined" Margin="Margin.Dense" aria-label="@T("Workspace:CnRowsPerPage")" OpenIcon="@MoIcons.ChevronDown" CloseIcon="@MoIcons.ChevronUp">@foreach (var size in new[] { 10, 20, 50 }) { <MudSelectItem Value="@size">@size</MudSelectItem> }</MudSelect></div>@if (Filtered.Count > Size) { <div class="sr-pager-btns"><button class="sr-btn sr-btn-outline sr-btn-sm" disabled="@(Page <= 1)" @onclick='() => Context.Set("page", (Page - 1).ToString())'>@T("Workspace:TrPrev")</button><button class="sr-btn sr-btn-outline sr-btn-sm" disabled="@(Page * Size >= Filtered.Count)" @onclick='() => Context.Set("page", (Page + 1).ToString())'>@T("Workspace:TrNext")</button></div> }</div></footer>
+            <MoCompactPager Page="@Page" PageSize="@Size" Total="@Filtered.Count" ShowSinglePage="true" ShowSinglePageControls="false"
+                            PageChanged='page => Context.Set("page", page.ToString(CultureInfo.InvariantCulture))'>
+                <PageSizeContent>
+                    <div class="sr-size-pick">
+                        <span class="sr-muted">@T("Workspace:CnRowsPerPage")</span>
+                        <MudSelect T="int" Value="@Size" ValueChanged='value => Change("size", value.ToString(CultureInfo.InvariantCulture))'
+                                   Variant="Variant.Outlined" Margin="Margin.Dense" aria-label="@T("Workspace:CnRowsPerPage")"
+                                   OpenIcon="@MoIcons.ChevronDown" CloseIcon="@MoIcons.ChevronUp">
+                            @foreach (var size in new[] { 10, 20, 50 })
+                            {
+                                <MudSelectItem Value="@size">@size</MudSelectItem>
+                            }
+                        </MudSelect>
+                    </div>
+                </PageSizeContent>
+            </MoCompactPager>
         }
     </section>
 }

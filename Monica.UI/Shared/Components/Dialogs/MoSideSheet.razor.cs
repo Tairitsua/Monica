@@ -1,6 +1,5 @@
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Web;
-using Microsoft.JSInterop;
 using MudBlazor;
 
 namespace Monica.UI.Shared.Components.Dialogs;
@@ -98,7 +97,6 @@ public partial class MoSideSheet : IAsyncDisposable
     private readonly string _headingId = $"mo-side-sheet-heading-{Guid.NewGuid():N}";
     private readonly SemaphoreSlim _lifecycle = new(1, 1);
     private MudDialog? _dialog;
-    private MudIconButton? _closeButton;
     private IDialogReference? _reference;
     private Task? _retirement;
     private bool _retired, _dismissed, _requestedOpen;
@@ -121,12 +119,7 @@ public partial class MoSideSheet : IAsyncDisposable
     /// <inheritdoc />
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
-        if (_retired) return;
-        if (IsHosted)
-        {
-            if (firstRender) await FocusCloseAsync();
-            return;
-        }
+        if (_retired || IsHosted) return;
         await _lifecycle.WaitAsync();
         try
         {
@@ -134,10 +127,7 @@ public partial class MoSideSheet : IAsyncDisposable
             if (Open && !_dismissed)
             {
                 if (_reference is null || _reference.Result.IsCompleted)
-                {
                     _reference = await _dialog!.ShowAsync();
-                    if (Open) await FocusCloseAsync();
-                }
                 if (!_retired && Open) return;
             }
             if (_reference is not null)
@@ -147,13 +137,6 @@ public partial class MoSideSheet : IAsyncDisposable
             }
         }
         finally { _lifecycle.Release(); }
-    }
-
-    private async Task FocusCloseAsync()
-    {
-        if (_retired || !FocusCloseOnOpen || !Dismissible || _closeButton is null) return;
-        try { await _closeButton.FocusAsync(); }
-        catch (JSDisconnectedException) { }
     }
 
     private async Task OnVisibilityChangedAsync(bool visible)

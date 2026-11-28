@@ -71,6 +71,7 @@
     "RefreshConns": "Refresh connections",
     "Close": "Close",
     "Copy": "Copy",
+    "CopyHost": "Copy host name {0}",
     "ResetFilters": "Reset filters",
     "None": "None",
     "NotObserved": "Not observed",
@@ -204,9 +205,6 @@
     },
     "TrEmpty": "No events recorded yet. Connect to a hub, invoke a method, or send a quick message to watch wire frames arrive here.",
     "TrNoMatch": "No trace events match these filters.",
-    "TrShowing": "Events {0}–{1} of {2} matching",
-    "TrPrev": "Prev",
-    "TrNext": "Next",
     "SdDisplayLabel": "Server send methods needing attention",
     "SdDisplayUnit": "/ {0} observed methods",
     "SdReasons": {
@@ -325,7 +323,6 @@
     "CnNoMatch": "No connections match this search.",
     "CnNoMatchHelp": "Search covers complete connection and user IDs, user names, and supplied claim types and values.",
     "CnRowsPerPage": "Rows",
-    "CnPageInfo": "{0}–{1} of {2}",
     "Sheet": {
       "ConnEyebrow": "Detached connection snapshot",
       "ConnFrozenTitle": "Frozen point-in-time copy",

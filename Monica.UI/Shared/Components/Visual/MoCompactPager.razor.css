@@ -10,8 +10,8 @@
     font: 500 .75rem/1.4 var(--mo-font-family-mono);
     font-variant-numeric: tabular-nums;
 }
-.mo-pager-controls { display: flex; gap: 8px; align-items: center; margin-inline-start: auto; }
-.mo-pager-controls button {
+.mo-pager-controls { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-inline-start: auto; }
+.mo-pager-controls > button {
     display: grid;
     place-items: center;
     width: 30px;
@@ -22,6 +22,6 @@
     background: var(--mud-palette-surface);
     cursor: pointer;
 }
-.mo-pager-controls button:hover:enabled { color: var(--mud-palette-primary); background: var(--mud-palette-action-default-hover); }
-.mo-pager-controls button:focus-visible { outline: 2px solid var(--mud-palette-primary); outline-offset: 2px; }
-.mo-pager-controls button:disabled { border-color: var(--mud-palette-divider); color: var(--mud-palette-action-disabled); cursor: default; }
+.mo-pager-controls > button:not([aria-disabled="true"]):hover { color: var(--mud-palette-primary); background: var(--mud-palette-action-default-hover); }
+.mo-pager-controls > button:focus-visible { outline: 2px solid var(--mud-palette-primary); outline-offset: 2px; }
+.mo-pager-controls > button[aria-disabled="true"] { border-color: var(--mud-palette-divider); color: var(--mud-palette-action-disabled); cursor: default; }

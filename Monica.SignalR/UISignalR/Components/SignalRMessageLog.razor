@@ -26,7 +26,8 @@
                 <li class="sr-trace-item @(type == "Error" ? "is-err" : null)" @key="message.Id"><button type="button" class="sr-trace-btn" @onclick='() => Context.Set("event", message.Id, true)'><div class="sr-trace-meta"><SignalRBadge Text="@T($"Workspace:TrTypes:{type}")" Role="@SignalRDiagnosticRules.TraceRole(type)" Icon="@Icon(type)" /><time class="mono" datetime="@message.Timestamp.ToString("O")" title="@UiTime.Format(message.Timestamp)">@UiTime.FormatTime(message.Timestamp)</time><span class="sr-trace-src">@Source(message.Source)</span><MoIcon Icon="@MoIcons.ChevronRight" Size="14px" Class="sr-trace-chev" /></div><p class="sr-trace-text mono">@message.Content</p></button></li>
             }
         </ol>
-        <footer class="sr-trace-foot"><span class="sr-muted">@T("Workspace:TrShowing", (Page - 1) * 20 + 1, Math.Min(Page * 20, Filtered.Count), Filtered.Count)</span>@if (Filtered.Count > 20) { <div class="sr-pager-btns"><button class="sr-btn sr-btn-outline sr-btn-sm" disabled="@(Page <= 1)" @onclick='() => Context.Set("tracePage", (Page - 1).ToString())'>@T("Workspace:TrPrev")</button><button class="sr-btn sr-btn-outline sr-btn-sm" disabled="@(Page * 20 >= Filtered.Count)" @onclick='() => Context.Set("tracePage", (Page + 1).ToString())'>@T("Workspace:TrNext")</button></div> }</footer>
+        <MoCompactPager Page="@Page" PageSize="20" Total="@Filtered.Count" ShowSinglePage="true" ShowSinglePageControls="false"
+                        PageChanged='page => Context.Set("tracePage", page.ToString(CultureInfo.InvariantCulture))' />
     }
 </section>
 

@@ -2,7 +2,7 @@
 @inject IStringLocalizer<SharedResource> L
 
 <MudDialog @ref="_dialog" VisibleChanged="OnVisibilityChangedAsync" Options="CurrentOptions"
-           DefaultFocus="@(FocusCloseOnOpen && Dismissible ? DefaultFocus.None : DismissRequested.HasDelegate ? DefaultFocus.FirstChild : null)" OnBackdropClick="BackdropHandler"
+           DefaultFocus="@(FocusCloseOnOpen && Dismissible ? DefaultFocus.Element : DismissRequested.HasDelegate ? DefaultFocus.FirstChild : null)" OnBackdropClick="BackdropHandler"
            Gutters="false" TitleClass="pa-0" ContentClass="mo-side-sheet-content" ActionsClass="mo-side-sheet-footer"
            Class="@($"mo-side-sheet {(Compact ? "mo-side-sheet--compact" : null)} {(InsetHeader ? "mo-side-sheet--inset-header" : null)} {(WrapTabs ? "mo-side-sheet--wrap-tabs" : null)}")"
            Style="@($"--mo-side-sheet-width: {Width}; --mo-side-sheet-expanded-width: {ExpandedWidth ?? Width};")"
@@ -14,7 +14,7 @@
                 @if (TitleContent is not null) { @TitleContent }
                 else { <h2>@Title</h2> }
             </div>
-            <MudIconButton @ref="_closeButton" Class="mo-side-sheet-close" Icon="@MoIcons.Close" Disabled="@(!Dismissible)"
+            <MudIconButton Class="mo-side-sheet-close" Icon="@MoIcons.Close" Disabled="@(!Dismissible)"
                            aria-label="@(CloseLabel ?? L["Common:Close"].Value)" OnClick="CloseAsync" />
         </div>
         @if (HeaderContent is not null)
@@ -23,7 +23,7 @@
         }
     </TitleContent>
     <DialogContent>
-        <MoSideSheetPolicy Options="CurrentOptions" DismissRequested="EscapeHandler" />
+        <MoSideSheetPolicy Options="CurrentOptions" DismissRequested="EscapeHandler" FocusCloseOnOpen="@(FocusCloseOnOpen && Dismissible)" />
         @if (TabPanels is not null)
         {
             <MudTabs Class="mo-side-sheet-tabs" ActivePanelIndex="ActiveTabIndex" ActivePanelIndexChanged="ActiveTabIndexChanged"

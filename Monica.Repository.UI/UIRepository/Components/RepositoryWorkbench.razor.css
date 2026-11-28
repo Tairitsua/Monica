@@ -273,7 +273,6 @@
 @container repository-workbench (max-width: 520px) {
     .rp-page ::deep .rp-stamp { text-align: start; }
     .rp-page ::deep .rp-mh .mo-vl-title { font-size: 24px; }
-    .rp-page ::deep .mo-workbench-navigation { align-items: flex-start; flex-direction: column; }
     .rp-page ::deep :is(.rp-decision, .rp-topo, .rp-ruler, .rp-mtrack) { padding: 15px 14px; }
     .rp-page ::deep .rp-facts { grid-template-columns: repeat(2, minmax(0, 1fr)); }
     .rp-page ::deep .rp-facts > div { padding: 10px 14px; }

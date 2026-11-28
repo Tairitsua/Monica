@@ -125,6 +125,8 @@ Store actual command outcomes before the follow-up evidence refresh. `Repository
 
 Cancellation can interrupt observation after database changes committed. Provider/service catches may return failed data; cancellation between bulk visits can instead become a failed facade envelope without the partial result list. Cancellation or missing outcomes are not rollback evidence. Refresh migration history before deciding whether another attempt is needed.
 
+On a narrow workbench, the related-route links wrap to the available width. To inspect successive database sessions with the keyboard, focus a session link, press Enter, read the sheet and press Escape. Focus returns to the same session link while that row remains present.
+
 ## Preserve UI lifetime ownership
 
 `RepositoryDashboardState` is scoped to the circuit and borrowed by the three workbenches. It serializes selection, reads, and commands through one gate and rechecks the caller's token before adopting results. This coordination applies within one circuit.
