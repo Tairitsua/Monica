@@ -152,7 +152,7 @@
                                             <span>@T("atlasRolesCount", roles.Length) · @T("atlasRemoteEdgeFoot", Model.Calls.Count(call => call.SourceApp == app.Id && call.Remote), Model.Calls.Count(call => call.TargetApp == app.Id && call.Remote))</span>
                                             @if (addresses.FirstOrDefault() is { } address)
                                             {
-                                                <code title="@string.Join(", ", addresses)">@address@(addresses.Length > 1 ? $" +{addresses.Length - 1}" : null)</code>
+                                                <code title="@string.Join(", ", addresses.Select(ListeningAddressLabel))">@ListeningAddressLabel(address)@(addresses.Length > 1 ? $" +{addresses.Length - 1}" : null)</code>
                                             }
                                         </footer>
                                     </article>

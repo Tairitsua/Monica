@@ -57,7 +57,8 @@ public partial class DiscoveryWorkbench : IAsyncDisposable
     private bool IsEndpoint => View == "Endpoints";
     private string? Error => IsEndpoint ? _endpointError : Membership?.Error;
     private DateTimeOffset? CapturedAt => IsEndpoint ? Endpoints?.CapturedAt : Evidence?.At is { } at ? new DateTimeOffset(at) : null;
-    private string StorageKey => Settings?.ExternalStateStoreServiceKey ?? nameof(ModuleServiceDiscovery);
+    private string? ExternalStorageKey => Settings is { StorageMode: ServiceDiscoveryStorageMode.ExternalKeyed } settings
+        ? settings.ExternalStateStoreServiceKey : null;
     private (string Key, string Role) Posture => (Error, CapturedAt, IsEndpoint, Autonomous, CanPoll && Auto) switch
     {
         (not null, null, _, _, _) => ("failedStatus", "error"),

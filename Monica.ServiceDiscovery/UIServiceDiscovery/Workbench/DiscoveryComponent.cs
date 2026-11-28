@@ -88,13 +88,20 @@ public abstract class DiscoveryComponent : ComponentBase
 
     private protected static bool IsListeningAddress(string key) => key is "K8S_LISTENING_ADDRESSES" or "LISTENING_ADDRESS";
 
-    private protected string[] ListeningAddresses(ServiceRow service) =>
+    private protected Uri[] ListeningAddresses(ServiceRow service) =>
         Workbench.UiSettings?.DisableListeningAddressDisplay == true ? [] : service.Instances
             .SelectMany(instance => instance.State.Metadata
                 .Where(entry => IsListeningAddress(entry.Key))
                 .SelectMany(entry => entry.Value.Split([';', ','], StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries)))
-            .Where(value => Uri.TryCreate(value, UriKind.Absolute, out var uri) && uri.Scheme is "http" or "https")
-            .Distinct(StringComparer.Ordinal).ToArray();
+            .Select(value => Uri.TryCreate(value, UriKind.Absolute, out var address) && address.Scheme is "http" or "https"
+                && address.Host.Length > 0 && address.Port > 0 && address.UserInfo.Length == 0 ? address : null)
+            .OfType<Uri>().DistinctBy(address => address.AbsoluteUri, StringComparer.Ordinal).ToArray();
+
+    private protected static string ListeningAddressLabel(Uri address)
+    {
+        var authority = address.GetComponents(UriComponents.SchemeAndServer | UriComponents.StrongPort, UriFormat.UriEscaped);
+        return authority + (address.PathAndQuery == "/" ? string.Empty : address.PathAndQuery) + address.Fragment;
+    }
 
     private protected static bool RetainedPrior(ServiceEndpointSnapshot target) =>
         target.Resolution is "Failed" or "Timeout" && target.ResolvedAt is not null && target.Candidates.Count != 0;

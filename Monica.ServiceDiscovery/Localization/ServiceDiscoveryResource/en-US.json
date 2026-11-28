@@ -112,6 +112,7 @@
     "confirmReleaseBody": "Gracefully resign leadership on {0}? Lease renewal will stop and leader-scoped work will be cancelled while takeover awaits natural TTL expiry.",
     "confirmReleaseTitle": "Release local leader status",
     "confirmReleaseWarn": "A successor can acquire leadership after the current lease expires.",
+    "copyStoreKey": "Copy storage key {0}",
     "copyId": "Copy App ID",
     "coverage": {
       "shared": "Multi-hosted",
@@ -529,6 +530,7 @@
     "notCaptured": "Not captured",
     "notSpecified": "Not specified",
     "onlyRegistered": "With instances only",
+    "openOtherDomains": "View the other {0} subdomains",
     "openLocalRoleHealth": "Open role health",
     "ordinaryContract": "Ordinary",
     "paused": "Manual snapshot",
@@ -553,6 +555,15 @@
       "Title": "Service registry"
     },
     "registryPolicyHint": "Evaluated against each instance's reported policy when available",
+    "regFindingBuildCount": "{0} different builds",
+    "regFindingDisappeared": "This session observed {0}, including for {1}.",
+    "regFindingDisappearedCount": "{0} instances disappear from the registry",
+    "regFindingError": "{0}. Inspect {1} for its registration status.",
+    "regFindingOffline": "{0}, including {1}.",
+    "regFindingOfflineCount": "{0} predefined without live instances",
+    "regFindingOverdue": "{0}. The oldest heartbeat for {1} is {2}s old against a {3}s registration TTL.",
+    "regFindingOverdueCount": "{0} overdue instance heartbeats",
+    "regFindingSkew": "{0} runs {1} ({2}).",
     "regReasonDisappeared": "Observed disappeared {0}",
     "regReasonError": "Service errors {0}",
     "regReasonOffline": "Predefined offline {0}",
@@ -647,6 +658,11 @@
       "Distributed": "Distributed state store",
       "ExternalKeyed": "External keyed state store",
       "Memory": "Process-local memory store"
+    },
+    "storageScopeModes": {
+      "Distributed": "Distributed",
+      "ExternalKeyed": "External keyed store",
+      "Memory": "In-process memory"
     },
     "thisHostTag": "This host",
     "ttlFormula": "{0} × {1} + {2} = {3} s",

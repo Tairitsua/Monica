@@ -20,11 +20,15 @@ else
     else
     {
         <DiscoverySignature Label="@T("regDecisionLabel")" Value="@Model.Attention.ToString()" Unit="@T("regDecisionUnit", Model.Services.Count)"
-                            Role="@(Offline > 0 ? "error" : Model.Attention > 0 ? "warning" : "success")" Facts="@Facts">
+                            Role="@(Offline > 0 || Errors > 0 ? "error" : Model.Attention > 0 ? "warning" : "success")" Facts="@Facts">
             <Reasons>
                 <DiscoveryReason Role="error" Count="@Offline">@T("regReasonOffline", Offline)</DiscoveryReason>
                 <DiscoveryReason Role="warning" Count="@Overdue">@T("regReasonOverdue", Overdue)</DiscoveryReason>
                 <DiscoveryReason Role="warning" Count="@Skew">@T("regReasonSkew", Skew)</DiscoveryReason>
+                @if (Errors > 0)
+                {
+                    <DiscoveryReason Role="error" Count="@Errors">@T("regReasonError", Errors)</DiscoveryReason>
+                }
                 <DiscoveryReason Role="info" Count="@Updating">@T("regReasonUpdating", Updating)</DiscoveryReason>
                 <DiscoveryReason Role="neutral" Count="@Disappearances">@T("regReasonDisappeared", Disappearances)</DiscoveryReason>
             </Reasons>
@@ -35,10 +39,9 @@ else
                 }
                 else
                 {
-                    @foreach (var cause in Causes())
+                    @foreach (var finding in Findings())
                     {
-                        <MoValueMark Role="@cause.Role" Href="@Workbench.Here(("inspect", cause.Service.Id), ("tab", null))">@cause.Copy · @cause.Service.Name</MoValueMark>
-                        <text> </text>
+                        @finding@(" ")
                     }
                 }
             </Finding>
@@ -130,7 +133,9 @@ else
                                                 }
                                                 @if (row.Domains.Count > 3)
                                                 {
-                                                    <a class="sv-dom-more" href="@Workbench.Here(("inspect", row.Id), ("tab", "identity"))">+@(row.Domains.Count - 3)</a>
+                                                    var remaining = row.Domains.Count - 3;
+                                                    <a class="sv-dom-more" aria-label="@T("openOtherDomains", remaining)"
+                                                       href="@Workbench.Here(("inspect", row.Id), ("tab", "identity"))"><span>+@remaining</span></a>
                                                 }
                                             </div>
                                         }
@@ -172,9 +177,23 @@ else
                                         else { <span>@(row.Versions.FirstOrDefault() is { } version ? $"v{version}" : "—")</span> }
                                     </td>
                                     <td data-label="@T("colEndpoints")" class="sv-cell-addr mono">
-                                        <span class="sv-addr-one" title="@string.Join(", ", addresses)">@(addresses.FirstOrDefault() ?? "—")
-                                            @if (addresses.Length > 1) { <b class="sv-addr-more">+@(addresses.Length - 1)</b> }
-                                        </span>
+                                        @if (addresses.Length == 0)
+                                        {
+                                            <span class="sv-dim">—</span>
+                                        }
+                                        else
+                                        {
+                                            <ul class="sv-reg-addresses">
+                                                @foreach (var address in addresses)
+                                                {
+                                                    <li>
+                                                        <a class="sv-reg-address" href="@address.AbsoluteUri" target="_blank" rel="noopener noreferrer">
+                                                            <span>@ListeningAddressLabel(address)</span><MoIcon Icon="@MoIcons.ArrowUpRight" Size="12px" />
+                                                        </a>
+                                                    </li>
+                                                }
+                                            </ul>
+                                        }
                                         @foreach (var tag in metadata)
                                         {
                                             <div class="sv-registry-meta"><small>@tag.Key</small> <code title="@tag.Value">@tag.Value</code></div>
@@ -218,13 +237,15 @@ else
     private int Overdue => Model.Services.Count(service => service.Overdue);
     private int Skew => Model.Services.Count(service => service.Skew);
     private int Updating => Model.Services.Count(service => service.State.OverallStatus == ServiceStatus.Updating);
+    private int Errors => Model.Services.Count(service => service.State.OverallStatus == ServiceStatus.Error);
+    private int OverdueInstances => Instances.Count(IsOverdue);
     private int Disappearances => Model.Services.Sum(service => service.State.EvictedInstances.Count);
 
     private IReadOnlyList<DiscoverySignature.Fact> Facts =>
     [
         new("success", T("regFactRegistered"), $"{Model.Services.Count - Offline}/{Model.Services.Count}", T("regFactRegisteredSub", Offline)),
         new("primary", T("regFactInstances"), Instances.Count.ToString(), T("regFactInstancesSub", Instances.Count(instance => instance.State.IsLeader), Instances.Count(instance => instance.Health == "Healthy"))),
-        new(Overdue > 0 ? "warning" : "neutral", T("regFactOverdue"), Instances.Count(instance => instance.Health is "Unhealthy" or "Offline").ToString(), T("registryPolicyHint")),
+        new(Overdue > 0 ? "warning" : "neutral", T("regFactOverdue"), OverdueInstances.ToString(), T("registryPolicyHint")),
         new(Disappearances > 0 ? "warning" : "neutral", T("regFactDisappeared"), Disappearances.ToString(), T("regFactDisappearedSub"), Disappearances == 0)
     ];
 
@@ -254,21 +275,56 @@ else
 
     private void Reset() => Workbench.SetQuery(false, ("q", null), ("status", null), ("domain", null), ("registered", null));
 
-    private IEnumerable<(MoVisualRole Role, ServiceRow Service, string Copy)> Causes()
+    private IEnumerable<RenderFragment> Findings()
     {
-        foreach (var (predicate, role, label) in new (Func<ServiceRow, bool>, MoVisualRole, string)[]
+        var services = Model.Services;
+        if (services.FirstOrDefault(row => row.Offline) is { } offline)
         {
-            (row => row.Offline, MoVisualRole.Error, "regReasonOffline"),
-            (row => row.Overdue, MoVisualRole.Warning, "regReasonOverdue"),
-            (row => row.Skew, MoVisualRole.Warning, "regReasonSkew"),
-            (row => row.State.OverallStatus == ServiceStatus.Error, MoVisualRole.Error, "regReasonError"),
-            (row => row.State.EvictedInstances.Count != 0, MoVisualRole.Neutral, "regReasonDisappeared")
-        })
+            yield return MoRichFinding.Compose(T("regFindingOffline"),
+                FindingMark(MoVisualRole.Error, T("regFindingOfflineCount", Offline)),
+                FindingMark(MoVisualRole.Error, offline.Name, offline.Id));
+        }
+
+        var oldest = services.SelectMany(service => service.Instances.Where(IsOverdue)
+                .Select(instance => (Service: service, Instance: instance)))
+            .OrderByDescending(item => item.Instance.Age).FirstOrDefault();
+        if (oldest.Instance is { } heartbeat)
         {
-            var rows = Model.Services.Where(predicate).ToArray();
-            if (rows.Length > 0) yield return (role, rows[0], T(label, rows.Length));
+            yield return MoRichFinding.Compose(T("regFindingOverdue"),
+                FindingMark(MoVisualRole.Warning, T("regFindingOverdueCount", OverdueInstances)),
+                FindingMark(MoVisualRole.Warning, oldest.Service.Name, oldest.Service.Id),
+                FindingText(Num(heartbeat.Age)), FindingText(Num(heartbeat.Ttl)));
+        }
+
+        if (services.FirstOrDefault(row => row.Skew) is { } skew)
+        {
+            yield return MoRichFinding.Compose(T("regFindingSkew"),
+                FindingMark(MoVisualRole.Warning, skew.Name, skew.Id),
+                FindingMark(MoVisualRole.Warning, T("regFindingBuildCount", skew.Versions.Count)),
+                FindingText(string.Join(" / ", skew.Versions)));
+        }
+
+        if (services.FirstOrDefault(row => row.State.OverallStatus == ServiceStatus.Error) is { } failed)
+        {
+            yield return MoRichFinding.Compose(T("regFindingError"),
+                FindingMark(MoVisualRole.Error, T("regReasonError", Errors)),
+                FindingMark(MoVisualRole.Error, failed.Name, failed.Id));
+        }
+
+        if (services.FirstOrDefault(row => row.State.EvictedInstances.Count > 0) is { } disappeared)
+        {
+            yield return MoRichFinding.Compose(T("regFindingDisappeared"),
+                FindingMark(MoVisualRole.Neutral, T("regFindingDisappearedCount", Disappearances)),
+                FindingMark(MoVisualRole.Neutral, disappeared.Name, disappeared.Id));
         }
     }
+
+    private RenderFragment FindingMark(MoVisualRole role, string text, string? appId = null) =>
+        @<MoValueMark Role="@role" Href="@(appId is null ? null : Workbench.Here(("inspect", appId), ("tab", null)))">@text</MoValueMark>;
+
+    private static RenderFragment FindingText(string value) => @<span>@value</span>;
+
+    private static bool IsOverdue(InstanceRow instance) => instance.Health is "Unhealthy" or "Offline";
 
     private IEnumerable<KeyValuePair<string, string>> RegistryMetadata(ServiceRow service)
     {

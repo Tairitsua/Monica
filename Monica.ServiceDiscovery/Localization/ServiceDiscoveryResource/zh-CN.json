@@ -112,6 +112,7 @@
     "confirmReleaseBody": "确定让当前主机 {0} 优雅放弃 Leader 角色？本机将停止租约续约并取消依赖 Leader 的后台任务，等待租约自然过期后由集群接管。",
     "confirmReleaseTitle": "确认释放本机 Leader 状态",
     "confirmReleaseWarn": "当前租约自然到期后，后继实例才能取得 Leader。",
+    "copyStoreKey": "复制存储键 {0}",
     "copyId": "复制 App ID",
     "coverage": {
       "shared": "多服务承载",
@@ -529,6 +530,7 @@
     "notCaptured": "尚未捕获",
     "notSpecified": "未指定",
     "onlyRegistered": "仅含在线实例",
+    "openOtherDomains": "查看其余 {0} 个子域",
     "openLocalRoleHealth": "查看本机角色健康",
     "ordinaryContract": "普通调用",
     "paused": "手动快照",
@@ -553,6 +555,15 @@
       "Title": "服务注册目录"
     },
     "registryPolicyHint": "优先按各实例上报的心跳与 TTL 策略判定",
+    "regFindingBuildCount": "{0} 个混合构建版本",
+    "regFindingDisappeared": "本会话观察到{0}，例如 {1}。",
+    "regFindingDisappearedCount": "{0} 个实例从注册表消失",
+    "regFindingError": "{0}，可查看 {1} 的注册状态。",
+    "regFindingOffline": "{0}，例如 {1}。",
+    "regFindingOfflineCount": "{0} 个预定义服务无在线实例",
+    "regFindingOverdue": "{0}。{1} 最旧的心跳已 {2} 秒未刷新，该实例的注册 TTL 为 {3} 秒。",
+    "regFindingOverdueCount": "{0} 个实例心跳逾期",
+    "regFindingSkew": "{0} 存在{1}（{2}）。",
     "regReasonDisappeared": "曾观察消失 {0}",
     "regReasonError": "服务异常 {0}",
     "regReasonOffline": "预定义离线 {0}",
@@ -647,6 +658,11 @@
       "Distributed": "分布式状态存储",
       "ExternalKeyed": "外部键控状态存储",
       "Memory": "进程内内存状态存储"
+    },
+    "storageScopeModes": {
+      "Distributed": "分布式",
+      "ExternalKeyed": "外部键控存储",
+      "Memory": "进程内存"
     },
     "thisHostTag": "当前主机",
     "ttlFormula": "{0} × {1} + {2} = {3} 秒",

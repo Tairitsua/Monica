@@ -8,11 +8,23 @@
                 <DiscoveryBadge Role="@Posture.Role" Live="@(Posture.Key == "live")">@T(Posture.Key)</DiscoveryBadge>
                 @if (IsEndpoint)
                 {
-                    <span class="chip is-outline is-mono"><MoIcon Icon="@MoIcons.Monitor" Size="13px" /><MoCopyButton Value="@(Endpoints?.Host ?? Environment.MachineName)" Label="@T("copyId")">@T("epHostChip", Endpoints?.Host ?? Environment.MachineName, Endpoints?.ProcessId ?? Environment.ProcessId)</MoCopyButton></span>
+                    <MoCopyButton Value="@(Endpoints?.Host ?? Environment.MachineName)" Label="@T("copyId")">
+                        <MoIcon Icon="@MoIcons.Monitor" Size="13px" />
+                        <code>@T("epHostChip", Endpoints?.Host ?? Environment.MachineName, Endpoints?.ProcessId ?? Environment.ProcessId)</code>
+                    </MoCopyButton>
                 }
-                else
+                else if (ExternalStorageKey is { Length: > 0 } storageKey)
                 {
-                    <span class="chip is-outline is-mono"><MoIcon Icon="@MoIcons.Database" Size="13px" /><MoCopyButton Value="@StorageKey" Label="@T("copyId")">@T("scopeChip", StorageKey)</MoCopyButton></span>
+                    <MoCopyButton Value="@storageKey" Label="@T("copyStoreKey", storageKey)">
+                        <MoIcon Icon="@MoIcons.Database" Size="13px" />
+                        <code>@T("scopeChip", storageKey)</code>
+                    </MoCopyButton>
+                }
+                else if (Settings?.StorageMode is { } storageMode)
+                {
+                    <span class="chip is-outline sv-store-scope">
+                        <MoIcon Icon="@MoIcons.Database" Size="13px" />@T("scopeChip", T("storageScopeModes:" + storageMode))
+                    </span>
                 }
                 <span class="chip is-outline" title="@UiTime.TimeZone.Id">@T("tzChip", UiTime.FormatZoneLabel(CapturedAt))</span>
             </Meta>
