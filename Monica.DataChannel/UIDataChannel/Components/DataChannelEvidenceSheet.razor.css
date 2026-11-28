@@ -551,8 +551,24 @@
 .dc-sheet-body ::deep .dc-kafka-box h4, .dc-sheet-body ::deep .dc-ep-meta h4, .dc-sheet-body ::deep .dc-mw-info h4 { font-size: 12.5px; font-weight: 600; color: var(--mud-palette-text-primary); }
 .dc-sheet-body ::deep .dc-ep-meta, .dc-sheet-body ::deep .dc-mw-info { display: flex; flex-direction: column; gap: 8px; }
 
+.dc-sheet-body ::deep .dc-mw-list,
+.dc-sheet-body ::deep .dc-ex-records {
+    --dc-list-border-width: 1px;
+    --dc-list-radius: 10px;
+    display: flex;
+    flex-direction: column;
+    border: var(--dc-list-border-width) solid var(--mud-palette-divider);
+    border-radius: var(--dc-list-radius);
+    overflow: hidden;
+}
+
+/* Follow the inner edge where the list clips its rows. */
+.dc-sheet-body ::deep .dc-mw-row.is-selected,
+.dc-sheet-body ::deep .dc-ex-rec:is(.is-selected, :focus-visible) {
+    border-radius: calc(var(--dc-list-radius) - var(--dc-list-border-width));
+}
+
 /* Middleware tab */
-.dc-sheet-body ::deep .dc-mw-list { display: flex; flex-direction: column; border: 1px solid var(--mud-palette-divider); border-radius: 10px; overflow: hidden; }
 .dc-sheet-body ::deep .dc-mw-row {
     display: flex;
     flex-wrap: wrap;
@@ -625,11 +641,6 @@
 .dc-sheet-body ::deep .dc-sheet-search { flex: none; }
 
 .dc-sheet-body ::deep .dc-ex-records {
-    display: flex;
-    flex-direction: column;
-    border: 1px solid var(--mud-palette-divider);
-    border-radius: 10px;
-    overflow: hidden;
     max-height: 240px;
     overflow-y: auto;
 }

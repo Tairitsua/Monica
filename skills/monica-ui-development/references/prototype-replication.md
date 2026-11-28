@@ -9,7 +9,7 @@ Before coding, inspect the accepted route, relevant states, native page and stat
 Classify each difference:
 
 - **Geometry or paint:** measure the prototype and rendered native element at the same owner width, locale, theme and state. Correct the existing presentation owner.
-- **Prototype placeholder or defect:** replace unstyled browser controls with existing Monica or MudBlazor controls, and correct clear clipping, misalignment or unequal insets. Preserve the intended information structure and explain material corrections in the change report.
+- **Prototype placeholder or defect:** replace unstyled browser controls with existing Monica or MudBlazor controls. Fix obvious rendering defects during replication, including clipped selection or focus outlines, unintended centering and unequal insets. Preserve the intended information structure and explain material corrections in the change report.
 - **Reusable semantics:** extend a shared component when several real callers need the same contract, then migrate them in the same change.
 - **Business composition:** keep module-specific evidence, data access, state transitions and aggregate calculations with the module. Compose shared primitives around it.
 - **Unavailable evidence or behavior:** verify the backend contract and extend that boundary only when the task requires it. Do not fabricate successful states or complete history to fill the design.
@@ -37,6 +37,8 @@ Measure the page root against its shell content owner at a viewport wide enough 
 Compare the whole control group at matched owner widths, then inspect the painted inner controls. Record field heights, text weight, border contrast, gaps and alignment against neighboring elements. A compact dropdown can retain its native input margin or minimum height after its wrapper has been sized. Use the visible localized option text for intrinsic width, cap it at the group's available width, and check a long option with adjacent metadata. In a ledger, verify the counter's anchor in the heading and the alignment of sort, direction and grouping when the toolbar is on one row and when it wraps. Include the dark-mode border and surface paint in the paired captures.
 
 Build a small state check for each changed control. Compare the actual paint at rest, hover, keyboard focus, press and disabled states. For a compound search, verify the empty field, a draft value, an applied value and clearing. Place Clear inside the field ahead of an explicit Apply action. A field-level clear resets the keyword, while the separate all-filters action resets its own broader scope.
+
+When a row sits flush inside a rounded list, match the selection and focus paint to the list's inner radius, which accounts for its border width. Inspect the painted corners on the first, last and only rows. Scroll a selected row to the visible edge and check the result in both themes.
 
 Compare the visible shape and optical center of each colored marker against its adjacent text, including rows with mixed font sizes and wrapped labels. Reuse one nominal size for markers with the same role within a group. Preserve meaningful shapes such as severity diamonds. If the prototype marker sits low against the text or the group no longer aligns with a wide heading, correct the alignment in the shared marker or its owning layout. Check the group again after reflow.
 
